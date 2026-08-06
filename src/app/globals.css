@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens
+
+   The admin dashboard commits to a single light look (dark sidebar, light
+   content) rather than shipping a half-tuned dark mode, so surfaces are fixed
+   rather than theme-switched.
+
+   Chart colours come from a validated data-viz palette: a single blue series
+   hue, plus reserved status colours that always ship beside a text label so
+   meaning is never carried by colour alone.
+--------------------------------------------------------------------------- */
+@theme {
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Surfaces */
+  --color-plane: #f6f6f5;
+  --color-surface: #ffffff;
+  --color-sidebar: #0c0f16;
+  --color-sidebar-hover: #171b25;
+
+  /* Ink */
+  --color-ink: #0b0b0c;
+  --color-ink-secondary: #55565a;
+  --color-ink-muted: #8a8b90;
+
+  /* Lines */
+  --color-line: #e8e8e5;
+  --color-line-strong: #d8d8d4;
+
+  /* Brand */
+  --color-brand: #a6265c;
+  --color-brand-soft: #fdf2f6;
+
+  /* Data-viz series (single hue — validated on a white surface) */
+  --color-series: #2a78d6;
+  --color-series-soft: #cde2fb;
+
+  /* Status (reserved: never reused as a series colour, always with a label) */
+  --color-good: #0ca30c;
+  --color-good-soft: #e8f7e8;
+  --color-warning: #fab219;
+  --color-warning-soft: #fef6e3;
+  --color-serious: #ec835a;
+  --color-serious-soft: #fdeee7;
+  --color-critical: #d03b3b;
+  --color-critical-soft: #fceaea;
+  --color-good-text: #006300;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-plane);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Numbers that stack in columns must align; standalone figures should not. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: var(--color-brand);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-series);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .card {
+    background: var(--color-surface);
+    border-radius: 0.875rem;
+    box-shadow:
+      0 0 0 1px rgb(11 11 12 / 0.06),
+      0 1px 2px rgb(11 11 12 / 0.04);
+  }
+
+  /* Wide content scrolls inside its own container, never the page body. */
+  .scroll-x {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+}
+
+/* Hide scrollbars on the horizontal filter rails without losing scrollability */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
