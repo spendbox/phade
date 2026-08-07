@@ -17,10 +17,16 @@ create table if not exists public.categories (
   slug        text not null unique,
   description text,
   image_url   text,
+  -- Key into the icon set in src/lib/category-icons.tsx, chosen by the admin.
+  icon        text not null default 'tag',
   sort_order  integer not null default 0,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+
+-- For projects created before category icons existed.
+alter table public.categories
+  add column if not exists icon text not null default 'tag';
 
 -- ---------------------------------------------------------------------------
 -- Products
@@ -200,11 +206,11 @@ create policy "Public read for product images"
   using (bucket_id = 'product-images');
 
 -- ---------------------------------------------------------------------------
--- Starter categories (optional — delete if you prefer to start empty)
+-- Starter categories
 -- ---------------------------------------------------------------------------
-insert into public.categories (name, slug, description, sort_order) values
-  ('Dresses',     'dresses',     'Everyday and occasion dresses',   1),
-  ('Tops',        'tops',        'Blouses, shirts and camisoles',   2),
-  ('Bottoms',     'bottoms',     'Trousers, skirts and shorts',     3),
-  ('Accessories', 'accessories', 'Bags, jewellery and scarves',     4)
+insert into public.categories (name, slug, description, icon, sort_order) values
+  ('Bags',                   'bags',                   'Handbags, totes and clutches',   'handbag',    1),
+  ('Shoes',                  'shoes',                  'Heels, flats and sandals',       'shoes',      2),
+  ('Abayas',                 'abayas',                 'Abayas and modest outerwear',    'dress',      3),
+  ('Ready to wear outfits',  'ready-to-wear-outfits',  'Complete outfits, ready to go',  'shirt',      4)
 on conflict (slug) do nothing;

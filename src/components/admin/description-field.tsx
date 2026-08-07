@@ -12,12 +12,10 @@ import {
 } from "lucide-react";
 
 import { Textarea } from "@/components/ui/field";
-import { cn } from "@/lib/cn";
-
-type Mode = "generate" | "improve" | "shorten" | "expand" | "bullets";
+import { describeProduct, type DescribeMode } from "@/lib/ai-client";
 
 const ACTIONS: {
-  mode: Mode;
+  mode: DescribeMode;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
@@ -46,11 +44,11 @@ export function DescriptionField({
 }) {
   const [value, setValue] = useState(defaultValue);
   const [previous, setPrevious] = useState<string | null>(null);
-  const [pending, setPending] = useState<Mode | null>(null);
+  const [pending, setPending] = useState<DescribeMode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  async function run(mode: Mode) {
+  async function run(mode: DescribeMode) {
     const form = textareaRef.current?.form;
     if (!form) return;
 
@@ -63,35 +61,23 @@ export function DescriptionField({
     setError(null);
 
     try {
-      const response = await fetch("/api/admin/ai/describe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode,
-          name: String(data.get("name") ?? ""),
-          category:
-            categorySelect?.selectedIndex && categorySelect.selectedIndex > 0
-              ? categorySelect.options[categorySelect.selectedIndex].text
-              : "",
-          price: String(data.get("price") ?? ""),
-          current: value,
-        }),
+      const description = await describeProduct(mode, {
+        name: String(data.get("name") ?? ""),
+        category:
+          categorySelect?.selectedIndex && categorySelect.selectedIndex > 0
+            ? categorySelect.options[categorySelect.selectedIndex].text
+            : "",
+        price: String(data.get("price") ?? ""),
+        current: value,
       });
 
-      const result = (await response.json()) as {
-        description?: string;
-        error?: string;
-      };
-
-      if (!response.ok || !result.description) {
-        throw new Error(result.error ?? "The assistant couldn't respond.");
-      }
-
       setPrevious(value);
-      setValue(result.description);
+      setValue(description);
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "The assistant couldn't respond.",
+        cause instanceof Error
+          ? cause.message
+          : "The assistant couldn't respond.",
       );
     } finally {
       setPending(null);
@@ -120,9 +106,7 @@ export function DescriptionField({
             type="button"
             onClick={() => void run("generate")}
             disabled={busy}
-            className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-soft px-2.5 text-[13px] font-medium text-brand transition-colors hover:bg-brand/10 disabled:opacity-50",
-            )}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-soft px-2.5 text-[13px] font-medium text-brand transition-colors hover:bg-brand/10 disabled:opacity-50"
           >
             {pending === "generate" ? (
               <Loader2 className="size-3.5 animate-spin" />

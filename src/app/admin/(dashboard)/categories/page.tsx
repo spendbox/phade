@@ -10,6 +10,7 @@ import {
 } from "@/components/admin/row-menu";
 import { ErrorNotice, SetupNotice } from "@/components/admin/setup-notice";
 import { EmptyState } from "@/components/ui/empty-state";
+import { CategoryIcon } from "@/lib/category-icons";
 import { formatNumber } from "@/lib/format";
 import { getCategoriesWithCounts } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -48,13 +49,18 @@ export default async function CategoriesPage() {
           {categories.map((category) => (
             <li key={category.id} className="card flex flex-col p-4">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-ink">
-                    {category.name}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-ink-muted">
-                    /{category.slug}
-                  </p>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                    <CategoryIcon icon={category.icon} className="size-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-ink">
+                      {category.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-ink-muted">
+                      /{category.slug}
+                    </p>
+                  </div>
                 </div>
 
                 <RowMenu label={`Actions for ${category.name}`}>

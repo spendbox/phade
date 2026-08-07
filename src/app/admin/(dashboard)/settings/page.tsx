@@ -38,10 +38,10 @@ export default async function SettingsPage() {
     },
     {
       name: "AI description assistant",
-      ready: Boolean(process.env.ANTHROPIC_API_KEY),
-      variables: ["ANTHROPIC_API_KEY"],
+      ready: Boolean(process.env.OPENAI_API_KEY),
+      variables: ["OPENAI_API_KEY", "OPENAI_MODEL"],
       detail:
-        "Powers the write/improve/shorten buttons on the product description field. Everything else works without it.",
+        "Powers the write/improve/shorten buttons on the product description field. OPENAI_MODEL is optional and defaults to gpt-4o-mini. Everything else works without it.",
     },
   ];
 
@@ -118,11 +118,11 @@ export default async function SettingsPage() {
           Paste this into Paystack → Settings → API Keys &amp; Webhooks:
         </p>
         <code className="mt-2 block overflow-x-auto rounded-lg bg-plane px-3 py-2 font-mono text-[13px] text-ink">
-          https://your-domain.com/api/paystack/webhook
+          https://phadewoman.com/api/paystack/webhook
         </code>
         <p className="mt-2 text-xs text-ink-muted">
-          Replace the host with your live Vercel domain. Deliveries are verified
-          with your Paystack secret key, and repeated deliveries are safe.
+          Deliveries are verified with your Paystack secret key, and repeated
+          deliveries are safe.
         </p>
       </Panel>
     </div>

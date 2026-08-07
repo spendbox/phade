@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { DEFAULT_CATEGORY_ICON, isCategoryIconKey } from "@/lib/category-icons";
 import { actionError, requireAdmin } from "@/lib/guard";
 import { slugify } from "@/lib/format";
 import { requireSupabase } from "@/lib/supabase";
@@ -42,12 +43,14 @@ export async function saveCategory(
     if (!name) throw new Error("Give the category a name.");
 
     const sortOrder = Number.parseInt(text(formData, "sort_order"), 10);
+    const icon = text(formData, "icon");
 
     const payload = {
       name,
       slug: await uniqueSlug(slugify(text(formData, "slug") || name), id || undefined),
       description: text(formData, "description") || null,
       image_url: text(formData, "image_url") || null,
+      icon: isCategoryIconKey(icon) ? icon : DEFAULT_CATEGORY_ICON,
       sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
     };
 

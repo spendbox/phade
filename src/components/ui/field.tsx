@@ -71,9 +71,52 @@ export function Select({
   );
 }
 
+/**
+ * A default of `0` in a number field means the next keystroke produces `05`.
+ * Clearing the zero on focus (and restoring it if nothing was typed) keeps the
+ * field honest without ever losing the value.
+ */
+function clearLeadingZero(event: React.FocusEvent<HTMLInputElement>) {
+  if (event.target.value === "0" || event.target.value === "0.00") {
+    event.target.value = "";
+  } else {
+    event.target.select();
+  }
+}
+
+function restoreZero(event: React.FocusEvent<HTMLInputElement>) {
+  if (event.target.value === "") event.target.value = "0";
+}
+
+export function NumberInput({
+  className,
+  onFocus,
+  onBlur,
+  ...props
+}: ComponentPropsWithRef<"input">) {
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      className={cn(control, "h-10 tabular-nums", className)}
+      onFocus={(event) => {
+        clearLeadingZero(event);
+        onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        restoreZero(event);
+        onBlur?.(event);
+      }}
+      {...props}
+    />
+  );
+}
+
 /** Naira-prefixed money input. The value is plain naira; convert at the edge. */
 export function MoneyInput({
   className,
+  onFocus,
+  onBlur,
   ...props
 }: ComponentPropsWithRef<"input">) {
   return (
@@ -87,6 +130,14 @@ export function MoneyInput({
         min="0"
         inputMode="decimal"
         className={cn(control, "h-10 pl-7 tabular-nums", className)}
+        onFocus={(event) => {
+          clearLeadingZero(event);
+          onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          restoreZero(event);
+          onBlur?.(event);
+        }}
         {...props}
       />
     </div>

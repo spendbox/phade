@@ -1,11 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MoreHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 
-/** Overflow menu for a table row. Children are the menu items. */
+const MENU_WIDTH = 176;
+const MENU_MAX_HEIGHT = 200;
+
+/**
+ * Overflow menu for a table row. Children are the menu items.
+ *
+ * The panel renders in a portal on `document.body` rather than inside the row,
+ * so a card with `overflow-hidden` (every table on this dashboard) can't clip
+ * it. Position is measured from the trigger and re-measured on scroll.
+ */
 export function RowMenu({
   children,
   label = "More actions",
@@ -14,31 +24,73 @@ export function RowMenu({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  function place() {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    // Right-align to the trigger, then flip above it when the viewport bottom
+    // is closer than the menu is tall.
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const top =
+      spaceBelow < MENU_MAX_HEIGHT ? rect.top - MENU_MAX_HEIGHT - 4 : rect.bottom + 4;
+
+    setPosition({
+      top: Math.max(8, top),
+      left: Math.min(
+        Math.max(8, rect.right - MENU_WIDTH),
+        window.innerWidth - MENU_WIDTH - 8,
+      ),
+    });
+  }
+
+  function toggle() {
+    if (!open) place();
+    setOpen((value) => !value);
+  }
 
   useEffect(() => {
     if (!open) return;
 
     function onPointerDown(event: MouseEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (
+        !panelRef.current?.contains(target) &&
+        !triggerRef.current?.contains(target)
+      ) {
+        setOpen(false);
+      }
     }
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
+    function reposition() {
+      place();
+    }
 
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
     };
   }, [open]);
 
   return (
-    <div ref={containerRef} className="relative">
+    <>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={toggle}
         aria-label={label}
         aria-expanded={open}
         className={cn(
@@ -49,16 +101,25 @@ export function RowMenu({
         <MoreHorizontal className="size-4" />
       </button>
 
-      {open && (
-        <div
-          role="menu"
-          onClick={() => setOpen(false)}
-          className="absolute right-0 top-9 z-20 w-44 overflow-hidden rounded-xl bg-surface p-1 shadow-[0_0_0_1px_rgb(11_11_12_/_0.08),0_8px_24px_rgb(11_11_12_/_0.12)]"
-        >
-          {children}
-        </div>
-      )}
-    </div>
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={panelRef}
+            role="menu"
+            onClick={() => setOpen(false)}
+            style={{
+              top: position.top,
+              left: position.left,
+              width: MENU_WIDTH,
+            }}
+            className="fixed z-[60] overflow-hidden rounded-xl bg-surface p-1 shadow-[0_0_0_1px_rgb(11_11_12_/_0.08),0_8px_24px_rgb(11_11_12_/_0.14)]"
+          >
+            {children}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

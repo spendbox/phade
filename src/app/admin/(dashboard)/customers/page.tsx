@@ -80,10 +80,10 @@ export default async function CustomersPage({
       ) : (
         <div className="card overflow-hidden">
           {/* Desktop table */}
-          <div className="scroll-x hidden md:block">
+          <div className="table-scroll hidden md:block">
             <table className="w-full min-w-[44rem] text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs font-medium text-ink-secondary">
+              <thead className="table-head">
+                <tr className="text-left text-xs font-medium text-ink-secondary">
                   <th className="px-5 py-3 font-medium">Customer</th>
                   <th className="px-3 py-3 font-medium">Phone</th>
                   <th className="px-3 py-3 text-right font-medium">Orders</th>

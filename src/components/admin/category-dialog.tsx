@@ -7,8 +7,9 @@ import {
   saveCategory,
   type CategoryFormState,
 } from "@/app/admin/(dashboard)/categories/actions";
+import { IconPicker } from "@/components/admin/icon-picker";
 import { Button, buttonClass } from "@/components/ui/button";
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { Field, Input, NumberInput, Textarea } from "@/components/ui/field";
 import type { Category } from "@/lib/types";
 
 const initialState: CategoryFormState = { ok: null };
@@ -104,6 +105,10 @@ export function CategoryDialog({
                 />
               </Field>
 
+              <Field label="Icon" hint="Shown wherever this category appears">
+                <IconPicker defaultValue={category?.icon} />
+              </Field>
+
               <Field label="Description" htmlFor="category-description">
                 <Textarea
                   id="category-description"
@@ -131,10 +136,9 @@ export function CategoryDialog({
                   htmlFor="category-sort"
                   hint="Lower shows first"
                 >
-                  <Input
+                  <NumberInput
                     id="category-sort"
                     name="sort_order"
-                    type="number"
                     step={1}
                     defaultValue={category?.sort_order ?? 0}
                   />

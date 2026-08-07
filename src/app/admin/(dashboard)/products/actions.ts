@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { actionError, requireAdmin } from "@/lib/guard";
 import { nairaToKobo, slugify } from "@/lib/format";
+import { categoryNameFor, generateSku } from "@/lib/sku";
 import { requireSupabase } from "@/lib/supabase";
 import type { ActionResult, ProductStatus } from "@/lib/types";
 
@@ -117,6 +118,14 @@ export async function createProduct(
     const parsed = parseProduct(formData);
     parsed.slug = await uniqueSlug(parsed.slug);
 
+    // A blank SKU means "generate one" — the admin never has to invent codes.
+    if (!parsed.sku) {
+      parsed.sku = await generateSku(
+        supabase,
+        await categoryNameFor(supabase, parsed.category_id),
+      );
+    }
+
     const { data, error } = await supabase
       .from("products")
       .insert(parsed)
@@ -138,6 +147,137 @@ export async function createProduct(
     return { ok: true, message: `${parsed.name} created.` };
   } catch (error) {
     return actionError(error);
+  }
+}
+
+/**
+ * One product drafted in the bulk uploader. Only media, name, price and status
+ * are asked for up front — everything else is optional and collapsed behind
+ * "More details", so a batch can be published in a couple of minutes.
+ */
+export type ProductDraft = {
+  name?: string;
+  price?: string;
+  status?: string;
+  media?: string[];
+  description?: string;
+  compareAtPrice?: string;
+  costPrice?: string;
+  stock?: string;
+  lowStockThreshold?: string;
+  sku?: string;
+  tags?: string;
+  featured?: boolean;
+};
+
+export type BulkCreateState =
+  | { ok: null }
+  | { ok: true; created: number; message: string }
+  | { ok: false; error: string };
+
+export async function createProductsBulk(
+  _previous: BulkCreateState,
+  formData: FormData,
+): Promise<BulkCreateState> {
+  try {
+    await requireAdmin();
+    const supabase = requireSupabase();
+
+    const categoryId = text(formData, "category_id") || null;
+
+    let drafts: ProductDraft[] = [];
+    try {
+      const parsed: unknown = JSON.parse(text(formData, "drafts") || "[]");
+      if (Array.isArray(parsed)) drafts = parsed as ProductDraft[];
+    } catch {
+      throw new Error("Couldn't read the drafts. Try saving again.");
+    }
+
+    if (drafts.length === 0) throw new Error("Add at least one product first.");
+
+    const categoryName = await categoryNameFor(supabase, categoryId);
+
+    // Sequential rather than parallel: slugs and SKUs are both derived from
+    // what's already stored, so each insert needs to see the previous one.
+    let created = 0;
+    for (const [index, draft] of drafts.entries()) {
+      const name = (draft.name ?? "").trim();
+      if (!name) throw new Error(`Product ${index + 1} still needs a name.`);
+
+      const priceKobo = nairaToKobo(draft.price ?? "");
+      if (priceKobo <= 0) {
+        throw new Error(`${name} still needs a price.`);
+      }
+
+      const status = ["draft", "active", "archived"].includes(draft.status ?? "")
+        ? (draft.status as ProductStatus)
+        : "active";
+
+      const stock = Math.max(
+        Number.parseInt(draft.stock ?? "", 10) || 0,
+        0,
+      );
+
+      const { data, error } = await supabase
+        .from("products")
+        .insert({
+          name,
+          slug: await uniqueSlug(slugify(name)),
+          description: (draft.description ?? "").trim() || null,
+          category_id: categoryId,
+          price_kobo: priceKobo,
+          compare_at_price_kobo: draft.compareAtPrice
+            ? nairaToKobo(draft.compareAtPrice)
+            : null,
+          cost_price_kobo: draft.costPrice ? nairaToKobo(draft.costPrice) : null,
+          sku:
+            (draft.sku ?? "").trim() ||
+            (await generateSku(supabase, categoryName)),
+          stock,
+          low_stock_threshold: Math.max(
+            Number.parseInt(draft.lowStockThreshold ?? "", 10) || 5,
+            0,
+          ),
+          status,
+          images: (draft.media ?? []).filter(
+            (url): url is string => typeof url === "string",
+          ),
+          tags: (draft.tags ?? "")
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+          featured: Boolean(draft.featured),
+        })
+        .select("id")
+        .single();
+
+      if (error) throw new Error(`${name}: ${error.message}`);
+      created += 1;
+
+      if (stock > 0) {
+        await supabase.from("inventory_movements").insert({
+          product_id: data.id,
+          delta: stock,
+          reason: "restock",
+          note: "Opening stock",
+        });
+      }
+    }
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/inventory");
+    revalidatePath("/admin");
+
+    return {
+      ok: true,
+      created,
+      message: `${created} product${created === 1 ? "" : "s"} published.`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Something went wrong.",
+    };
   }
 }
 
@@ -230,6 +370,11 @@ export async function duplicateProduct(formData: FormData): Promise<void> {
     ...rest,
     name: copyName,
     slug: await uniqueSlug(slugify(copyName)),
+    // A copy gets its own SKU — two products sharing one is a reporting trap.
+    sku: await generateSku(
+      supabase,
+      await categoryNameFor(supabase, (rest.category_id as string | null) ?? null),
+    ),
     status: "draft",
     stock: 0,
   });

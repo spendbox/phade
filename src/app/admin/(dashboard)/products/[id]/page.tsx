@@ -70,7 +70,7 @@ export default async function EditProductPage({
       <ProductForm
         product={product}
         categories={categories}
-        aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY)}
+        aiEnabled={Boolean(process.env.OPENAI_API_KEY)}
       />
     </div>
   );

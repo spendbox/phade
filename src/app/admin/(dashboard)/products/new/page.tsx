@@ -1,11 +1,11 @@
 import { PageHeader } from "@/components/admin/page-header";
-import { ProductForm } from "@/components/admin/product-form";
+import { ProductUploaderMount } from "@/components/admin/product-uploader-mount";
 import { SetupNotice } from "@/components/admin/setup-notice";
 import { getCategories } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "New product" };
+export const metadata = { title: "Add products" };
 
 export default async function NewProductPage() {
   const { data: categories } = await getCategories();
@@ -13,16 +13,16 @@ export default async function NewProductPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="New product"
-        description="Add the details, drop in a few photos, and publish when you're ready."
+        title="Add products"
+        description="Pick a category, drop in your photos and videos, then name and price each one."
       />
 
       {!isSupabaseConfigured() ? (
         <SetupNotice description="Products are stored in Supabase. Add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, run supabase/schema.sql, then redeploy." />
       ) : (
-        <ProductForm
+        <ProductUploaderMount
           categories={categories}
-          aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY)}
+          aiEnabled={Boolean(process.env.OPENAI_API_KEY)}
         />
       )}
     </div>
