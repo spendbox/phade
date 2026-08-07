@@ -51,6 +51,7 @@ create table if not exists public.products (
   tags                  text[] not null default '{}',
   -- Optional colourways: [{ "name": "Emerald", "hex": "#0f6b4f" }, …]
   colors                jsonb not null default '[]'::jsonb,
+  sizes                 jsonb not null default '[]'::jsonb,
   featured              boolean not null default false,
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
@@ -60,7 +61,8 @@ create table if not exists public.products (
 alter table public.products
   add column if not exists subcategory text;
 alter table public.products
-  add column if not exists colors jsonb not null default '[]'::jsonb;
+  add column if not exists colors jsonb not null default '[]'::jsonb,
+  add column if not exists sizes jsonb not null default '[]'::jsonb;
 
 create index if not exists products_category_id_idx on public.products (category_id);
 create index if not exists products_status_idx      on public.products (status);

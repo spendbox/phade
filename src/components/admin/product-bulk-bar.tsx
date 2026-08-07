@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dropdown } from "@/components/ui/dropdown";
 import { Input } from "@/components/ui/field";
+import { Modal } from "@/components/ui/modal";
 import { DELETE_CONFIRMATION, PRODUCT_STATUSES } from "@/lib/types";
 
 const initialState: BulkActionState = { ok: null };
@@ -121,21 +122,12 @@ export function ProductBulkBar({
         </div>
       </div>
 
-      {confirming && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-          <button
-            type="button"
-            aria-label="Cancel"
-            onClick={() => setConfirming(false)}
-            className="absolute inset-0 bg-ink/50 backdrop-blur-[2px]"
-          />
-
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Confirm delete"
-            className="relative w-full max-w-sm rounded-t-2xl bg-surface p-5 shadow-2xl sm:rounded-2xl"
-          >
+      <Modal
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        size="sm"
+      >
+        <div className="p-5">
             <h2 className="text-sm font-semibold text-ink">
               Delete {ids.length} product{ids.length === 1 ? "" : "s"}?
             </h2>
@@ -179,9 +171,8 @@ export function ProductBulkBar({
                 </Button>
               </div>
             </form>
-          </div>
         </div>
-      )}
+      </Modal>
     </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { Loader2, Plus, Sparkles, X } from "lucide-react";
+import { useActionState, useState } from "react";
+import { Loader2, Plus, Sparkles } from "lucide-react";
 
 import {
   saveCategory,
@@ -10,6 +10,7 @@ import {
 import { IconPicker } from "@/components/admin/icon-picker";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Field, Input, NumberInput, Textarea } from "@/components/ui/field";
+import { Modal } from "@/components/ui/modal";
 import { describeCategory } from "@/lib/ai-client";
 import type { Category } from "@/lib/types";
 
@@ -43,15 +44,6 @@ export function CategoryDialog({
     if (state.ok) setOpen(false);
   }
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
   return (
     <>
       {trigger ? (
@@ -69,47 +61,21 @@ export function CategoryDialog({
         </button>
       )}
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
-          />
-
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={category ? "Edit category" : "New category"}
-            className="relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl"
-          >
-            <header className="sticky top-0 flex items-center justify-between border-b border-line bg-surface px-5 py-3.5">
-              <h2 className="text-sm font-semibold text-ink">
-                {category ? "Edit category" : "New category"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                className="flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-plane hover:text-ink"
-              >
-                <X className="size-4" />
-              </button>
-            </header>
-
-            <CategoryForm
-              key={category?.id ?? "new"}
-              category={category}
-              aiEnabled={aiEnabled}
-              formAction={formAction}
-              pending={pending}
-              state={state}
-              onCancel={() => setOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={category ? "Edit category" : "New category"}
+      >
+        <CategoryForm
+          key={category?.id ?? "new"}
+          category={category}
+          aiEnabled={aiEnabled}
+          formAction={formAction}
+          pending={pending}
+          state={state}
+          onCancel={() => setOpen(false)}
+        />
+      </Modal>
     </>
   );
 }

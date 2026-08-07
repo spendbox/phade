@@ -793,6 +793,106 @@ export async function getProductOptions(): Promise<
 }
 
 // ---------------------------------------------------------------------------
+// Database (spreadsheet)
+// ---------------------------------------------------------------------------
+
+export type SheetRow = ProductWithCategory & {
+  /** Units sold across orders that were actually paid for. */
+  sold: number;
+  /** Naira taken for this product, at the price each order recorded. */
+  revenueKobo: number;
+};
+
+/**
+ * Every product with its trading numbers attached — one read for the whole
+ * sheet, so sales and stock line up with the row they belong to instead of
+ * being fetched per cell.
+ */
+export async function getSheetRows(): Promise<QueryResult<SheetRow[]>> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const [products, items] = await Promise.all([
+    supabase
+      .from("products")
+      .select("*, category:categories(id, name, slug)")
+      .order("created_at", { ascending: false })
+      .limit(1000),
+    supabase
+      .from("order_items")
+      .select(
+        "product_id, quantity, unit_price_kobo, order:orders!inner(status)",
+      ),
+  ]);
+
+  if (products.error) return empty([], products.error.message);
+
+  // Sales are a column, not the point of the page: if the join fails the sheet
+  // still opens with zeroes rather than an error.
+  const sold = new Map<string, { units: number; kobo: number }>();
+  if (!items.error) {
+    const counted: OrderStatus[] = [
+      "paid",
+      "processing",
+      "shipped",
+      "delivered",
+    ];
+    for (const row of (items.data ?? []) as unknown as {
+      product_id: string | null;
+      quantity: number;
+      unit_price_kobo: number;
+      order: { status: OrderStatus } | null;
+    }[]) {
+      if (!row.product_id || !row.order) continue;
+      if (!counted.includes(row.order.status)) continue;
+      const tally = sold.get(row.product_id) ?? { units: 0, kobo: 0 };
+      tally.units += row.quantity;
+      tally.kobo += row.quantity * row.unit_price_kobo;
+      sold.set(row.product_id, tally);
+    }
+  }
+
+  const rows = (products.data ?? []) as unknown as ProductWithCategory[];
+  return empty(
+    rows.map((row) => {
+      const tally = sold.get(row.id);
+      return {
+        ...row,
+        sold: tally?.units ?? 0,
+        revenueKobo: tally?.kobo ?? 0,
+      };
+    }),
+  );
+}
+
+/** Same list, with a thumbnail — for pickers where the picture is the label. */
+export async function getProductPickerOptions(): Promise<
+  QueryResult<{ id: string; name: string; image: string | null }[]>
+> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, images")
+    .neq("status", "archived")
+    .order("name", { ascending: true })
+    .limit(500);
+
+  if (error) return empty([], error.message);
+
+  return empty(
+    ((data ?? []) as { id: string; name: string; images: string[] | null }[]).map(
+      (row) => ({
+        id: row.id,
+        name: row.name,
+        image: row.images?.[0] ?? null,
+      }),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Carts (uncompleted checkouts)
 // ---------------------------------------------------------------------------
 

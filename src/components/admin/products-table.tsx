@@ -10,6 +10,7 @@ import {
 } from "@/app/admin/(dashboard)/products/actions";
 import { ColorDots } from "@/components/admin/color-picker";
 import { MediaThumb } from "@/components/admin/media-thumb";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ProductBulkBar } from "@/components/admin/product-bulk-bar";
 import {
   ConfirmSubmit,
@@ -206,31 +207,6 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
         <ProductBulkBar ids={active} onClear={() => setSelected([])} />
       )}
     </>
-  );
-}
-
-function Checkbox({
-  checked,
-  indeterminate = false,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  indeterminate?: boolean;
-  onChange: () => void;
-  label: string;
-}) {
-  return (
-    <input
-      type="checkbox"
-      aria-label={label}
-      checked={checked}
-      ref={(node) => {
-        if (node) node.indeterminate = indeterminate;
-      }}
-      onChange={onChange}
-      className="size-4 shrink-0 cursor-pointer rounded border-line-strong text-brand accent-brand focus:ring-brand"
-    />
   );
 }
 

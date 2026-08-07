@@ -21,6 +21,7 @@ import {
   type BulkCreateState,
 } from "@/app/admin/(dashboard)/products/actions";
 import { ColorPicker } from "@/components/admin/color-picker";
+import { SizePicker } from "@/components/admin/size-picker";
 import { MediaThumb } from "@/components/admin/media-thumb";
 import { Button, buttonClass } from "@/components/ui/button";
 import {
@@ -54,6 +55,7 @@ type Draft = {
   sku: string;
   subcategory: string;
   colors: ProductColor[];
+  sizes: number[];
   tags: string;
   featured: boolean;
 };
@@ -77,42 +79,10 @@ function newDraft(media: string[], name: string): Draft {
     sku: "",
     subcategory: "",
     colors: [],
+    sizes: [],
     tags: "",
     featured: false,
   };
-}
-
-/**
- * The picker keeps its own state and reports through a hidden input; here the
- * draft owns the value instead, so it survives autosave. Reading the input on
- * change keeps the two in step without forking the component.
- */
-function ColorPickerBridge({
-  draft,
-  onChange,
-}: {
-  draft: Draft;
-  onChange: (patch: Partial<Draft>) => void;
-}) {
-  return (
-    <div
-      onChange={(event) => {
-        const target = event.target as HTMLElement;
-        const hidden = target
-          .closest("[data-color-picker]")
-          ?.querySelector<HTMLInputElement>('input[type="hidden"]');
-        if (!hidden) return;
-        try {
-          onChange({ colors: JSON.parse(hidden.value) as ProductColor[] });
-        } catch {
-          /* ignore malformed intermediate values */
-        }
-      }}
-      data-color-picker
-    >
-      <ColorPicker name={`colors-${draft.id}`} initial={draft.colors} />
-    </div>
-  );
 }
 
 /** "IMG_4821.jpeg" -> "Img 4821" — a starting point the admin can overwrite. */
@@ -842,7 +812,21 @@ function MoreDetails({
       </div>
 
       <Field label="Colours" hint="Optional — the colourways you stock">
-        <ColorPickerBridge draft={draft} onChange={onChange} />
+        {/* The draft owns the value, not the picker, so autosave keeps it. */}
+        <ColorPicker
+          name={`colors-${draft.id}`}
+          initial={draft.colors}
+          aiEnabled={aiEnabled}
+          onChange={(colors) => onChange({ colors })}
+        />
+      </Field>
+
+      <Field label="Sizes" hint="Optional — leave blank for one-size pieces">
+        <SizePicker
+          name={`sizes-${draft.id}`}
+          initial={draft.sizes}
+          onChange={(sizes) => onChange({ sizes })}
+        />
       </Field>
 
       <Field

@@ -17,13 +17,14 @@ admin dashboard is complete and usable.
 | **Dashboard** | Revenue over time, order status mix, top sellers, recent orders, low-stock alerts. Switchable 7 / 30 / 90 day window. |
 | **Orders** | Filter by status and type, open an order to see items, totals, payments, delivery address, and change its status. |
 | **Checkouts** | Carts that were started but never paid for, what was left in them, and how many made it through. Needs `STOREFRONT_API_KEY`. |
-| **Products** | Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name, price and stock side by side — autosaved as you work. Optional colourways, bulk-select rows to change status or delete. AI writes descriptions and suggests tags from them. SKUs generate themselves. |
+| **Products** | Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name, price and stock side by side — autosaved as you work. Optional colourways and sizes, bulk-select rows to change status or delete. AI writes descriptions, suggests tags, and matches typed colour names to real shades. SKUs generate themselves. |
+| **Database** | The whole catalogue as one editable spreadsheet. Cells save as you leave them, new rows arrive as drafts, media / colours / sizes open in a dialog, and units sold and revenue come along for the ride. Opens full screen. |
 | **Categories** | Create and edit categories with a chosen icon, and let AI grow a short description into a fuller one. |
 | **Inventory** | Featured image, stock on hand and stock value, red/amber/green level indicators, one-click ±1, and a full adjustment dialog that records the reason. The five most recent movements sit on the page, with the full history one click away. |
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | **General** holds the default low-stock alert level; **Developers** lists which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
+| **Settings** | **General** holds the default low-stock alert level; **Storefront** edits the announcement bar, hero copy, hero images, call-to-action and featured products; **Developers** lists which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -127,6 +128,7 @@ src/
     queries.ts                   All dashboard reads
     supabase.ts  paystack.ts     Service clients
     format.ts                    Naira, dates, slugs
+    storefront.ts                Shop-front copy, stored as one settings row
   proxy.ts                       Gates /admin behind a valid session
 supabase/schema.sql              Database schema — run once
 ```
@@ -153,6 +155,16 @@ A few decisions worth knowing:
   that writes without an admin session, so it answers `501` until
   `STOREFRONT_API_KEY` is set and `401` to anyone who doesn't send it. Carts idle
   for over an hour are counted as abandoned — nothing has to mark them.
+- **Dialogs are portalled, menus don't unmount.** Every dialog goes through
+  `components/ui/modal.tsx`, which renders into `document.body`, and `RowMenu`
+  hides its panel rather than tearing it down. A dialog opened from a menu
+  therefore outlives the menu — a hand-rolled dialog nested inside a closing
+  popover is why the sale editor used to flash and vanish.
+- **The sheet writes one cell at a time.** Each edit sends `{ id, field, value }`
+  to a single server action, so a save can't clobber a column the admin didn't
+  touch, and stock edits still write an `inventory_movements` row like every
+  other stock change. The sheet re-reads on a timer rather than a socket: RLS
+  has no policies, so the browser's anon key can't subscribe to anything.
 - **Bulk deletes ask for the word.** Deleting a selection needs `DELETE` typed
   into a dialog, and the server re-checks it — a client that skips the prompt
   can't wipe the catalogue.

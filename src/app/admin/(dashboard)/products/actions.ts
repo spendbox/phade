@@ -9,7 +9,12 @@ import { getSettings } from "@/lib/settings";
 import { categoryNameFor, generateSku } from "@/lib/sku";
 import { requireSupabase } from "@/lib/supabase";
 import { DELETE_CONFIRMATION } from "@/lib/types";
-import type { ActionResult, ProductColor, ProductStatus } from "@/lib/types";
+import {
+  PRODUCT_SIZES,
+  type ActionResult,
+  type ProductColor,
+  type ProductStatus,
+} from "@/lib/types";
 
 export type ProductFormState = ActionResult | { ok: null };
 
@@ -29,6 +34,7 @@ type ParsedProduct = {
   images: string[];
   tags: string[];
   colors: ProductColor[];
+  sizes: number[];
   featured: boolean;
 };
 
@@ -94,6 +100,8 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
     colors = [];
   }
 
+  const sizes = parseSizes(formData.get("sizes"));
+
   return {
     name,
     slug: slugify(text(formData, "slug") || name),
@@ -113,8 +121,30 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
     images,
     tags,
     colors,
+    sizes,
     featured: formData.get("featured") === "on",
   };
+}
+
+/** Only the sizes we actually stock survive, de-duplicated and in order. */
+function parseSizes(raw: unknown): number[] {
+  let list: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      list = JSON.parse(raw || "[]");
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+
+  const allowed = new Set<number>(PRODUCT_SIZES);
+  const chosen = new Set<number>();
+  for (const item of list) {
+    const size = Number(item);
+    if (allowed.has(size)) chosen.add(size);
+  }
+  return PRODUCT_SIZES.filter((size) => chosen.has(size));
 }
 
 /** Slugs are unique; append -2, -3 … until we find a free one. */
@@ -195,6 +225,7 @@ export type ProductDraft = {
   sku?: string;
   subcategory?: string;
   colors?: ProductColor[];
+  sizes?: number[];
   tags?: string;
   featured?: boolean;
 };
@@ -279,6 +310,7 @@ export async function createProductsBulk(
             .map((tag) => tag.trim())
             .filter(Boolean),
           colors: Array.isArray(draft.colors) ? draft.colors : [],
+          sizes: parseSizes(draft.sizes),
           featured: Boolean(draft.featured),
         })
         .select("id")

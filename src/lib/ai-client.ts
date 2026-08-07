@@ -7,7 +7,7 @@ export type DescribeMode =
   | "seo";
 
 type Payload = {
-  kind?: "product" | "tags" | "category";
+  kind?: "product" | "tags" | "category" | "color";
   mode?: DescribeMode;
   name: string;
   category?: string;
@@ -50,6 +50,44 @@ export function describeCategory(
   context: Omit<Payload, "kind" | "mode">,
 ): Promise<string> {
   return ask({ kind: "category", ...context });
+}
+
+/**
+ * Turns colour names an admin typed ("wine, nude, forest") into named swatches.
+ *
+ * Guessing hex codes by hand is where colour data goes wrong — "wine" ends up
+ * as pure red and every burgundy in the catalogue looks different. The model
+ * judges the shade; anything it returns that isn't a real hex is dropped.
+ */
+export async function matchColors(
+  input: string,
+): Promise<{ name: string; hex: string }[]> {
+  const text = await ask({ kind: "color", name: input, current: input });
+
+  // Models like to wrap JSON in a code fence; take the array either way.
+  const start = text.indexOf("[");
+  const end = text.lastIndexOf("]");
+  if (start === -1 || end === -1) throw new Error("Couldn't read the colours.");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text.slice(start, end + 1));
+  } catch {
+    throw new Error("Couldn't read the colours.");
+  }
+  if (!Array.isArray(parsed)) throw new Error("Couldn't read the colours.");
+
+  const colors = parsed.flatMap((item): { name: string; hex: string }[] => {
+    if (typeof item !== "object" || item === null) return [];
+    const entry = item as Record<string, unknown>;
+    const name = typeof entry.name === "string" ? entry.name.trim() : "";
+    const hex = typeof entry.hex === "string" ? entry.hex.trim() : "";
+    if (!name || !/^#[0-9a-fA-F]{6}$/.test(hex)) return [];
+    return [{ name, hex }];
+  });
+
+  if (colors.length === 0) throw new Error("No colours came back.");
+  return colors;
 }
 
 /** Merges suggested tags into existing ones without introducing duplicates. */

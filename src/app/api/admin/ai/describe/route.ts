@@ -68,8 +68,21 @@ House style:
 
 Return only the description text.`;
 
+const COLOR_SYSTEM = `You convert fashion colour names into hex codes for a Nigerian women's fashion catalogue.
+
+Rules:
+- Return ONLY a JSON array, no prose: [{"name":"Burgundy","hex":"#6d1f34"}]
+- One object per colour named in the input, in the order given.
+- "name" is the colour title-cased and tidied up (fix obvious typos).
+- "hex" is a 6-digit hex code starting with #, lowercase.
+- Judge the shade the way a fabric buyer would: "nude" is a warm beige, "wine"
+  is a deep desaturated red, "emerald" is a rich blue-green, "ash" is a grey.
+  Nigerian trade names count — "wine", "chocolate", "coffee", "peach", "lemon".
+- If a line names two colours ("black and gold"), return both.
+- Never return more than 12 objects.`;
+
 type Payload = {
-  kind?: "product" | "tags" | "category";
+  kind?: "product" | "tags" | "category" | "color";
   mode?: string;
   name?: string;
   category?: string;
@@ -104,6 +117,14 @@ function buildRequest(body: Payload):
       ]
         .filter(Boolean)
         .join("\n"),
+    };
+  }
+
+  if (kind === "color") {
+    if (!current) return { error: "Type a colour name first.", status: 400 };
+    return {
+      system: COLOR_SYSTEM,
+      user: `Colours: ${current}`,
     };
   }
 

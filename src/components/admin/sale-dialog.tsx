@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useActionState } from "react";
-import { Loader2, Plus, Search, X } from "lucide-react";
+import { Loader2, Plus, Search } from "lucide-react";
 
 import {
   saveSale,
@@ -16,6 +16,7 @@ import {
   NumberInput,
   Textarea,
 } from "@/components/ui/field";
+import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/cn";
 import { koboToNairaInput, toDateTimeLocal } from "@/lib/format";
 import type {
@@ -54,15 +55,6 @@ export function SaleDialog({
     if (state.ok) setOpen(false);
   }
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
   return (
     <>
       {trigger ? (
@@ -80,48 +72,22 @@ export function SaleDialog({
         </button>
       )}
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
-          />
-
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={sale ? "Edit sale" : "Start a sale"}
-            className="relative max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl"
-          >
-            <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3.5">
-              <h2 className="text-sm font-semibold text-ink">
-                {sale ? "Edit sale" : "Start a sale"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                className="flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-plane hover:text-ink"
-              >
-                <X className="size-4" />
-              </button>
-            </header>
-
-            <SaleForm
-              key={sale?.id ?? "new"}
-              sale={sale}
-              categories={categories}
-              products={products}
-              formAction={formAction}
-              pending={pending}
-              state={state}
-              onCancel={() => setOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={sale ? "Edit sale" : "Start a sale"}
+      >
+        <SaleForm
+          key={sale?.id ?? "new"}
+          sale={sale}
+          categories={categories}
+          products={products}
+          formAction={formAction}
+          pending={pending}
+          state={state}
+          onCancel={() => setOpen(false)}
+        />
+      </Modal>
     </>
   );
 }

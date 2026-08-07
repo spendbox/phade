@@ -9,6 +9,7 @@ import {
 } from "@/app/admin/(dashboard)/inventory/actions";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/cn";
 import { INVENTORY_REASONS } from "@/lib/types";
 
@@ -48,21 +49,12 @@ export function StockDialog({
         Adjust
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
-          />
-
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Adjust stock for ${productName}`}
-            className="relative w-full max-w-sm rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl"
-          >
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        size="sm"
+      >
+        <>
             <header className="flex items-start justify-between gap-3 border-b border-line px-5 py-3.5">
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-semibold text-ink">
@@ -168,9 +160,8 @@ export function StockDialog({
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        </>
+      </Modal>
     </>
   );
 }

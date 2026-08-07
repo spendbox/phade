@@ -28,6 +28,9 @@ export type InventoryReason =
 
 export type ProductColor = { name: string; hex: string };
 
+/** The size run phadewoman stocks. Sizes are optional per product. */
+export const PRODUCT_SIZES = [6, 8, 10, 12, 14, 16, 18] as const;
+
 export type Category = {
   id: string;
   name: string;
@@ -60,6 +63,7 @@ export type Product = {
   tags: string[];
   /** Optional colourways offered for this product. */
   colors: ProductColor[];
+  sizes: number[];
   featured: boolean;
   created_at: string;
   updated_at: string;

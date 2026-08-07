@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Loader2, Plus, Sparkles, X } from "lucide-react";
 
+import { matchColors } from "@/lib/ai-client";
 import { cn } from "@/lib/cn";
 import type { ProductColor } from "@/lib/types";
 
@@ -36,13 +37,25 @@ const SUGGESTIONS: ProductColor[] = [
 export function ColorPicker({
   name = "colors",
   initial = [],
+  aiEnabled = false,
+  onChange,
 }: {
   name?: string;
   initial?: ProductColor[];
+  /** Shows the "Match with AI" button, which turns typed names into shades. */
+  aiEnabled?: boolean;
+  onChange?: (colors: ProductColor[]) => void;
 }) {
   const [colors, setColors] = useState<ProductColor[]>(initial);
   const [draftName, setDraftName] = useState("");
   const [draftHex, setDraftHex] = useState("#a63655");
+  const [matching, setMatching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function commit(next: ProductColor[]) {
+    setColors(next);
+    onChange?.(next);
+  }
 
   function add(color: ProductColor) {
     const clean = color.name.trim();
@@ -50,7 +63,36 @@ export function ColorPicker({
     if (colors.some((item) => item.name.toLowerCase() === clean.toLowerCase())) {
       return;
     }
-    setColors((current) => [...current, { name: clean, hex: color.hex }]);
+    commit([...colors, { name: clean, hex: color.hex }]);
+  }
+
+  /** "wine, nude" -> two named swatches with shades a buyer would recognise. */
+  async function match() {
+    const input = draftName.trim();
+    if (!input) return;
+
+    setMatching(true);
+    setError(null);
+    try {
+      const matched = await matchColors(input);
+      const merged = [...colors];
+      for (const color of matched) {
+        if (
+          merged.some(
+            (item) => item.name.toLowerCase() === color.name.toLowerCase(),
+          )
+        ) {
+          continue;
+        }
+        merged.push(color);
+      }
+      commit(merged);
+      setDraftName("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "That didn't work.");
+    } finally {
+      setMatching(false);
+    }
   }
 
   return (
@@ -74,9 +116,7 @@ export function ColorPicker({
                 type="button"
                 aria-label={`Remove ${color.name}`}
                 onClick={() =>
-                  setColors((current) =>
-                    current.filter((item) => item.name !== color.name),
-                  )
+                  commit(colors.filter((item) => item.name !== color.name))
                 }
                 className="flex size-5 items-center justify-center rounded-full text-ink-muted transition hover:bg-surface hover:text-critical"
               >
@@ -130,6 +170,38 @@ export function ColorPicker({
           Add
         </button>
       </div>
+
+      {aiEnabled && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void match()}
+            disabled={matching || !draftName.trim()}
+            title={
+              draftName.trim()
+                ? undefined
+                : "Type colour names first, e.g. wine, nude, forest"
+            }
+            className="inline-flex h-7 items-center gap-1.5 rounded-md bg-brand-soft px-2 text-xs font-medium text-brand transition hover:bg-brand/10 disabled:opacity-50"
+          >
+            {matching ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <Sparkles className="size-3" />
+            )}
+            {matching ? "Matching…" : "Match with AI"}
+          </button>
+          <span className="text-xs text-ink-muted">
+            Type names like “wine, nude, forest” and AI picks the shades.
+          </span>
+        </div>
+      )}
+
+      {error && (
+        <p role="alert" className="text-xs text-critical">
+          {error}
+        </p>
+      )}
 
       {/* Quick picks */}
       <div className="flex flex-wrap gap-1.5">
