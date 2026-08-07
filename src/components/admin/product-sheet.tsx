@@ -25,8 +25,10 @@ import {
 import { ColorDots, ColorPicker } from "@/components/admin/color-picker";
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { MediaThumb } from "@/components/admin/media-thumb";
+import { SheetImport } from "@/components/admin/sheet-import";
 import { SelectCell, TextCell } from "@/components/admin/sheet-cells";
 import { SizePicker } from "@/components/admin/size-picker";
+import type { CatalogueDefaults } from "@/lib/catalogue-settings";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/field";
@@ -49,11 +51,11 @@ type Category = { id: string; name: string };
 export function ProductSheet({
   rows,
   categories,
-  aiEnabled,
+  defaults,
 }: {
   rows: SheetRow[];
   categories: Category[];
-  aiEnabled: boolean;
+  defaults: CatalogueDefaults;
 }) {
   const router = useRouter();
 
@@ -122,8 +124,10 @@ export function ProductSheet({
         full && "fixed inset-0 z-50 bg-plane p-4",
       )}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+      {/* Search takes the full width on a phone; cramming it beside three
+          buttons left room for about four characters. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 sm:max-w-xs sm:flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
           <Input
             value={search}
@@ -133,11 +137,15 @@ export function ProductSheet({
           />
         </div>
 
-        <span className="text-xs text-ink-muted">
+        <span className="hidden text-xs text-ink-muted sm:inline">
           {visible.length} of {rows.length} rows
         </span>
 
-        <span className="ml-auto flex items-center gap-2">
+        <span className="flex items-center gap-2 sm:ml-auto">
+          <span className="text-xs text-ink-muted sm:hidden">
+            {visible.length}/{rows.length}
+          </span>
+
           {selected.length > 0 && (
             <button
               type="button"
@@ -149,6 +157,8 @@ export function ProductSheet({
             </button>
           )}
 
+          <SheetImport />
+
           <form action={addAction}>
             <Button type="submit" variant="secondary" disabled={adding}>
               {adding ? (
@@ -156,7 +166,8 @@ export function ProductSheet({
               ) : (
                 <Plus className="size-4" />
               )}
-              Add row
+              <span className="hidden sm:inline">Add row</span>
+              <span className="sm:hidden">Add</span>
             </Button>
           </form>
 
@@ -165,7 +176,7 @@ export function ProductSheet({
             onClick={() => setFull((value) => !value)}
             aria-label={full ? "Exit full screen" : "Full screen"}
             title={full ? "Exit full screen" : "Full screen"}
-            className="flex size-9 items-center justify-center rounded-lg bg-surface text-ink-secondary shadow-[0_0_0_1px_rgb(11_11_12_/_0.08)] transition hover:text-ink"
+            className="hidden size-9 items-center justify-center rounded-lg bg-surface text-ink-secondary shadow-[0_0_0_1px_rgb(11_11_12_/_0.08)] transition hover:text-ink md:flex"
           >
             {full ? (
               <Minimize2 className="size-4" />
@@ -182,9 +193,11 @@ export function ProductSheet({
         </p>
       )}
 
+      {/* Desktop: the real sheet. A spreadsheet needs its columns side by
+          side, and squeezing fourteen of them onto a phone helps nobody. */}
       <div
         className={cn(
-          "card min-h-0 flex-1 overflow-auto",
+          "card hidden min-h-0 flex-1 overflow-auto md:block",
           full ? "" : "max-h-[70vh]",
         )}
       >
@@ -406,9 +419,172 @@ export function ProductSheet({
         </table>
       </div>
 
+      {/* Mobile: one card per product, same edits, stacked. */}
+      <ul className="card divide-y divide-line md:hidden">
+        {visible.length === 0 ? (
+          <li className="px-4 py-10 text-center text-sm text-ink-muted">
+            {search
+              ? "No rows match that search."
+              : "No products yet. Add a row to start one."}
+          </li>
+        ) : (
+          visible.map((row) => {
+            const checked = selected.includes(row.id);
+            return (
+              <li
+                key={row.id}
+                className={cn("p-4", checked && "bg-brand-soft/50")}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="pt-1.5">
+                    <Checkbox
+                      checked={checked}
+                      onChange={() =>
+                        setSelected((current) =>
+                          checked
+                            ? current.filter((id) => id !== row.id)
+                            : [...current, row.id],
+                        )
+                      }
+                      label={`Select ${row.name}`}
+                    />
+                  </span>
+
+                  <span className="min-w-0 flex-1">
+                    <TextCell
+                      id={row.id}
+                      field="name"
+                      value={row.name}
+                      className="font-medium"
+                    />
+                  </span>
+
+                  <Link
+                    href={`/admin/products/${row.id}`}
+                    aria-label={`Open ${row.name}`}
+                    className="mt-1 flex size-7 shrink-0 items-center justify-center rounded text-ink-muted transition hover:bg-plane hover:text-ink"
+                  >
+                    <ExternalLink className="size-3.5" />
+                  </Link>
+                </div>
+
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5">
+                  <MobileField label="Colour">
+                    <PanelButton
+                      onClick={() => setEditing({ row, panel: "colors" })}
+                      label={`Colours for ${row.name}`}
+                    >
+                      {row.colors?.length ? (
+                        <ColorDots colors={row.colors} limit={4} />
+                      ) : (
+                        <Palette className="size-3.5 text-ink-muted" />
+                      )}
+                    </PanelButton>
+                  </MobileField>
+
+                  <MobileField label="Size">
+                    <PanelButton
+                      onClick={() => setEditing({ row, panel: "sizes" })}
+                      label={`Sizes for ${row.name}`}
+                    >
+                      {row.sizes?.length ? (
+                        <span className="truncate tabular-nums">
+                          {row.sizes.join(" · ")}
+                        </span>
+                      ) : (
+                        <Ruler className="size-3.5 text-ink-muted" />
+                      )}
+                    </PanelButton>
+                  </MobileField>
+
+                  <MobileField label="Qty">
+                    <span className="flex items-center gap-1.5">
+                      <StockDot
+                        stock={row.stock}
+                        threshold={row.low_stock_threshold}
+                      />
+                      <TextCell
+                        id={row.id}
+                        field="stock"
+                        type="number"
+                        value={String(row.stock)}
+                      />
+                    </span>
+                  </MobileField>
+
+                  <MobileField label="Sold">
+                    <span className="px-1.5 py-1 tabular-nums text-ink-secondary">
+                      {row.sold}
+                    </span>
+                  </MobileField>
+
+                  <MobileField label="Price">
+                    <TextCell
+                      id={row.id}
+                      field="price"
+                      value={koboToNairaInput(row.price_kobo)}
+                    />
+                  </MobileField>
+
+                  <MobileField label="Media">
+                    <PanelButton
+                      onClick={() => setEditing({ row, panel: "media" })}
+                      label={`Media for ${row.name}`}
+                    >
+                      {row.images?.length ? (
+                        <>
+                          <MediaThumb
+                            url={row.images[0]}
+                            className="size-6 rounded ring-1 ring-inset ring-line"
+                          />
+                          {row.images.length > 1 && (
+                            <span className="text-xs text-ink-muted">
+                              +{row.images.length - 1}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <Images className="size-3.5 text-ink-muted" />
+                      )}
+                    </PanelButton>
+                  </MobileField>
+
+                  <MobileField label="Category">
+                    <SelectCell
+                      id={row.id}
+                      field="category_id"
+                      value={row.category_id ?? ""}
+                      options={[
+                        { value: "", label: "—" },
+                        ...categories.map((category) => ({
+                          value: category.id,
+                          label: category.name,
+                        })),
+                      ]}
+                    />
+                  </MobileField>
+
+                  <MobileField label="Status">
+                    <SelectCell
+                      id={row.id}
+                      field="status"
+                      value={row.status}
+                      options={PRODUCT_STATUSES.map((status) => ({
+                        value: status,
+                        label: status[0].toUpperCase() + status.slice(1),
+                      }))}
+                    />
+                  </MobileField>
+                </dl>
+              </li>
+            );
+          })
+        )}
+      </ul>
+
       <EditorModal
         editing={editing}
-        aiEnabled={aiEnabled}
+        defaults={defaults}
         onClose={() => setEditing(null)}
       />
 
@@ -469,11 +645,11 @@ export function ProductSheet({
  */
 function EditorModal({
   editing,
-  aiEnabled,
+  defaults,
   onClose,
 }: {
   editing: { row: SheetRow; panel: "media" | "colors" | "sizes" } | null;
-  aiEnabled: boolean;
+  defaults: CatalogueDefaults;
   onClose: () => void;
 }) {
   const [saving, setSaving] = useState(false);
@@ -533,7 +709,7 @@ function EditorModal({
             <ColorPicker
               key={`colors-${row.id}`}
               initial={row.colors ?? []}
-              aiEnabled={aiEnabled}
+              suggestions={defaults.colors}
               onChange={(colors: ProductColor[]) => {
                 valueRef.current = JSON.stringify(colors);
               }}
@@ -544,6 +720,7 @@ function EditorModal({
             <SizePicker
               key={`sizes-${row.id}`}
               initial={row.sizes ?? []}
+              options={defaults.sizes}
               onChange={(sizes) => {
                 valueRef.current = JSON.stringify(sizes);
               }}
@@ -568,6 +745,23 @@ function EditorModal({
         </div>
       )}
     </Modal>
+  );
+}
+
+function MobileField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="mb-0.5 text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+        {label}
+      </dt>
+      <dd className="min-w-0">{children}</dd>
+    </div>
   );
 }
 

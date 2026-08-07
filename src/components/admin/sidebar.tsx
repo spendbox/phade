@@ -16,7 +16,6 @@ import {
   ShoppingBag,
   ShoppingCart,
   Table2,
-  Tags,
   Ticket,
   Users,
   X,
@@ -39,7 +38,6 @@ const NAV = [
 
 /** Set up once, then visited now and again — below the rule. */
 const SECONDARY = [
-  { href: "/admin/categories", label: "Categories", icon: Tags },
   { href: "/admin/sales", label: "Sales", icon: Ticket },
   { href: "/admin/checkouts", label: "Checkouts", icon: ShoppingCart },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },

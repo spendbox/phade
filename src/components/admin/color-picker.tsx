@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, Sparkles, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
-import { matchColors } from "@/lib/ai-client";
 import { cn } from "@/lib/cn";
 import type { ProductColor } from "@/lib/types";
 
@@ -15,7 +14,7 @@ import type { ProductColor } from "@/lib/types";
  * hidden input as JSON, so the surrounding server-action form picks it up.
  */
 
-const SUGGESTIONS: ProductColor[] = [
+const DEFAULT_SUGGESTIONS: ProductColor[] = [
   { name: "Black", hex: "#111111" },
   { name: "White", hex: "#f5f5f3" },
   { name: "Cream", hex: "#efe4d2" },
@@ -37,20 +36,18 @@ const SUGGESTIONS: ProductColor[] = [
 export function ColorPicker({
   name = "colors",
   initial = [],
-  aiEnabled = false,
+  suggestions = DEFAULT_SUGGESTIONS,
   onChange,
 }: {
   name?: string;
   initial?: ProductColor[];
-  /** Shows the "Match with AI" button, which turns typed names into shades. */
-  aiEnabled?: boolean;
+  /** Quick picks — the shop's saved palette, set in Settings. */
+  suggestions?: ProductColor[];
   onChange?: (colors: ProductColor[]) => void;
 }) {
   const [colors, setColors] = useState<ProductColor[]>(initial);
   const [draftName, setDraftName] = useState("");
   const [draftHex, setDraftHex] = useState("#a63655");
-  const [matching, setMatching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   function commit(next: ProductColor[]) {
     setColors(next);
@@ -64,35 +61,6 @@ export function ColorPicker({
       return;
     }
     commit([...colors, { name: clean, hex: color.hex }]);
-  }
-
-  /** "wine, nude" -> two named swatches with shades a buyer would recognise. */
-  async function match() {
-    const input = draftName.trim();
-    if (!input) return;
-
-    setMatching(true);
-    setError(null);
-    try {
-      const matched = await matchColors(input);
-      const merged = [...colors];
-      for (const color of matched) {
-        if (
-          merged.some(
-            (item) => item.name.toLowerCase() === color.name.toLowerCase(),
-          )
-        ) {
-          continue;
-        }
-        merged.push(color);
-      }
-      commit(merged);
-      setDraftName("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "That didn't work.");
-    } finally {
-      setMatching(false);
-    }
   }
 
   return (
@@ -171,41 +139,9 @@ export function ColorPicker({
         </button>
       </div>
 
-      {aiEnabled && (
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void match()}
-            disabled={matching || !draftName.trim()}
-            title={
-              draftName.trim()
-                ? undefined
-                : "Type colour names first, e.g. wine, nude, forest"
-            }
-            className="inline-flex h-7 items-center gap-1.5 rounded-md bg-brand-soft px-2 text-xs font-medium text-brand transition hover:bg-brand/10 disabled:opacity-50"
-          >
-            {matching ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <Sparkles className="size-3" />
-            )}
-            {matching ? "Matching…" : "Match with AI"}
-          </button>
-          <span className="text-xs text-ink-muted">
-            Type names like “wine, nude, forest” and AI picks the shades.
-          </span>
-        </div>
-      )}
-
-      {error && (
-        <p role="alert" className="text-xs text-critical">
-          {error}
-        </p>
-      )}
-
       {/* Quick picks */}
       <div className="flex flex-wrap gap-1.5">
-        {SUGGESTIONS.filter(
+        {suggestions.filter(
           (suggestion) =>
             !colors.some(
               (color) => color.name.toLowerCase() === suggestion.name.toLowerCase(),

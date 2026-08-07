@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 
+import type { CatalogueDefaults } from "@/lib/catalogue-settings";
 import type { Category } from "@/lib/types";
 
 /**
@@ -23,6 +24,7 @@ export function ProductUploaderMount(props: {
   categories: Category[];
   subcategories: string[];
   aiEnabled: boolean;
+  defaults: CatalogueDefaults;
   defaultLowStock: number;
 }) {
   return <ProductUploader {...props} />;

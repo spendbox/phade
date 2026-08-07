@@ -9,11 +9,11 @@ import { getSettings } from "@/lib/settings";
 import { categoryNameFor, generateSku } from "@/lib/sku";
 import { requireSupabase } from "@/lib/supabase";
 import { DELETE_CONFIRMATION } from "@/lib/types";
-import {
-  PRODUCT_SIZES,
-  type ActionResult,
-  type ProductColor,
-  type ProductStatus,
+import { parseSizeList } from "@/lib/catalogue-settings";
+import type {
+  ActionResult,
+  ProductColor,
+  ProductStatus,
 } from "@/lib/types";
 
 export type ProductFormState = ActionResult | { ok: null };
@@ -126,7 +126,7 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
   };
 }
 
-/** Only the sizes we actually stock survive, de-duplicated and in order. */
+/** Sizes arrive as JSON from the picker, or already parsed from a draft. */
 function parseSizes(raw: unknown): number[] {
   let list: unknown = raw;
   if (typeof raw === "string") {
@@ -136,32 +136,24 @@ function parseSizes(raw: unknown): number[] {
       return [];
     }
   }
-  if (!Array.isArray(list)) return [];
-
-  const allowed = new Set<number>(PRODUCT_SIZES);
-  const chosen = new Set<number>();
-  for (const item of list) {
-    const size = Number(item);
-    if (allowed.has(size)) chosen.add(size);
-  }
-  return PRODUCT_SIZES.filter((size) => chosen.has(size));
+  return parseSizeList(list);
 }
 
 /** Slugs are unique; append -2, -3 … until we find a free one. */
 async function uniqueSlug(base: string, ignoreId?: string): Promise<string> {
   const supabase = requireSupabase();
-  let candidate = base || "product";
-  let attempt = 1;
-
-  for (;;) {
+  // Bounded: a lookup that kept answering "taken" would otherwise spin
+  // forever, and a timestamped slug beats a hung request.
+  for (let attempt = 1; attempt <= 50; attempt += 1) {
+    const candidate = attempt === 1 ? base || "product" : `${base}-${attempt}`;
     let query = supabase.from("products").select("id").eq("slug", candidate);
     if (ignoreId) query = query.neq("id", ignoreId);
     const { data, error } = await query.limit(1);
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) return candidate;
-    attempt += 1;
-    candidate = `${base}-${attempt}`;
   }
+
+  return `${base}-${Date.now().toString().slice(-6)}`;
 }
 
 export async function createProduct(

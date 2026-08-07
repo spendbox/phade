@@ -12,6 +12,7 @@ import type {
   Payment,
   Product,
   ProductWithCategory,
+  SubcategoryWithCategory,
 } from "@/lib/types";
 
 /**
@@ -323,23 +324,48 @@ export async function getProducts(filters?: {
 }
 
 /** Existing subcategory values, to suggest while typing a new one. */
+/**
+ * The managed subcategory list, plus anything already typed onto a product
+ * before the list existed — so an older catalogue keeps offering its own terms
+ * rather than losing them the day the table arrived.
+ */
 export async function getSubcategories(): Promise<QueryResult<string[]>> {
   const supabase = getSupabase();
   if (!supabase) return empty([], NOT_CONFIGURED);
 
+  const [managed, used] = await Promise.all([
+    supabase.from("subcategories").select("name").order("sort_order"),
+    supabase.from("products").select("subcategory").not("subcategory", "is", null),
+  ]);
+
+  if (managed.error && used.error) return empty([], managed.error.message);
+
+  const unique = new Set<string>();
+  for (const row of (managed.data ?? []) as { name: string }[]) {
+    if (row.name?.trim()) unique.add(row.name.trim());
+  }
+  for (const row of (used.data ?? []) as { subcategory: string | null }[]) {
+    if (row.subcategory?.trim()) unique.add(row.subcategory.trim());
+  }
+
+  return empty([...unique].sort((a, b) => a.localeCompare(b)));
+}
+
+/** Full rows, for the settings screen where they're edited. */
+export async function getSubcategoryRows(): Promise<
+  QueryResult<SubcategoryWithCategory[]>
+> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
   const { data, error } = await supabase
-    .from("products")
-    .select("subcategory")
-    .not("subcategory", "is", null);
+    .from("subcategories")
+    .select("*, category:categories(id, name)")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
 
   if (error) return empty([], error.message);
-
-  const unique = new Set(
-    ((data ?? []) as { subcategory: string | null }[])
-      .map((row) => row.subcategory?.trim())
-      .filter((value): value is string => Boolean(value)),
-  );
-  return empty([...unique].sort((a, b) => a.localeCompare(b)));
+  return empty((data ?? []) as unknown as SubcategoryWithCategory[]);
 }
 
 export async function getProduct(

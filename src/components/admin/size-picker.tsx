@@ -10,16 +10,19 @@ import { PRODUCT_SIZES } from "@/lib/types";
  * most accessories) has no size at all, so an empty selection is a valid answer
  * rather than a missing one.
  *
- * The run is fixed at 6–18, so this is a row of toggles instead of a free text
- * field: nothing to mistype, and the order is always the same.
+ * The run comes from Settings, so this is a row of toggles instead of a free
+ * text field: nothing to mistype, and the order is always the same.
  */
 export function SizePicker({
   name = "sizes",
   initial = [],
+  options = PRODUCT_SIZES,
   onChange,
 }: {
   name?: string;
   initial?: number[];
+  /** The shop's size run, set in Settings. */
+  options?: readonly number[];
   onChange?: (sizes: number[]) => void;
 }) {
   const [sizes, setSizes] = useState<number[]>(initial);
@@ -27,7 +30,7 @@ export function SizePicker({
   function toggle(size: number) {
     const next = sizes.includes(size)
       ? sizes.filter((item) => item !== size)
-      : PRODUCT_SIZES.filter((item) => item === size || sizes.includes(item));
+      : options.filter((item) => item === size || sizes.includes(item));
     setSizes(next);
     onChange?.(next);
   }
@@ -37,7 +40,7 @@ export function SizePicker({
       <input type="hidden" name={name} value={JSON.stringify(sizes)} />
 
       <div className="flex flex-wrap gap-1.5">
-        {PRODUCT_SIZES.map((size) => {
+        {options.map((size) => {
           const on = sizes.includes(size);
           return (
             <button

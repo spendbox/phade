@@ -13,6 +13,7 @@ import {
 import { DescriptionField } from "@/components/admin/description-field";
 import { ColorPicker } from "@/components/admin/color-picker";
 import { SizePicker } from "@/components/admin/size-picker";
+import type { CatalogueDefaults } from "@/lib/catalogue-settings";
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { TagsField } from "@/components/admin/tags-field";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -34,12 +35,14 @@ export function ProductForm({
   categories,
   subcategories,
   aiEnabled,
+  defaults,
   defaultLowStock,
 }: {
   product?: ProductWithCategory;
   categories: Category[];
   subcategories: string[];
   aiEnabled: boolean;
+  defaults: CatalogueDefaults;
   defaultLowStock: number;
 }) {
   const isEdit = Boolean(product);
@@ -121,11 +124,14 @@ export function ProductForm({
           </Panel>
 
           <Panel title="Colours">
-            <ColorPicker initial={product?.colors ?? []} aiEnabled={aiEnabled} />
+            <ColorPicker
+              initial={product?.colors ?? []}
+              suggestions={defaults.colors}
+            />
           </Panel>
 
           <Panel title="Sizes">
-            <SizePicker initial={product?.sizes ?? []} />
+            <SizePicker initial={product?.sizes ?? []} options={defaults.sizes} />
           </Panel>
 
           <Panel title="Pricing">

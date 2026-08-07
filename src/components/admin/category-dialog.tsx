@@ -6,7 +6,7 @@ import { Loader2, Plus, Sparkles } from "lucide-react";
 import {
   saveCategory,
   type CategoryFormState,
-} from "@/app/admin/(dashboard)/categories/actions";
+} from "@/app/admin/(dashboard)/settings/categories/actions";
 import { IconPicker } from "@/components/admin/icon-picker";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Field, Input, NumberInput, Textarea } from "@/components/ui/field";

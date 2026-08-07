@@ -31,6 +31,20 @@ export type ProductColor = { name: string; hex: string };
 /** The size run phadewoman stocks. Sizes are optional per product. */
 export const PRODUCT_SIZES = [6, 8, 10, 12, 14, 16, 18] as const;
 
+export type Subcategory = {
+  id: string;
+  name: string;
+  slug: string;
+  category_id: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SubcategoryWithCategory = Subcategory & {
+  category: Pick<Category, "id" | "name"> | null;
+};
+
 export type Category = {
   id: string;
   name: string;
