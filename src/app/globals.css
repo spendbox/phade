@@ -3,9 +3,9 @@
 /* ---------------------------------------------------------------------------
    Design tokens
 
-   The admin dashboard commits to a single light look (dark sidebar, light
-   content) rather than shipping a half-tuned dark mode, so surfaces are fixed
-   rather than theme-switched.
+   The brand is #A63655 and black. The dashboard commits to a single light look
+   — light sidebar, light content — rather than shipping a half-tuned dark mode,
+   so surfaces are fixed rather than theme-switched.
 
    Chart colours come from a validated data-viz palette: a single blue series
    hue, plus reserved status colours that always ship beside a text label so
@@ -19,8 +19,8 @@
   /* Surfaces */
   --color-plane: #f6f6f5;
   --color-surface: #ffffff;
-  --color-sidebar: #0c0f16;
-  --color-sidebar-hover: #171b25;
+  --color-sidebar: #ffffff;
+  --color-sidebar-hover: #f2f2f1;
 
   /* Ink */
   --color-ink: #0b0b0c;
@@ -32,8 +32,9 @@
   --color-line-strong: #d8d8d4;
 
   /* Brand */
-  --color-brand: #a6265c;
-  --color-brand-soft: #fdf2f6;
+  --color-brand: #a63655;
+  --color-brand-dark: #8a2946;
+  --color-brand-soft: #fbeef2;
 
   /* Data-viz series (single hue — validated on a white surface) */
   --color-series: #2a78d6;
@@ -75,8 +76,18 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-series);
+    outline: 2px solid var(--color-brand);
     outline-offset: 2px;
+  }
+
+  /* Number fields: hide the spinners so a typed value is the only value. */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
   }
 }
 
@@ -93,6 +104,24 @@
   .scroll-x {
     overflow-x: auto;
     overscroll-behavior-x: contain;
+  }
+
+  /* Tables scroll inside the card so their header can stay put. */
+  .table-scroll {
+    overflow: auto;
+    max-height: calc(100dvh - 13rem);
+    overscroll-behavior: contain;
+  }
+
+  /* Column headings pin to the top of the scroll area while rows move under
+     them. The rule lives on the cells, not the row, because a sticky <tr> is
+     not honoured in every browser. */
+  .table-head th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--color-surface);
+    box-shadow: inset 0 -1px 0 var(--color-line);
   }
 }
 

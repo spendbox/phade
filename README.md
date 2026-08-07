@@ -16,8 +16,8 @@ admin dashboard is complete and usable.
 | --- | --- |
 | **Dashboard** | Revenue over time, order status mix, top sellers, recent orders, low-stock alerts. Switchable 7 / 30 / 90 day window. |
 | **Orders** | Filter by status and type, open an order to see items, totals, payments, delivery address, and change its status. |
-| **Products** | Add and edit products with photos, pricing, stock, category, tags. AI assistant for descriptions. Duplicate and delete. |
-| **Categories** | Create and edit categories; see how many products sit in each. |
+| **Products** | Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name and price side by side — autosaved as you work. AI assistant for descriptions. SKUs generate themselves. |
+| **Categories** | Create and edit categories with a chosen icon; see how many products sit in each. |
 | **Inventory** | Stock on hand and stock value, low/out-of-stock views, one-click ±1, and a full adjustment dialog that records the reason. Every change is logged. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
@@ -64,14 +64,15 @@ In Vercel, go to **Settings → Environment Variables** and add the following, t
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Your Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase `service_role` secret. Server-only. |
 | `PAYSTACK_SECRET_KEY` | — | Enables revenue tracking and payment sync. |
-| `ANTHROPIC_API_KEY` | — | Enables the AI description assistant. |
+| `OPENAI_API_KEY` | — | Enables the AI description assistant. |
+| `OPENAI_MODEL` | — | Which model writes descriptions. Defaults to `gpt-4o-mini`. |
 
 **To change the admin login later**, edit `ADMIN_EMAIL` / `ADMIN_PASSWORD` in
 Vercel and redeploy. There is no sign-up, no user table, and no password reset
 flow to secure — the credentials live only in the environment.
 
 Anything optional simply switches its feature off: without `PAYSTACK_SECRET_KEY`
-the Payments page explains what to add; without `ANTHROPIC_API_KEY` the AI
+the Payments page explains what to add; without `OPENAI_API_KEY` the AI
 buttons don't appear.
 
 ### 4. Paystack
@@ -112,7 +113,7 @@ src/
       (dashboard)/               Every dashboard page + its server actions
     api/
       admin/ai/describe/         AI description assistant
-      admin/upload/              Product image upload → Supabase Storage
+      admin/upload-url/          Signed URLs for direct media upload
       paystack/webhook/          Paystack webhook receiver
   components/
     admin/                       Shell, charts, forms, dialogs
@@ -137,6 +138,13 @@ A few decisions worth knowing:
 - **Stock changes are always logged.** Editing stock on the product page, using
   ±1, or using the adjustment dialog all write an `inventory_movements` row, so
   the history is a complete account rather than just a current number.
+- **Media uploads go straight to Supabase.** The browser asks the server for a
+  signed URL and PUTs the file itself, so videos aren't limited by the
+  serverless request body size. Images are downscaled before they leave the
+  browser; videos are stored as-is.
+- **The bulk uploader autosaves to the browser.** Drafts live in `localStorage`
+  until you publish, so a closed tab or a refresh doesn't lose a batch. Nothing
+  is written to the database until you hit Publish.
 - **Unconfigured integrations degrade gracefully.** A fresh deployment with no
   Supabase credentials renders setup instructions on each page instead of an
   error.

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/admin/login-form";
 import { adminCredentialsState, getSession } from "@/lib/auth";
+import { LOGO_TYPE } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Sign in · phadewoman admin",
@@ -23,11 +24,10 @@ export default async function LoginPage({
   return (
     <main className="flex min-h-dvh flex-col justify-center bg-plane px-4 py-12">
       <div className="mx-auto w-full max-w-sm">
-        <div className="mb-7 text-center">
-          <span className="text-lg font-semibold tracking-tight text-ink">
-            phade<span className="text-brand">woman</span>
-          </span>
-          <p className="mt-1.5 text-sm text-ink-secondary">
+        <div className="mb-7 flex flex-col items-center text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO_TYPE} alt="phadewoman" className="h-6 w-auto" />
+          <p className="mt-2.5 text-sm text-ink-secondary">
             Sign in to the admin dashboard
           </p>
         </div>

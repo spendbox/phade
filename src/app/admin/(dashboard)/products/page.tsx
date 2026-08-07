@@ -93,10 +93,10 @@ export default async function ProductsPage({
       ) : (
         <div className="card overflow-hidden">
           {/* Desktop table */}
-          <div className="scroll-x hidden md:block">
+          <div className="table-scroll hidden md:block">
             <table className="w-full min-w-[46rem] text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs font-medium text-ink-secondary">
+              <thead className="table-head">
+                <tr className="text-left text-xs font-medium text-ink-secondary">
                   <th className="px-5 py-3 font-medium">Product</th>
                   <th className="px-3 py-3 font-medium">Category</th>
                   <th className="px-3 py-3 text-right font-medium">Price</th>

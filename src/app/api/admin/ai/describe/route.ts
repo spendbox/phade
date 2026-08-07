@@ -1,18 +1,20 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import OpenAI from "openai";
 
 import { getSession } from "@/lib/auth";
 
 /**
- * Product description assistant.
+ * Product description assistant, powered by OpenAI.
  *
- * Thinking is on by default on this model and shares the max_tokens budget with
- * the response, so the cap is generous even though the copy itself is short.
- * Effort is low because writing a product blurb is not a reasoning-heavy task.
+ * The model is configurable through OPENAI_MODEL so it can be changed without a
+ * code edit; the default is a fast, inexpensive one, which suits short
+ * marketing copy.
  */
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+const DEFAULT_MODEL = "gpt-4o-mini";
 
 const MODES = {
   generate: "Write a fresh product description from the details provided.",
@@ -47,11 +49,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
       {
         error:
-          "The AI assistant isn't set up. Add ANTHROPIC_API_KEY in Vercel and redeploy.",
+          "The AI assistant isn't set up. Add OPENAI_API_KEY in Vercel and redeploy.",
       },
       { status: 501 },
     );
@@ -104,32 +106,17 @@ export async function POST(request: Request) {
     .join("\n");
 
   try {
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: "claude-opus-5",
-      max_tokens: 8000,
-      system: SYSTEM,
-      output_config: { effort: "low" },
+    const client = new OpenAI();
+    const completion = await client.chat.completions.create({
+      model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
+      max_completion_tokens: 600,
       messages: [
-        {
-          role: "user",
-          content: `${MODES[mode]}\n\n${details}`,
-        },
+        { role: "system", content: SYSTEM },
+        { role: "user", content: `${MODES[mode]}\n\n${details}` },
       ],
     });
 
-    if (response.stop_reason === "refusal") {
-      return NextResponse.json(
-        { error: "The assistant declined this request. Try rewording it." },
-        { status: 422 },
-      );
-    }
-
-    const description = response.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("")
-      .trim();
+    const description = completion.choices[0]?.message?.content?.trim() ?? "";
 
     if (!description) {
       return NextResponse.json(
@@ -141,8 +128,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ description });
   } catch (error) {
     const message =
-      error instanceof Anthropic.APIError
-        ? `AI request failed (${error.status}).`
+      error instanceof OpenAI.APIError
+        ? `AI request failed (${error.status}): ${error.message}`
         : "AI request failed.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
