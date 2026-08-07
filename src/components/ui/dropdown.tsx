@@ -1,25 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { panelClass, panelStyle, usePopover } from "@/components/ui/popover";
 
 export type DropdownOption = { value: string; label: string };
 
-type PanelPosition = {
-  left: number;
-  top?: number;
-  bottom?: number;
-  maxHeight?: number;
-};
-
 const PANEL_WIDTH = 224;
-const PANEL_GAP = 6;
-const VIEWPORT_MARGIN = 8;
-/** Below this, dropping down would leave a panel too short to be useful. */
-const MIN_ROOM = 180;
 
 /**
  * Select-style dropdown built from a button and a portalled panel.
@@ -45,66 +34,8 @@ export function Dropdown({
   allLabel?: string;
   className?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<PanelPosition>({ left: 0, top: 0 });
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * Anchor the panel to whichever side of the trigger has room. A trigger in a
-   * bar pinned to the bottom of the window has almost nothing beneath it, so
-   * dropping down would push the options off-screen — those flip upwards.
-   */
-  function place() {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const left = Math.max(
-      VIEWPORT_MARGIN,
-      Math.min(rect.left, window.innerWidth - PANEL_WIDTH - VIEWPORT_MARGIN),
-    );
-    const below = window.innerHeight - rect.bottom - PANEL_GAP - VIEWPORT_MARGIN;
-    const above = rect.top - PANEL_GAP - VIEWPORT_MARGIN;
-
-    if (below < MIN_ROOM && above > below) {
-      setPosition({
-        left,
-        bottom: window.innerHeight - rect.top + PANEL_GAP,
-        maxHeight: above,
-      });
-      return;
-    }
-
-    setPosition({ left, top: rect.bottom + PANEL_GAP, maxHeight: below });
-  }
-
-  useEffect(() => {
-    if (!open) return;
-
-    function onPointerDown(event: MouseEvent) {
-      const target = event.target as Node;
-      if (
-        !panelRef.current?.contains(target) &&
-        !triggerRef.current?.contains(target)
-      ) {
-        setOpen(false);
-      }
-    }
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [open]);
+  const { open, setOpen, toggle, position, triggerRef, panelRef } =
+    usePopover<HTMLButtonElement>(PANEL_WIDTH);
 
   const selected = options.find((option) => option.value === value);
 
@@ -113,10 +44,7 @@ export function Dropdown({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => {
-          if (!open) place();
-          setOpen((current) => !current);
-        }}
+        onClick={toggle}
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
@@ -144,14 +72,8 @@ export function Dropdown({
             ref={panelRef}
             role="listbox"
             aria-label={label}
-            style={{
-              top: position.top,
-              bottom: position.bottom,
-              left: position.left,
-              width: PANEL_WIDTH,
-              maxHeight: Math.min(position.maxHeight ?? 288, 288),
-            }}
-            className="fixed z-[60] overflow-y-auto rounded-xl bg-surface p-1 shadow-[0_0_0_1px_rgb(11_11_12_/_0.08),0_8px_24px_rgb(11_11_12_/_0.14)]"
+            style={panelStyle(position, PANEL_WIDTH)}
+            className={panelClass}
           >
             <Row
               label={allLabel ?? `All ${plural(label.toLowerCase())}`}

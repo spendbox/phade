@@ -17,8 +17,8 @@ admin dashboard is complete and usable.
 | **Dashboard** | Revenue over time, order status mix, top sellers, recent orders, low-stock alerts. Switchable 7 / 30 / 90 day window. |
 | **Orders** | Filter by status and type, open an order to see items, totals, payments, delivery address, and change its status. |
 | **Checkouts** | Carts that were started but never paid for, what was left in them, and how many made it through. Needs `STOREFRONT_API_KEY`. |
-| **Products** | Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name, price and stock side by side — autosaved as you work. Optional colourways and sizes, bulk-select rows to change status or delete. AI writes descriptions and suggests tags. SKUs generate themselves. |
-| **Database** | The whole catalogue as one editable spreadsheet. Cells save as you leave them, new rows arrive as drafts, media / colours / sizes open in a dialog, and units sold and revenue come along for the ride. Import a CSV or Excel file with a progress bar, or open the sheet full screen. Falls back to cards on a phone. |
+| **Products** | Category, price, stock and status edit in place — changing a price shouldn't mean opening a product. Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name, price and stock side by side — autosaved as you work. Optional colourways and sizes, bulk-select rows to change status or delete. AI writes descriptions and suggests tags. SKUs generate themselves. |
+| **Database** | The whole catalogue as one editable spreadsheet — name, colour, size, quantity, sold, media, category, price, cost, status, SKU, subcategory, revenue and when it was added. Cells save as you leave them, new rows arrive as drafts, media / colours / sizes open in a dialog. Download the column template, import a CSV or Excel file with a progress bar, or open the sheet full screen. Falls back to cards on a phone. |
 | **Inventory** | Featured image, stock on hand and stock value, red/amber/green level indicators, one-click ±1, and a full adjustment dialog that records the reason. The five most recent movements sit on the page, with the full history one click away. |
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
@@ -130,6 +130,7 @@ src/
     storefront.ts                Shop-front copy, stored as one settings row
     catalogue-settings.ts        The shop's colour palette and size run
     spreadsheet.ts               CSV and .xlsx reader, no dependencies
+    xlsx-writer.ts               .xlsx writer for the import template
   proxy.ts                       Gates /admin behind a valid session
 supabase/schema.sql              Database schema — run once
 ```
@@ -161,13 +162,16 @@ A few decisions worth knowing:
   hides its panel rather than tearing it down. A dialog opened from a menu
   therefore outlives the menu — a hand-rolled dialog nested inside a closing
   popover is why the sale editor used to flash and vanish.
-- **Spreadsheets are read without a parser dependency.** Both maintained npm
+- **Spreadsheets are read and written without a parser dependency.** Both maintained npm
   xlsx readers ship with unfixed advisories, and a product importer isn't worth
   a known-vulnerable dependency. `src/lib/spreadsheet.ts` reads CSV/TSV directly
   and unpacks `.xlsx` with the platform's own `DecompressionStream` and
   `DOMParser` — a zip of XML, about a hundred lines, no supply chain. Imports
   are sent in batches of ten so the progress bar counts rows the server actually
-  wrote rather than guessing at one long request.
+  wrote rather than guessing at one long request. `src/lib/xlsx-writer.ts` goes
+  the other way for the downloadable template, which is generated from the same
+  column list the importer reads — so the two can't drift apart — with the four
+  columns we ask for highlighted and placed first.
 - **Colour names are resolved once per import.** The shop's saved palette answers
   first, so "Wine" is whatever the admin decided wine looks like; only names the
   palette doesn't know go to the assistant, in one request for the whole file. If

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import { Download, FileSpreadsheet, Loader2, Upload } from "lucide-react";
 
 import {
   importSheetRows,
@@ -14,11 +14,13 @@ import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/cn";
 import {
   SPREADSHEET_ACCEPT,
+  TEMPLATE_COLUMNS,
   mapColumns,
   readSpreadsheet,
   splitList,
   type SheetField,
 } from "@/lib/spreadsheet";
+import { buildTemplateWorkbook } from "@/lib/xlsx-writer";
 import type { ProductColor } from "@/lib/types";
 
 /** Rows per request. Small enough that the bar moves, large enough to be quick. */
@@ -132,6 +134,25 @@ export function SheetImport() {
     }
   }
 
+  /** The template is generated here rather than served — it tracks the columns
+   *  the importer actually reads, so the two can never drift apart. */
+  function downloadTemplate() {
+    const blob = buildTemplateWorkbook(
+      TEMPLATE_COLUMNS.map((column) => ({
+        header: column.header,
+        required: column.required,
+        width: column.width,
+      })),
+    );
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "phadewoman-products-template.xlsx";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function close() {
     if (busy) return;
     setOpen(false);
@@ -204,16 +225,49 @@ export function SheetImport() {
                 />
               </div>
 
-              <div className="rounded-lg bg-plane px-3 py-2.5 text-xs leading-relaxed text-ink-secondary">
-                <p className="font-medium text-ink">
-                  Name, colour, size, quantity and sold
+              <button
+                type="button"
+                onClick={downloadTemplate}
+                className="flex w-full items-center gap-3 rounded-lg bg-plane px-3 py-2.5 text-left transition hover:bg-line/60"
+              >
+                <Download className="size-4 shrink-0 text-brand" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-ink">
+                    Download the template
+                  </span>
+                  <span className="block text-xs text-ink-secondary">
+                    Every column we read, with the four we ask for highlighted
+                    and first.
+                  </span>
+                </span>
+              </button>
+
+              <div className="rounded-lg ring-1 ring-inset ring-line">
+                <p className="border-b border-line px-3 py-2 text-xs font-medium text-ink">
+                  What each column takes
                 </p>
-                <p className="mt-1">
-                  Those are all that&apos;s needed — price, category,
-                  subcategory, SKU, description and tags come in too if the
-                  columns are there. Colour names are read as you write them
-                  (“wine, nude”) and matched to your palette. Everything is
-                  saved as a draft for you to review.
+                <ul className="max-h-52 divide-y divide-line overflow-y-auto">
+                  {TEMPLATE_COLUMNS.map((column) => (
+                    <li
+                      key={column.header}
+                      className="flex gap-3 px-3 py-1.5 text-xs leading-relaxed"
+                    >
+                      <span
+                        className={cn(
+                          "w-24 shrink-0 font-medium",
+                          column.required ? "text-brand" : "text-ink-secondary",
+                        )}
+                      >
+                        {column.header}
+                      </span>
+                      <span className="min-w-0 flex-1 text-ink-muted">
+                        {column.note}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="border-t border-line px-3 py-2 text-xs text-ink-muted">
+                  Everything lands as a draft for you to review.
                 </p>
               </div>
 

@@ -17,16 +17,30 @@ import {
   RowMenu,
   menuItemClass,
 } from "@/components/admin/row-menu";
-import { ProductStatusBadge, StockBadge, StockDot } from "@/components/ui/badge";
+import { SelectCell, TextCell } from "@/components/admin/sheet-cells";
+import { StockDot } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
-import { formatNaira } from "@/lib/format";
+import { koboToNairaInput } from "@/lib/format";
 import type { ProductRow } from "@/lib/queries";
+import { PRODUCT_STATUSES } from "@/lib/types";
 
 /**
  * The products table. Client-side because of the selection checkboxes — the
  * rows themselves are still rendered from server-fetched data.
+ *
+ * Category, price, stock and status are editable in place, using the same
+ * one-field-at-a-time save the Database sheet uses. Changing a price shouldn't
+ * mean opening a product, and the two screens now behave the same way.
  */
-export function ProductsTable({ products }: { products: ProductRow[] }) {
+export function ProductsTable({
+  products,
+  categories,
+  subcategories,
+}: {
+  products: ProductRow[];
+  categories: { id: string; name: string }[];
+  subcategories: string[];
+}) {
   const [selected, setSelected] = useState<string[]>([]);
 
   // Rows can disappear under the selection after a delete or a filter change.
@@ -65,7 +79,7 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
                 </th>
                 <th className="px-3 py-3 font-medium">Product</th>
                 <th className="px-3 py-3 font-medium">Category</th>
-                <th className="px-3 py-3 text-right font-medium">Price</th>
+                <th className="px-3 py-3 text-right font-medium">Price ₦</th>
                 <th className="px-3 py-3 text-right font-medium">Stock</th>
                 <th className="px-3 py-3 text-right font-medium">Orders</th>
                 <th className="px-3 py-3 font-medium">Status</th>
@@ -113,26 +127,51 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
                       </Link>
                     </td>
 
-                    <td className="px-3 py-3 text-ink-secondary">
-                      <span className="block truncate">
-                        {product.category?.name ?? "—"}
-                      </span>
-                      {product.subcategory && (
-                        <span className="block truncate text-xs text-ink-muted">
-                          {product.subcategory}
-                        </span>
-                      )}
+                    <td className="px-3 py-3">
+                      <SelectCell
+                        id={product.id}
+                        field="category_id"
+                        value={product.category_id ?? ""}
+                        options={[
+                          { value: "", label: "—" },
+                          ...categories.map((category) => ({
+                            value: category.id,
+                            label: category.name,
+                          })),
+                        ]}
+                      />
+                      <SelectCell
+                        id={product.id}
+                        field="subcategory"
+                        value={product.subcategory ?? ""}
+                        placeholder="Subcategory"
+                        options={subcategories.map((value) => ({
+                          value,
+                          label: value,
+                        }))}
+                        className="text-xs text-ink-muted"
+                      />
                     </td>
 
-                    <td className="px-3 py-3 text-right font-medium tabular-nums text-ink">
-                      {formatNaira(product.price_kobo)}
+                    <td className="px-3 py-3">
+                      <TextCell
+                        id={product.id}
+                        field="price"
+                        align="right"
+                        value={koboToNairaInput(product.price_kobo)}
+                        className="font-medium"
+                      />
                     </td>
 
-                    <td className="whitespace-nowrap px-3 py-3 text-right">
-                      <span className="inline-flex items-center gap-2">
-                        <span className="tabular-nums text-ink-secondary">
-                          {product.stock}
-                        </span>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      <span className="flex items-center justify-end gap-1.5">
+                        <TextCell
+                          id={product.id}
+                          field="stock"
+                          type="number"
+                          align="right"
+                          value={String(product.stock)}
+                        />
                         <StockDot
                           stock={product.stock}
                           threshold={product.low_stock_threshold}
@@ -145,7 +184,15 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
                     </td>
 
                     <td className="px-3 py-3">
-                      <ProductStatusBadge status={product.status} />
+                      <SelectCell
+                        id={product.id}
+                        field="status"
+                        value={product.status}
+                        options={PRODUCT_STATUSES.map((status) => ({
+                          value: status,
+                          label: status[0].toUpperCase() + status.slice(1),
+                        }))}
+                      />
                     </td>
 
                     <td className="px-3 py-3">
@@ -176,26 +223,50 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
                   label={`Select ${product.name}`}
                 />
                 <Thumb src={product.images?.[0]} />
-                <Link
-                  href={`/admin/products/${product.id}`}
-                  className="min-w-0 flex-1"
-                >
-                  <p className="truncate text-sm font-medium text-ink">
-                    {product.name}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-ink-muted">
-                    {product.category?.name ?? "No category"} ·{" "}
-                    {formatNaira(product.price_kobo)} · {product.orderCount}{" "}
-                    order{product.orderCount === 1 ? "" : "s"}
-                  </p>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                    <ProductStatusBadge status={product.status} />
-                    <StockBadge
-                      stock={product.stock}
-                      threshold={product.low_stock_threshold}
+                <div className="min-w-0 flex-1">
+                  <Link href={`/admin/products/${product.id}`}>
+                    <p className="truncate text-sm font-medium text-ink">
+                      {product.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-ink-muted">
+                      {product.category?.name ?? "No category"} ·{" "}
+                      {product.orderCount} order
+                      {product.orderCount === 1 ? "" : "s"}
+                    </p>
+                  </Link>
+
+                  <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1">
+                    <TextCell
+                      id={product.id}
+                      field="price"
+                      prefix="₦"
+                      value={koboToNairaInput(product.price_kobo)}
                     />
+                    <span className="flex items-center gap-1.5">
+                      <StockDot
+                        stock={product.stock}
+                        threshold={product.low_stock_threshold}
+                      />
+                      <TextCell
+                        id={product.id}
+                        field="stock"
+                        type="number"
+                        value={String(product.stock)}
+                      />
+                    </span>
+                    <span className="col-span-2">
+                      <SelectCell
+                        id={product.id}
+                        field="status"
+                        value={product.status}
+                        options={PRODUCT_STATUSES.map((status) => ({
+                          value: status,
+                          label: status[0].toUpperCase() + status.slice(1),
+                        }))}
+                      />
+                    </span>
                   </div>
-                </Link>
+                </div>
                 <ProductRowMenu id={product.id} name={product.name} />
               </li>
             );
