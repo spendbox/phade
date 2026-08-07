@@ -24,6 +24,27 @@ create table if not exists public.categories (
   updated_at  timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------------------
+-- Subcategories
+--
+-- A named list rather than free text on the product, so "Two piece",
+-- "Two-piece" and "2 piece" can't all end up in the same catalogue. Each one
+-- optionally belongs to a category; a subcategory with no category is offered
+-- everywhere.
+-- ---------------------------------------------------------------------------
+create table if not exists public.subcategories (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  slug        text not null unique,
+  category_id uuid references public.categories(id) on delete cascade,
+  sort_order  integer not null default 0,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists subcategories_category_idx
+  on public.subcategories (category_id);
+
 -- For projects created before category icons existed.
 alter table public.categories
   add column if not exists icon text not null default 'tag';
@@ -248,6 +269,35 @@ insert into public.app_settings (key, value) values
   ('low_stock_threshold', '5'::jsonb)
 on conflict (key) do nothing;
 
+-- Common subcategories for this catalogue. Edit them in Settings -> Catalogue.
+insert into public.subcategories (name, slug, category_id, sort_order)
+select v.name, v.slug, c.id, v.sort_order
+from (values
+  ('Totes',            'totes',            'bags',                  1),
+  ('Shoulder bags',    'shoulder-bags',    'bags',                  2),
+  ('Crossbody bags',   'crossbody-bags',   'bags',                  3),
+  ('Clutches',         'clutches',         'bags',                  4),
+  ('Mini bags',        'mini-bags',        'bags',                  5),
+  ('Heels',            'heels',            'shoes',                 1),
+  ('Flats',            'flats',            'shoes',                 2),
+  ('Sandals',          'sandals',          'shoes',                 3),
+  ('Mules',            'mules',            'shoes',                 4),
+  ('Slides',           'slides',           'shoes',                 5),
+  ('Boots',            'boots',            'shoes',                 6),
+  ('Open abayas',      'open-abayas',      'abayas',                1),
+  ('Closed abayas',    'closed-abayas',    'abayas',                2),
+  ('Kaftans',          'kaftans',          'abayas',                3),
+  ('Kimonos',          'kimonos',          'abayas',                4),
+  ('Two-piece sets',   'two-piece-sets',   'ready-to-wear-outfits', 1),
+  ('Dresses',          'dresses',          'ready-to-wear-outfits', 2),
+  ('Jumpsuits',        'jumpsuits',        'ready-to-wear-outfits', 3),
+  ('Skirts',           'skirts',           'ready-to-wear-outfits', 4),
+  ('Tops',             'tops',             'ready-to-wear-outfits', 5),
+  ('Trousers',         'trousers',         'ready-to-wear-outfits', 6)
+) as v(name, slug, category_slug, sort_order)
+join public.categories c on c.slug = v.category_slug
+on conflict (slug) do nothing;
+
 -- ---------------------------------------------------------------------------
 -- updated_at triggers
 -- ---------------------------------------------------------------------------
@@ -283,6 +333,7 @@ $$;
 -- anon/public key can never read or write these tables directly.
 -- ---------------------------------------------------------------------------
 alter table public.app_settings        enable row level security;
+alter table public.subcategories       enable row level security;
 alter table public.carts               enable row level security;
 alter table public.discount_categories enable row level security;
 alter table public.discount_products   enable row level security;

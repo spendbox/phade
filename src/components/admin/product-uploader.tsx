@@ -22,6 +22,7 @@ import {
 } from "@/app/admin/(dashboard)/products/actions";
 import { ColorPicker } from "@/components/admin/color-picker";
 import { SizePicker } from "@/components/admin/size-picker";
+import type { CatalogueDefaults } from "@/lib/catalogue-settings";
 import { MediaThumb } from "@/components/admin/media-thumb";
 import { Button, buttonClass } from "@/components/ui/button";
 import {
@@ -119,11 +120,13 @@ export function ProductUploader({
   categories,
   subcategories,
   aiEnabled,
+  defaults,
   defaultLowStock,
 }: {
   categories: Category[];
   subcategories: string[];
   aiEnabled: boolean;
+  defaults: CatalogueDefaults;
   defaultLowStock: number;
 }) {
   // Read once, on the first render — the component never server-renders, so
@@ -247,7 +250,7 @@ export function ProductUploader({
         {categories.length === 0 ? (
           <p className="mt-5 rounded-lg bg-warning-soft px-3 py-2 text-sm text-[#7a5200]">
             No categories yet —{" "}
-            <Link href="/admin/categories" className="font-medium underline">
+            <Link href="/admin/settings/categories" className="font-medium underline">
               create one first
             </Link>
             .
@@ -538,6 +541,7 @@ export function ProductUploader({
                         draft={draft}
                         categoryName={category?.name}
                         aiEnabled={aiEnabled}
+                        defaults={defaults}
                         defaultLowStock={defaultLowStock}
                         onChange={(patch) => update(draft.id, patch)}
                       />
@@ -677,12 +681,14 @@ function MoreDetails({
   draft,
   categoryName,
   aiEnabled,
+  defaults,
   defaultLowStock,
   onChange,
 }: {
   draft: Draft;
   categoryName?: string;
   aiEnabled: boolean;
+  defaults: CatalogueDefaults;
   defaultLowStock: number;
   onChange: (patch: Partial<Draft>) => void;
 }) {
@@ -816,7 +822,7 @@ function MoreDetails({
         <ColorPicker
           name={`colors-${draft.id}`}
           initial={draft.colors}
-          aiEnabled={aiEnabled}
+          suggestions={defaults.colors}
           onChange={(colors) => onChange({ colors })}
         />
       </Field>
@@ -825,6 +831,7 @@ function MoreDetails({
         <SizePicker
           name={`sizes-${draft.id}`}
           initial={draft.sizes}
+          options={defaults.sizes}
           onChange={(sizes) => onChange({ sizes })}
         />
       </Field>

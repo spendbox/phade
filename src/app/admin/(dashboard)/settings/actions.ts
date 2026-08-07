@@ -3,6 +3,12 @@
 import { revalidatePath } from "next/cache";
 
 import { actionError, requireAdmin } from "@/lib/guard";
+import {
+  CATALOGUE_KEY,
+  parseColorList,
+  parseSizeList,
+  type CatalogueDefaults,
+} from "@/lib/catalogue-settings";
 import { SETTING_KEYS } from "@/lib/settings";
 import {
   STOREFRONT_KEY,
@@ -107,6 +113,59 @@ export async function saveStorefront(
     revalidatePath("/admin/settings/storefront");
     revalidatePath("/");
     return { ok: true, message: "Storefront updated." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export type CatalogueFormState = ActionResult | { ok: null };
+
+/**
+ * The shop's palette and size run. Both are stored whole rather than merged,
+ * so removing a colour here actually removes it instead of leaving a stale
+ * entry behind.
+ */
+export async function saveCatalogue(
+  _previous: CatalogueFormState,
+  formData: FormData,
+): Promise<CatalogueFormState> {
+  try {
+    await requireAdmin();
+    const supabase = requireSupabase();
+
+    let rawColors: unknown = [];
+    let rawSizes: unknown = [];
+    try {
+      rawColors = JSON.parse(String(formData.get("colors") ?? "[]"));
+      rawSizes = JSON.parse(String(formData.get("sizes") ?? "[]"));
+    } catch {
+      throw new Error("Couldn't read those values. Try again.");
+    }
+
+    const colors = parseColorList(rawColors);
+    if (colors.length === 0) {
+      throw new Error("Keep at least one colour in the palette.");
+    }
+
+    const content: CatalogueDefaults = {
+      colors,
+      sizes: parseSizeList(rawSizes),
+    };
+
+    const { error } = await supabase.from("app_settings").upsert(
+      {
+        key: CATALOGUE_KEY,
+        value: content,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" },
+    );
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/settings/catalogue");
+    revalidatePath("/admin/products/new");
+    revalidatePath("/admin/database");
+    return { ok: true, message: "Catalogue updated." };
   } catch (error) {
     return actionError(error);
   }

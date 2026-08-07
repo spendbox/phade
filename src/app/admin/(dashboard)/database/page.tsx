@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/admin/page-header";
 import { ProductSheet } from "@/components/admin/product-sheet";
 import { ErrorNotice, SetupNotice } from "@/components/admin/setup-notice";
+import { getCatalogueDefaults } from "@/lib/catalogue-settings";
 import { getCategories, getSheetRows } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
@@ -8,10 +9,8 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Database" };
 
 export default async function DatabasePage() {
-  const [{ data: rows, error }, { data: categories }] = await Promise.all([
-    getSheetRows(),
-    getCategories(),
-  ]);
+  const [{ data: rows, error }, { data: categories }, defaults] =
+    await Promise.all([getSheetRows(), getCategories(), getCatalogueDefaults()]);
 
   const configured = isSupabaseConfigured();
 
@@ -32,7 +31,7 @@ export default async function DatabasePage() {
             id: category.id,
             name: category.name,
           }))}
-          aiEnabled={Boolean(process.env.OPENAI_API_KEY)}
+          defaults={defaults}
         />
       )}
     </div>
