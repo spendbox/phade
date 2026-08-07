@@ -8,7 +8,18 @@ import { cn } from "@/lib/cn";
 
 export type DropdownOption = { value: string; label: string };
 
+type PanelPosition = {
+  left: number;
+  top?: number;
+  bottom?: number;
+  maxHeight?: number;
+};
+
 const PANEL_WIDTH = 224;
+const PANEL_GAP = 6;
+const VIEWPORT_MARGIN = 8;
+/** Below this, dropping down would leave a panel too short to be useful. */
+const MIN_ROOM = 180;
 
 /**
  * Select-style dropdown built from a button and a portalled panel.
@@ -35,17 +46,36 @@ export function Dropdown({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState<PanelPosition>({ left: 0, top: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Anchor the panel to whichever side of the trigger has room. A trigger in a
+   * bar pinned to the bottom of the window has almost nothing beneath it, so
+   * dropping down would push the options off-screen — those flip upwards.
+   */
   function place() {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setPosition({
-      top: rect.bottom + 6,
-      left: Math.min(rect.left, window.innerWidth - PANEL_WIDTH - 8),
-    });
+
+    const left = Math.max(
+      VIEWPORT_MARGIN,
+      Math.min(rect.left, window.innerWidth - PANEL_WIDTH - VIEWPORT_MARGIN),
+    );
+    const below = window.innerHeight - rect.bottom - PANEL_GAP - VIEWPORT_MARGIN;
+    const above = rect.top - PANEL_GAP - VIEWPORT_MARGIN;
+
+    if (below < MIN_ROOM && above > below) {
+      setPosition({
+        left,
+        bottom: window.innerHeight - rect.top + PANEL_GAP,
+        maxHeight: above,
+      });
+      return;
+    }
+
+    setPosition({ left, top: rect.bottom + PANEL_GAP, maxHeight: below });
   }
 
   useEffect(() => {
@@ -114,8 +144,14 @@ export function Dropdown({
             ref={panelRef}
             role="listbox"
             aria-label={label}
-            style={{ top: position.top, left: position.left, width: PANEL_WIDTH }}
-            className="fixed z-[60] max-h-72 overflow-y-auto rounded-xl bg-surface p-1 shadow-[0_0_0_1px_rgb(11_11_12_/_0.08),0_8px_24px_rgb(11_11_12_/_0.14)]"
+            style={{
+              top: position.top,
+              bottom: position.bottom,
+              left: position.left,
+              width: PANEL_WIDTH,
+              maxHeight: Math.min(position.maxHeight ?? 288, 288),
+            }}
+            className="fixed z-[60] overflow-y-auto rounded-xl bg-surface p-1 shadow-[0_0_0_1px_rgb(11_11_12_/_0.08),0_8px_24px_rgb(11_11_12_/_0.14)]"
           >
             <Row
               label={allLabel ?? `All ${plural(label.toLowerCase())}`}

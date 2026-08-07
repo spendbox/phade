@@ -156,9 +156,6 @@ export default async function InventoryPage({
                             <span className="font-medium tabular-nums text-ink">
                               {row.stock}
                             </span>
-                            <span className="text-xs text-ink-muted">
-                              reorder at {row.low_stock_threshold}
-                            </span>
                           </span>
                         </td>
                         <td className="px-3 py-3 text-right tabular-nums text-ink-secondary">
