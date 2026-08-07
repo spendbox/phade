@@ -14,7 +14,9 @@ import {
   PanelLeftOpen,
   Settings,
   ShoppingBag,
+  ShoppingCart,
   Tags,
+  Ticket,
   Users,
   X,
 } from "lucide-react";
@@ -27,9 +29,11 @@ import { SIDEBAR_COOKIE } from "@/lib/ui-cookies";
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
+  { href: "/admin/checkouts", label: "Checkouts", icon: ShoppingCart },
   { href: "/admin/products", label: "Products", icon: Package },
   { href: "/admin/categories", label: "Categories", icon: Tags },
   { href: "/admin/inventory", label: "Inventory", icon: Boxes },
+  { href: "/admin/sales", label: "Sales", icon: Ticket },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
   { href: "/admin/customers", label: "Customers", icon: Users },
 ] as const;

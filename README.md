@@ -16,12 +16,14 @@ admin dashboard is complete and usable.
 | --- | --- |
 | **Dashboard** | Revenue over time, order status mix, top sellers, recent orders, low-stock alerts. Switchable 7 / 30 / 90 day window. |
 | **Orders** | Filter by status and type, open an order to see items, totals, payments, delivery address, and change its status. |
-| **Products** | Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name, price and stock side by side — autosaved as you work. Bulk-select rows to change status or delete. AI writes descriptions and suggests tags from them. SKUs generate themselves. |
+| **Checkouts** | Carts that were started but never paid for, what was left in them, and how many made it through. Needs `STOREFRONT_API_KEY`. |
+| **Products** | Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name, price and stock side by side — autosaved as you work. Optional colourways, bulk-select rows to change status or delete. AI writes descriptions and suggests tags from them. SKUs generate themselves. |
 | **Categories** | Create and edit categories with a chosen icon, and let AI grow a short description into a fuller one. |
-| **Inventory** | Stock on hand and stock value, red/amber/green level indicators, one-click ±1, and a full adjustment dialog that records the reason. The five most recent movements sit on the page, with the full history one click away. |
+| **Inventory** | Featured image, stock on hand and stock value, red/amber/green level indicators, one-click ±1, and a full adjustment dialog that records the reason. The five most recent movements sit on the page, with the full history one click away. |
+| **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | The default low-stock alert level, plus which integrations are connected and which environment variables drive them. |
+| **Settings** | **General** holds the default low-stock alert level; **Developers** lists which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -66,6 +68,7 @@ In Vercel, go to **Settings → Environment Variables** and add the following, t
 | `PAYSTACK_SECRET_KEY` | — | Enables revenue tracking and payment sync. |
 | `OPENAI_API_KEY` | — | Enables the AI description assistant. |
 | `OPENAI_MODEL` | — | Which model writes descriptions. Defaults to `gpt-4o-mini`. |
+| `STOREFRONT_API_KEY` | — | Shared secret the storefront sends as `x-storefront-key` when it POSTs cart changes to `/api/cart`. Unset means the endpoint stays closed and the Checkouts page stays empty. |
 
 **To change the admin login later**, edit `ADMIN_EMAIL` / `ADMIN_PASSWORD` in
 Vercel and redeploy. There is no sign-up, no user table, and no password reset
@@ -114,6 +117,7 @@ src/
     api/
       admin/ai/describe/         AI description assistant
       admin/upload-url/          Signed URLs for direct media upload
+      cart/                      Storefront cart tracking (shared-secret gated)
       paystack/webhook/          Paystack webhook receiver
   components/
     admin/                       Shell, charts, forms, dialogs
@@ -145,6 +149,10 @@ A few decisions worth knowing:
 - **The bulk uploader autosaves to the browser.** Drafts live in `localStorage`
   until you publish, so a closed tab or a refresh doesn't lose a batch. Nothing
   is written to the database until you hit Publish.
+- **Cart tracking is opt-in and closed by default.** `/api/cart` is the one route
+  that writes without an admin session, so it answers `501` until
+  `STOREFRONT_API_KEY` is set and `401` to anyone who doesn't send it. Carts idle
+  for over an hour are counted as abandoned — nothing has to mark them.
 - **Bulk deletes ask for the word.** Deleting a selection needs `DELETE` typed
   into a dialog, and the server re-checks it — a client that skips the prompt
   can't wipe the catalogue.

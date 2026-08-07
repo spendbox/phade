@@ -11,6 +11,7 @@ import {
   type ProductFormState,
 } from "@/app/admin/(dashboard)/products/actions";
 import { DescriptionField } from "@/components/admin/description-field";
+import { ColorPicker } from "@/components/admin/color-picker";
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { TagsField } from "@/components/admin/tags-field";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -116,6 +117,10 @@ export function ProductForm({
 
           <Panel title="Images">
             <ImageUploader initial={product?.images ?? []} />
+          </Panel>
+
+          <Panel title="Colours">
+            <ColorPicker initial={product?.colors ?? []} />
           </Panel>
 
           <Panel title="Pricing">

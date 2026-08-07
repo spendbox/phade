@@ -9,7 +9,7 @@ import { getSettings } from "@/lib/settings";
 import { categoryNameFor, generateSku } from "@/lib/sku";
 import { requireSupabase } from "@/lib/supabase";
 import { DELETE_CONFIRMATION } from "@/lib/types";
-import type { ActionResult, ProductStatus } from "@/lib/types";
+import type { ActionResult, ProductColor, ProductStatus } from "@/lib/types";
 
 export type ProductFormState = ActionResult | { ok: null };
 
@@ -28,6 +28,7 @@ type ParsedProduct = {
   status: ProductStatus;
   images: string[];
   tags: string[];
+  colors: ProductColor[];
   featured: boolean;
 };
 
@@ -76,6 +77,23 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
     .map((tag) => tag.trim())
     .filter(Boolean);
 
+  let colors: ProductColor[] = [];
+  try {
+    const parsed: unknown = JSON.parse(text(formData, "colors") || "[]");
+    if (Array.isArray(parsed)) {
+      colors = parsed.flatMap((item): ProductColor[] => {
+        if (typeof item !== "object" || item === null) return [];
+        const entry = item as Record<string, unknown>;
+        const colorName = typeof entry.name === "string" ? entry.name.trim() : "";
+        const hex = typeof entry.hex === "string" ? entry.hex : "";
+        if (!colorName || !/^#[0-9a-fA-F]{3,8}$/.test(hex)) return [];
+        return [{ name: colorName, hex }];
+      });
+    }
+  } catch {
+    colors = [];
+  }
+
   return {
     name,
     slug: slugify(text(formData, "slug") || name),
@@ -94,6 +112,7 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
     status: ["draft", "active", "archived"].includes(status) ? status : "draft",
     images,
     tags,
+    colors,
     featured: formData.get("featured") === "on",
   };
 }
@@ -175,6 +194,7 @@ export type ProductDraft = {
   lowStockThreshold?: string;
   sku?: string;
   subcategory?: string;
+  colors?: ProductColor[];
   tags?: string;
   featured?: boolean;
 };
@@ -258,6 +278,7 @@ export async function createProductsBulk(
             .split(",")
             .map((tag) => tag.trim())
             .filter(Boolean),
+          colors: Array.isArray(draft.colors) ? draft.colors : [],
           featured: Boolean(draft.featured),
         })
         .select("id")

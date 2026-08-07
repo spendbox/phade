@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Boxes, Minus, Plus } from "lucide-react";
 
 import { FilterBar } from "@/components/admin/filter-bar";
+import { MediaThumb } from "@/components/admin/media-thumb";
 import { PageHeader } from "@/components/admin/page-header";
 import { ErrorNotice, SetupNotice } from "@/components/admin/setup-notice";
 import { StockDialog } from "@/components/admin/stock-dialog";
@@ -128,12 +129,21 @@ export default async function InventoryPage({
                     {rows.map((row) => (
                       <tr key={row.id} className="hover:bg-plane/60">
                         <td className="px-5 py-3">
-                          <Link href={`/admin/products/${row.id}`}>
-                            <span className="block truncate font-medium text-ink">
-                              {row.name}
-                            </span>
-                            <span className="block truncate text-xs text-ink-muted">
-                              {row.sku ?? row.category?.name ?? "—"}
+                          <Link
+                            href={`/admin/products/${row.id}`}
+                            className="flex items-center gap-3"
+                          >
+                            <MediaThumb
+                              url={row.images?.[0]}
+                              className="size-10 shrink-0 rounded-lg ring-1 ring-inset ring-line"
+                            />
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium text-ink">
+                                {row.name}
+                              </span>
+                              <span className="block truncate text-xs text-ink-muted">
+                                {row.sku ?? row.category?.name ?? "—"}
+                              </span>
                             </span>
                           </Link>
                         </td>
@@ -177,22 +187,36 @@ export default async function InventoryPage({
               <ul className="divide-y divide-line md:hidden">
                 {rows.map((row) => (
                   <li key={row.id} className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <Link href={`/admin/products/${row.id}`} className="min-w-0">
-                        <p className="truncate text-sm font-medium text-ink">
+                    <Link
+                      href={`/admin/products/${row.id}`}
+                      className="flex items-start gap-3"
+                    >
+                      <MediaThumb
+                        url={row.images?.[0]}
+                        className="size-12 shrink-0 rounded-lg ring-1 ring-inset ring-line"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-ink">
                           {row.name}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-ink-muted">
-                          {row.sku ?? row.category?.name ?? "—"}
-                        </p>
-                      </Link>
-                      <span className="shrink-0 text-right">
-                        <span className="block text-sm font-semibold tabular-nums text-ink">
-                          {row.stock}
                         </span>
-                        <span className="text-xs text-ink-muted">on hand</span>
+                        <span className="mt-0.5 block truncate text-xs text-ink-muted">
+                          {row.sku ?? row.category?.name ?? "—"}
+                        </span>
+                        {/* The count sits under the name on narrow screens —
+                            beside it there was never room for both. */}
+                        <span className="mt-1.5 flex items-baseline gap-1.5">
+                          <span className="text-sm font-semibold tabular-nums text-ink">
+                            {row.stock}
+                          </span>
+                          <span className="text-xs text-ink-muted">
+                            on hand · {formatNaira(
+                              row.stock *
+                                (row.cost_price_kobo ?? row.price_kobo),
+                            )}
+                          </span>
+                        </span>
                       </span>
-                    </div>
+                    </Link>
                     <div className="mt-3 flex items-center justify-between gap-2">
                       <StockBadge
                         stock={row.stock}

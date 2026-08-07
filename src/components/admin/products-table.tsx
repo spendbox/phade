@@ -8,6 +8,7 @@ import {
   deleteProduct,
   duplicateProduct,
 } from "@/app/admin/(dashboard)/products/actions";
+import { ColorDots } from "@/components/admin/color-picker";
 import { MediaThumb } from "@/components/admin/media-thumb";
 import { ProductBulkBar } from "@/components/admin/product-bulk-bar";
 import {
@@ -99,11 +100,14 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
                           <span className="block truncate font-medium text-ink">
                             {product.name}
                           </span>
-                          {product.sku && (
-                            <span className="block truncate text-xs text-ink-muted">
-                              {product.sku}
-                            </span>
-                          )}
+                          <span className="flex items-center gap-2">
+                            {product.sku && (
+                              <span className="truncate text-xs text-ink-muted">
+                                {product.sku}
+                              </span>
+                            )}
+                            <ColorDots colors={product.colors ?? []} limit={4} />
+                          </span>
                         </span>
                       </Link>
                     </td>

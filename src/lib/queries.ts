@@ -1,7 +1,11 @@
 import { getSupabase } from "@/lib/supabase";
 import type {
+  Cart,
+  CartStatus,
   Category,
   Customer,
+  Discount,
+  DiscountWithTargets,
   Order,
   OrderItem,
   OrderStatus,
@@ -705,4 +709,130 @@ export async function getCustomer(id: string) {
     customer: customer.data as Customer,
     orders: (orders.data ?? []) as unknown as OrderListRow[],
   });
+}
+
+// ---------------------------------------------------------------------------
+// Sales and coupons
+// ---------------------------------------------------------------------------
+
+export async function getDiscounts(): Promise<
+  QueryResult<DiscountWithTargets[]>
+> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const [discounts, categoryLinks, productLinks] = await Promise.all([
+    supabase.from("discounts").select("*").order("created_at", { ascending: false }),
+    supabase
+      .from("discount_categories")
+      .select("discount_id, category:categories(id, name)"),
+    supabase
+      .from("discount_products")
+      .select("discount_id, product:products(id, name)"),
+  ]);
+
+  if (discounts.error) return empty([], discounts.error.message);
+
+  const categories = new Map<string, { id: string; name: string }[]>();
+  for (const row of (categoryLinks.data ?? []) as unknown as {
+    discount_id: string;
+    category: { id: string; name: string } | null;
+  }[]) {
+    if (!row.category) continue;
+    const list = categories.get(row.discount_id) ?? [];
+    list.push(row.category);
+    categories.set(row.discount_id, list);
+  }
+
+  const products = new Map<string, { id: string; name: string }[]>();
+  for (const row of (productLinks.data ?? []) as unknown as {
+    discount_id: string;
+    product: { id: string; name: string } | null;
+  }[]) {
+    if (!row.product) continue;
+    const list = products.get(row.discount_id) ?? [];
+    list.push(row.product);
+    products.set(row.discount_id, list);
+  }
+
+  return empty(
+    ((discounts.data ?? []) as Discount[]).map((discount) => {
+      const linkedCategories = categories.get(discount.id) ?? [];
+      const linkedProducts = products.get(discount.id) ?? [];
+      return {
+        ...discount,
+        categoryIds: linkedCategories.map((item) => item.id),
+        productIds: linkedProducts.map((item) => item.id),
+        targetNames:
+          discount.scope === "categories"
+            ? linkedCategories.map((item) => item.name)
+            : discount.scope === "products"
+              ? linkedProducts.map((item) => item.name)
+              : [],
+      };
+    }),
+  );
+}
+
+/** Minimal product list for the sale picker. */
+export async function getProductOptions(): Promise<
+  QueryResult<{ id: string; name: string }[]>
+> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name")
+    .neq("status", "archived")
+    .order("name", { ascending: true })
+    .limit(500);
+
+  if (error) return empty([], error.message);
+  return empty((data ?? []) as { id: string; name: string }[]);
+}
+
+// ---------------------------------------------------------------------------
+// Carts (uncompleted checkouts)
+// ---------------------------------------------------------------------------
+
+/**
+ * A cart counts as abandoned once it has sat untouched past this window without
+ * becoming an order. The storefront can also mark one abandoned explicitly.
+ */
+export const ABANDONED_AFTER_MINUTES = 60;
+
+export type CartRow = Cart & { isAbandoned: boolean };
+
+export async function getCarts(filters?: {
+  status?: string;
+  search?: string;
+}): Promise<QueryResult<CartRow[]>> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  let query = supabase
+    .from("carts")
+    .select("*")
+    .order("last_active_at", { ascending: false })
+    .limit(200);
+
+  if (filters?.status) query = query.eq("status", filters.status as CartStatus);
+  if (filters?.search) query = query.ilike("email", `%${filters.search}%`);
+
+  const { data, error } = await query;
+  if (error) return empty([], error.message);
+
+  const cutoff = Date.now() - ABANDONED_AFTER_MINUTES * 60_000;
+
+  return empty(
+    ((data ?? []) as unknown as Cart[]).map((cart) => ({
+      ...cart,
+      items: Array.isArray(cart.items) ? cart.items : [],
+      isAbandoned:
+        cart.status === "abandoned" ||
+        (cart.status === "active" &&
+          new Date(cart.last_active_at).getTime() < cutoff),
+    })),
+  );
 }

@@ -49,14 +49,18 @@ create table if not exists public.products (
                           check (status in ('draft', 'active', 'archived')),
   images                jsonb not null default '[]'::jsonb,
   tags                  text[] not null default '{}',
+  -- Optional colourways: [{ "name": "Emerald", "hex": "#0f6b4f" }, …]
+  colors                jsonb not null default '[]'::jsonb,
   featured              boolean not null default false,
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
 );
 
--- For projects created before subcategories existed.
+-- For projects created before subcategories and colourways existed.
 alter table public.products
   add column if not exists subcategory text;
+alter table public.products
+  add column if not exists colors jsonb not null default '[]'::jsonb;
 
 create index if not exists products_category_id_idx on public.products (category_id);
 create index if not exists products_status_idx      on public.products (status);
@@ -158,6 +162,75 @@ create table if not exists public.inventory_movements (
 create index if not exists inventory_movements_product_id_idx on public.inventory_movements (product_id, created_at desc);
 
 -- ---------------------------------------------------------------------------
+-- Sales and coupons
+--
+-- One row is one sale. It can run automatically (no code) or need a coupon
+-- code at checkout. Scope decides what it applies to: the whole catalogue,
+-- chosen categories, or chosen products.
+-- ---------------------------------------------------------------------------
+create table if not exists public.discounts (
+  id             uuid primary key default gen_random_uuid(),
+  name           text not null,
+  code           text unique,
+  description    text,
+  kind           text not null default 'percentage'
+                   check (kind in ('percentage', 'fixed')),
+  -- Percent (1-100) for 'percentage', kobo for 'fixed'.
+  value          integer not null default 0,
+  scope          text not null default 'all'
+                   check (scope in ('all', 'categories', 'products')),
+  min_order_kobo bigint not null default 0,
+  usage_limit    integer,
+  used_count     integer not null default 0,
+  enabled        boolean not null default true,
+  starts_at      timestamptz not null default now(),
+  ends_at        timestamptz,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+
+create index if not exists discounts_enabled_idx on public.discounts (enabled, starts_at desc);
+
+create table if not exists public.discount_categories (
+  discount_id uuid not null references public.discounts(id) on delete cascade,
+  category_id uuid not null references public.categories(id) on delete cascade,
+  primary key (discount_id, category_id)
+);
+
+create table if not exists public.discount_products (
+  discount_id uuid not null references public.discounts(id) on delete cascade,
+  product_id  uuid not null references public.products(id) on delete cascade,
+  primary key (discount_id, product_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- Carts (uncompleted checkouts)
+--
+-- The storefront upserts a row per shopping session through /api/cart. A cart
+-- that stops moving without an order behind it is an abandoned checkout, which
+-- is what the Checkouts page reports on.
+-- ---------------------------------------------------------------------------
+create table if not exists public.carts (
+  id             uuid primary key default gen_random_uuid(),
+  token          text not null unique,
+  customer_id    uuid references public.customers(id) on delete set null,
+  email          text,
+  phone          text,
+  status         text not null default 'active'
+                   check (status in ('active', 'converted', 'abandoned')),
+  -- [{ product_id, name, quantity, unit_price_kobo, image_url }]
+  items          jsonb not null default '[]'::jsonb,
+  subtotal_kobo  bigint not null default 0,
+  order_id       uuid references public.orders(id) on delete set null,
+  converted_at   timestamptz,
+  created_at     timestamptz not null default now(),
+  last_active_at timestamptz not null default now()
+);
+
+create index if not exists carts_status_idx      on public.carts (status, last_active_at desc);
+create index if not exists carts_last_active_idx on public.carts (last_active_at desc);
+
+-- ---------------------------------------------------------------------------
 -- App settings
 --
 -- Preferences the admin can change from the dashboard, rather than by editing
@@ -190,7 +263,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['categories', 'products', 'customers', 'orders']
+  foreach t in array array['categories', 'products', 'customers', 'orders', 'discounts']
   loop
     execute format('drop trigger if exists set_updated_at on public.%I', t);
     execute format(
@@ -208,6 +281,10 @@ $$;
 -- anon/public key can never read or write these tables directly.
 -- ---------------------------------------------------------------------------
 alter table public.app_settings        enable row level security;
+alter table public.carts               enable row level security;
+alter table public.discount_categories enable row level security;
+alter table public.discount_products   enable row level security;
+alter table public.discounts           enable row level security;
 alter table public.categories          enable row level security;
 alter table public.products            enable row level security;
 alter table public.customers           enable row level security;
