@@ -35,7 +35,12 @@ import { Input } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { StockDot } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
-import { formatNaira, koboToNairaInput } from "@/lib/format";
+import {
+  formatDateTime,
+  formatNaira,
+  formatRelative,
+  koboToNairaInput,
+} from "@/lib/format";
 import type { SheetRow } from "@/lib/queries";
 import {
   DELETE_CONFIRMATION,
@@ -51,10 +56,12 @@ type Category = { id: string; name: string };
 export function ProductSheet({
   rows,
   categories,
+  subcategories,
   defaults,
 }: {
   rows: SheetRow[];
   categories: Category[];
+  subcategories: string[];
   defaults: CatalogueDefaults;
 }) {
   const router = useRouter();
@@ -201,7 +208,7 @@ export function ProductSheet({
           full ? "" : "max-h-[70vh]",
         )}
       >
-        <table className="w-full min-w-[86rem] border-separate border-spacing-0 text-[13px]">
+        <table className="w-full min-w-[104rem] border-separate border-spacing-0 text-[13px]">
           <thead>
             <tr className="text-left text-xs font-medium text-ink-secondary">
               <Th className="w-10 pl-4">
@@ -219,15 +226,17 @@ export function ProductSheet({
               <Th className="min-w-[13rem]">Name</Th>
               <Th className="w-28">Colour</Th>
               <Th className="w-32">Size</Th>
-              <Th className="w-24 text-right">Qty</Th>
+              <Th className="w-28 text-right">Qty</Th>
               <Th className="w-20 text-right">Sold</Th>
               <Th className="w-20">Media</Th>
               <Th className="w-44">Category</Th>
-              <Th className="w-32 text-right">Price</Th>
+              <Th className="w-36 text-right">Price ₦</Th>
+              <Th className="w-36 text-right">Cost ₦</Th>
               <Th className="w-32">Status</Th>
-              <Th className="w-36">SKU</Th>
-              <Th className="w-32">Subcategory</Th>
+              <Th className="w-40">SKU</Th>
+              <Th className="w-40">Subcategory</Th>
               <Th className="w-28 text-right">Revenue</Th>
+              <Th className="w-36">Added</Th>
               <Th className="w-12" />
             </tr>
           </thead>
@@ -236,7 +245,7 @@ export function ProductSheet({
             {visible.length === 0 ? (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={16}
                   className="px-4 py-10 text-center text-sm text-ink-muted"
                 >
                   {search
@@ -369,6 +378,16 @@ export function ProductSheet({
                     </Td>
 
                     <Td>
+                      <TextCell
+                        id={row.id}
+                        field="cost_price"
+                        align="right"
+                        value={koboToNairaInput(row.cost_price_kobo)}
+                        placeholder="—"
+                      />
+                    </Td>
+
+                    <Td>
                       <SelectCell
                         id={row.id}
                         field="status"
@@ -390,16 +409,26 @@ export function ProductSheet({
                     </Td>
 
                     <Td>
-                      <TextCell
+                      <SelectCell
                         id={row.id}
                         field="subcategory"
                         value={row.subcategory ?? ""}
-                        placeholder="—"
+                        options={subcategories.map((value) => ({
+                          value,
+                          label: value,
+                        }))}
                       />
                     </Td>
 
                     <Td className="text-right tabular-nums text-ink-secondary">
                       {formatNaira(row.revenueKobo)}
+                    </Td>
+
+                    <Td
+                      className="whitespace-nowrap text-ink-muted"
+                      title={formatDateTime(row.created_at)}
+                    >
+                      {formatRelative(row.created_at)}
                     </Td>
 
                     <Td>
@@ -522,6 +551,7 @@ export function ProductSheet({
                     <TextCell
                       id={row.id}
                       field="price"
+                      prefix="₦"
                       value={koboToNairaInput(row.price_kobo)}
                     />
                   </MobileField>
@@ -575,7 +605,36 @@ export function ProductSheet({
                       }))}
                     />
                   </MobileField>
+
+                  <MobileField label="Subcategory">
+                    <SelectCell
+                      id={row.id}
+                      field="subcategory"
+                      value={row.subcategory ?? ""}
+                      options={subcategories.map((value) => ({
+                        value,
+                        label: value,
+                      }))}
+                    />
+                  </MobileField>
+
+                  <MobileField label="Cost">
+                    <TextCell
+                      id={row.id}
+                      field="cost_price"
+                      prefix="₦"
+                      value={koboToNairaInput(row.cost_price_kobo)}
+                      placeholder="—"
+                    />
+                  </MobileField>
                 </dl>
+
+                <p
+                  className="mt-3 text-xs text-ink-muted"
+                  title={formatDateTime(row.created_at)}
+                >
+                  Added {formatRelative(row.created_at)}
+                </p>
               </li>
             );
           })
@@ -810,9 +869,15 @@ function Th({
 function Td({
   children,
   className,
+  title,
 }: {
   children?: React.ReactNode;
   className?: string;
+  title?: string;
 }) {
-  return <td className={cn("px-2 py-1.5 align-middle", className)}>{children}</td>;
+  return (
+    <td className={cn("px-2 py-1.5 align-middle", className)} title={title}>
+      {children}
+    </td>
+  );
 }

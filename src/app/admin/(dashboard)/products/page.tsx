@@ -8,7 +8,7 @@ import { ErrorNotice, SetupNotice } from "@/components/admin/setup-notice";
 import { buttonClass } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatNumber } from "@/lib/format";
-import { getCategories, getProducts } from "@/lib/queries";
+import { getCategories, getProducts, getSubcategories } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { PRODUCT_STATUSES } from "@/lib/types";
 
@@ -22,10 +22,12 @@ export default async function ProductsPage({
 }) {
   const { q, category, status } = await searchParams;
 
-  const [{ data: products, error }, { data: categories }] = await Promise.all([
-    getProducts({ search: q, categoryId: category, status }),
-    getCategories(),
-  ]);
+  const [{ data: products, error }, { data: categories }, { data: subcategories }] =
+    await Promise.all([
+      getProducts({ search: q, categoryId: category, status }),
+      getCategories(),
+      getSubcategories(),
+    ]);
 
   const configured = isSupabaseConfigured();
   const filtered = Boolean(q || category || status);
@@ -89,7 +91,14 @@ export default async function ProductsPage({
           />
         </div>
       ) : (
-        <ProductsTable products={products} />
+        <ProductsTable
+          products={products}
+          categories={categories.map((item) => ({
+            id: item.id,
+            name: item.name,
+          }))}
+          subcategories={subcategories}
+        />
       )}
     </div>
   );

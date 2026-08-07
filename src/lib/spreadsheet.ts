@@ -312,3 +312,68 @@ export function splitList(value: string): string[] {
     .map((part) => part.trim())
     .filter(Boolean);
 }
+
+// ---------------------------------------------------------------------------
+// Template
+// ---------------------------------------------------------------------------
+
+/**
+ * The columns the importer reads, in the order the template lays them out.
+ *
+ * The four the shop is asked for come first and are highlighted in the file;
+ * everything else follows so a business that wants to fill in more can, without
+ * having to guess at the header wording.
+ */
+export const TEMPLATE_COLUMNS: {
+  header: string;
+  field: SheetField;
+  required?: boolean;
+  width?: number;
+  note: string;
+}[] = [
+  {
+    header: "Name",
+    field: "name",
+    required: true,
+    width: 28,
+    note: "The product name. The only column that must have a value.",
+  },
+  {
+    header: "Colour",
+    field: "colors",
+    required: true,
+    width: 24,
+    note: "Colour names, comma separated — e.g. wine, nude. Matched to your palette.",
+  },
+  {
+    header: "Size",
+    field: "sizes",
+    required: true,
+    width: 18,
+    note: "Sizes, comma separated — e.g. 10, 12, 14. Leave blank for one-size pieces.",
+  },
+  {
+    header: "Quantity",
+    field: "stock",
+    required: true,
+    width: 12,
+    note: "Units on hand. Becomes the opening stock movement.",
+  },
+  {
+    header: "Sold",
+    field: "sold",
+    width: 10,
+    note: "Optional. For your own reference — real sales come from orders.",
+  },
+  { header: "Price", field: "price", width: 14, note: "In naira." },
+  {
+    header: "Category",
+    field: "category",
+    width: 22,
+    note: "Must match one of your categories by name, or it's left unset.",
+  },
+  { header: "Subcategory", field: "subcategory", width: 20, note: "e.g. Totes." },
+  { header: "SKU", field: "sku", width: 18, note: "Blank and we generate one." },
+  { header: "Description", field: "description", width: 40, note: "Optional." },
+  { header: "Tags", field: "tags", width: 24, note: "Comma separated." },
+];

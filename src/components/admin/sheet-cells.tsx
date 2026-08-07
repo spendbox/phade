@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Loader2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
+import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 
 import { updateCell } from "@/app/admin/(dashboard)/database/actions";
+import { panelClass, panelStyle, usePopover } from "@/components/ui/popover";
 import { cn } from "@/lib/cn";
+
+const PANEL_WIDTH = 224;
 
 /**
  * Saving a single cell.
@@ -20,6 +25,7 @@ export type SaveState = "idle" | "saving" | "saved" | "error";
 export function useCellSave(id: string, field: string) {
   const [state, setState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   async function save(value: string) {
     setState("saving");
@@ -34,6 +40,9 @@ export function useCellSave(id: string, field: string) {
 
     if (result.ok === true) {
       setState("saved");
+      // Pull the row again so anything derived from it — the stock indicator,
+      // stock value, revenue — moves with the number that changed.
+      router.refresh();
       // The tick is a receipt, not a state — let it fade.
       setTimeout(() => setState("idle"), 1200);
       return true;
@@ -80,6 +89,7 @@ export function TextCell({
   value,
   align = "left",
   placeholder,
+  prefix,
   type = "text",
   className,
 }: {
@@ -88,6 +98,8 @@ export function TextCell({
   value: string;
   align?: "left" | "right";
   placeholder?: string;
+  /** Sits outside the input — a ₦ that money reads as money, not as data. */
+  prefix?: string;
   type?: "text" | "number";
   className?: string;
 }) {
@@ -114,7 +126,18 @@ export function TextCell({
   }
 
   return (
-    <span className="flex items-center gap-1">
+    // A prefixed cell keeps the symbol beside its number: the input stops
+    // stretching so "₦" and "12000" read as one figure rather than sitting at
+    // opposite ends of the column.
+    <span
+      className={cn(
+        "flex items-center gap-0.5",
+        prefix && align === "right" && "justify-end",
+      )}
+    >
+      {prefix && (
+        <span className="shrink-0 text-[13px] text-ink-muted">{prefix}</span>
+      )}
       <input
         value={draft}
         type={type}
@@ -133,8 +156,9 @@ export function TextCell({
           }
         }}
         className={cn(
-          "w-full min-w-0 rounded border border-transparent bg-transparent px-1.5 py-1 text-[13px] text-ink outline-none",
+          "min-w-0 rounded border border-transparent bg-transparent px-1.5 py-1 text-[13px] text-ink outline-none",
           "hover:border-line-strong focus:border-brand focus:bg-surface",
+          prefix ? "w-[6.5rem] max-w-full" : "w-full",
           align === "right" && "text-right tabular-nums",
           state === "error" && "border-critical",
           className,
@@ -145,22 +169,36 @@ export function TextCell({
   );
 }
 
-/** A cell backed by a fixed set of options. */
+/**
+ * A cell backed by a fixed set of options.
+ *
+ * A native <select> would open the OS picker — an inch-high wheel on a phone,
+ * a grey system list on desktop — so this renders the same portalled panel the
+ * filters use, and can be searched when the list is long.
+ */
 export function SelectCell({
   id,
   field,
   value,
   options,
+  placeholder = "—",
+  searchable,
   className,
 }: {
   id: string;
   field: string;
   value: string;
   options: { value: string; label: string }[];
+  placeholder?: string;
+  /** Defaults to on once the list is long enough to scroll. */
+  searchable?: boolean;
   className?: string;
 }) {
   const [current, setCurrent] = useState(value);
+  const [search, setSearch] = useState("");
   const { state, error, save } = useCellSave(id, field);
+  const { open, setOpen, toggle, position, triggerRef, panelRef } =
+    usePopover<HTMLButtonElement>(PANEL_WIDTH);
 
   const [lastValue, setLastValue] = useState(value);
   if (value !== lastValue) {
@@ -168,32 +206,109 @@ export function SelectCell({
     setCurrent(value);
   }
 
+  const withSearch = searchable ?? options.length > 8;
+  const visible =
+    withSearch && search
+      ? options.filter((option) =>
+          option.label.toLowerCase().includes(search.toLowerCase()),
+        )
+      : options;
+
+  const selected = options.find((option) => option.value === current);
+
+  function choose(next: string) {
+    const previous = current;
+    setCurrent(next);
+    setOpen(false);
+    setSearch("");
+    void save(next).then((ok) => {
+      if (!ok) setCurrent(previous);
+    });
+  }
+
   return (
     <span className="flex items-center gap-1">
-      <select
-        value={current}
-        onChange={(event) => {
-          const next = event.target.value;
-          const previous = current;
-          setCurrent(next);
-          void save(next).then((ok) => {
-            if (!ok) setCurrent(previous);
-          });
-        }}
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={toggle}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className={cn(
-          "w-full min-w-0 cursor-pointer rounded border border-transparent bg-transparent px-1 py-1 text-[13px] text-ink outline-none",
-          "hover:border-line-strong focus:border-brand focus:bg-surface",
+          "flex w-full min-w-0 items-center gap-1 rounded border border-transparent px-1.5 py-1 text-left text-[13px] outline-none transition-colors",
+          "hover:border-line-strong hover:bg-surface",
+          open && "border-brand bg-surface",
           state === "error" && "border-critical",
+          selected ? "text-ink" : "text-ink-muted",
           className,
         )}
       >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        <span className="min-w-0 flex-1 truncate">
+          {selected?.label ?? placeholder}
+        </span>
+        <ChevronDown
+          className={cn(
+            "size-3 shrink-0 text-ink-muted transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+
       <CellStatus state={state} error={error} />
+
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={panelRef}
+            role="listbox"
+            style={panelStyle(position, PANEL_WIDTH)}
+            className={panelClass}
+          >
+            {withSearch && (
+              <div className="relative mb-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-muted" />
+                <input
+                  type="search"
+                  autoFocus
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search"
+                  className="h-8 w-full rounded-md bg-plane pl-8 pr-2 text-[13px] text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+            )}
+
+            {visible.length === 0 ? (
+              <p className="px-2.5 py-3 text-center text-xs text-ink-muted">
+                No matches.
+              </p>
+            ) : (
+              visible.map((option) => {
+                const active = option.value === current;
+                return (
+                  <button
+                    key={option.value || "__blank"}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => choose(option.value)}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors",
+                      active
+                        ? "bg-brand-soft font-medium text-brand"
+                        : "text-ink-secondary hover:bg-plane hover:text-ink",
+                    )}
+                  >
+                    <span className="truncate">{option.label}</span>
+                    {active && <Check className="size-3.5 shrink-0" />}
+                  </button>
+                );
+              })
+            )}
+          </div>,
+          document.body,
+        )}
     </span>
   );
 }

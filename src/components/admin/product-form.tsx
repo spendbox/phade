@@ -13,6 +13,7 @@ import {
 import { DescriptionField } from "@/components/admin/description-field";
 import { ColorPicker } from "@/components/admin/color-picker";
 import { SizePicker } from "@/components/admin/size-picker";
+import { SelectField } from "@/components/ui/select-field";
 import type { CatalogueDefaults } from "@/lib/catalogue-settings";
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { TagsField } from "@/components/admin/tags-field";
@@ -260,20 +261,17 @@ export function ProductForm({
               <Field
                 label="Subcategory"
                 htmlFor="subcategory"
-                hint="Optional — e.g. Totes, Heels"
+                hint="Optional — manage the list in Settings → Categories"
               >
-                <Input
+                <SelectField
                   id="subcategory"
                   name="subcategory"
-                  list="phade-subcategories"
                   defaultValue={product?.subcategory ?? ""}
-                  placeholder="None"
+                  options={subcategories.map((value) => ({
+                    value,
+                    label: value,
+                  }))}
                 />
-                <datalist id="phade-subcategories">
-                  {subcategories.map((value) => (
-                    <option key={value} value={value} />
-                  ))}
-                </datalist>
               </Field>
 
               <TagsField

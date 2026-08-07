@@ -22,6 +22,7 @@ import {
 } from "@/app/admin/(dashboard)/products/actions";
 import { ColorPicker } from "@/components/admin/color-picker";
 import { SizePicker } from "@/components/admin/size-picker";
+import { SelectField } from "@/components/ui/select-field";
 import type { CatalogueDefaults } from "@/lib/catalogue-settings";
 import { MediaThumb } from "@/components/admin/media-thumb";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -317,12 +318,6 @@ export function ProductUploader({
         }}
       />
 
-      <datalist id="phade-subcategories">
-        {subcategories.map((value) => (
-          <option key={value} value={value} />
-        ))}
-      </datalist>
-
       {showRestored && (
         <div className="flex items-start gap-3 rounded-xl bg-brand-soft px-4 py-3">
           <Check className="mt-0.5 size-4 shrink-0 text-brand" />
@@ -540,6 +535,7 @@ export function ProductUploader({
                       <MoreDetails
                         draft={draft}
                         categoryName={category?.name}
+                        subcategories={subcategories}
                         aiEnabled={aiEnabled}
                         defaults={defaults}
                         defaultLowStock={defaultLowStock}
@@ -680,6 +676,7 @@ function Dropzone({
 function MoreDetails({
   draft,
   categoryName,
+  subcategories,
   aiEnabled,
   defaults,
   defaultLowStock,
@@ -687,6 +684,7 @@ function MoreDetails({
 }: {
   draft: Draft;
   categoryName?: string;
+  subcategories: string[];
   aiEnabled: boolean;
   defaults: CatalogueDefaults;
   defaultLowStock: number;
@@ -800,12 +798,14 @@ function MoreDetails({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Subcategory" hint="Optional — e.g. Totes, Heels">
-          <Input
-            list="phade-subcategories"
+        <Field
+          label="Subcategory"
+          hint="Optional — manage the list in Settings → Categories"
+        >
+          <SelectField
             value={draft.subcategory}
-            onChange={(event) => onChange({ subcategory: event.target.value })}
-            placeholder="None"
+            onChange={(subcategory) => onChange({ subcategory })}
+            options={subcategories.map((value) => ({ value, label: value }))}
           />
         </Field>
         <Field label="SKU" hint="Left blank, we generate one">
