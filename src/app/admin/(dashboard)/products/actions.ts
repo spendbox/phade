@@ -5,8 +5,10 @@ import { redirect } from "next/navigation";
 
 import { actionError, requireAdmin } from "@/lib/guard";
 import { nairaToKobo, slugify } from "@/lib/format";
+import { getSettings } from "@/lib/settings";
 import { categoryNameFor, generateSku } from "@/lib/sku";
 import { requireSupabase } from "@/lib/supabase";
+import { DELETE_CONFIRMATION } from "@/lib/types";
 import type { ActionResult, ProductStatus } from "@/lib/types";
 
 export type ProductFormState = ActionResult | { ok: null };
@@ -20,6 +22,7 @@ type ParsedProduct = {
   compare_at_price_kobo: number | null;
   cost_price_kobo: number | null;
   sku: string | null;
+  subcategory: string | null;
   stock: number;
   low_stock_threshold: number;
   status: ProductStatus;
@@ -42,7 +45,7 @@ function integer(formData: FormData, key: string, fallback = 0): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function parseProduct(formData: FormData): ParsedProduct {
+function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
   const name = text(formData, "name");
   if (!name) throw new Error("Give the product a name.");
 
@@ -82,8 +85,12 @@ function parseProduct(formData: FormData): ParsedProduct {
     compare_at_price_kobo: compareAt,
     cost_price_kobo: cost,
     sku: optional(formData, "sku"),
+    subcategory: optional(formData, "subcategory"),
     stock: Math.max(integer(formData, "stock"), 0),
-    low_stock_threshold: Math.max(integer(formData, "low_stock_threshold", 5), 0),
+    low_stock_threshold: Math.max(
+      integer(formData, "low_stock_threshold", defaultLowStock),
+      0,
+    ),
     status: ["draft", "active", "archived"].includes(status) ? status : "draft",
     images,
     tags,
@@ -115,7 +122,8 @@ export async function createProduct(
   try {
     await requireAdmin();
     const supabase = requireSupabase();
-    const parsed = parseProduct(formData);
+    const settings = await getSettings();
+    const parsed = parseProduct(formData, settings.lowStockThreshold);
     parsed.slug = await uniqueSlug(parsed.slug);
 
     // A blank SKU means "generate one" — the admin never has to invent codes.
@@ -166,6 +174,7 @@ export type ProductDraft = {
   stock?: string;
   lowStockThreshold?: string;
   sku?: string;
+  subcategory?: string;
   tags?: string;
   featured?: boolean;
 };
@@ -196,6 +205,7 @@ export async function createProductsBulk(
     if (drafts.length === 0) throw new Error("Add at least one product first.");
 
     const categoryName = await categoryNameFor(supabase, categoryId);
+    const settings = await getSettings();
 
     // Sequential rather than parallel: slugs and SKUs are both derived from
     // what's already stored, so each insert needs to see the previous one.
@@ -233,9 +243,11 @@ export async function createProductsBulk(
           sku:
             (draft.sku ?? "").trim() ||
             (await generateSku(supabase, categoryName)),
+          subcategory: (draft.subcategory ?? "").trim() || null,
           stock,
           low_stock_threshold: Math.max(
-            Number.parseInt(draft.lowStockThreshold ?? "", 10) || 5,
+            Number.parseInt(draft.lowStockThreshold ?? "", 10) ||
+              settings.lowStockThreshold,
             0,
           ),
           status,
@@ -381,6 +393,84 @@ export async function duplicateProduct(formData: FormData): Promise<void> {
   if (insertError) throw new Error(insertError.message);
 
   revalidatePath("/admin/products");
+}
+
+export type BulkActionState = ActionResult | { ok: null };
+
+function selectedIds(formData: FormData): string[] {
+  const raw = String(formData.get("ids") ?? "");
+  return raw.split(",").map((id) => id.trim()).filter(Boolean);
+}
+
+/** Applies one status to every selected product. */
+export async function bulkSetStatus(
+  _previous: BulkActionState,
+  formData: FormData,
+): Promise<BulkActionState> {
+  try {
+    await requireAdmin();
+    const supabase = requireSupabase();
+
+    const ids = selectedIds(formData);
+    if (ids.length === 0) throw new Error("Nothing selected.");
+
+    const status = String(formData.get("status") ?? "");
+    if (!["draft", "active", "archived"].includes(status)) {
+      throw new Error("Unknown status.");
+    }
+
+    const { error } = await supabase
+      .from("products")
+      .update({ status })
+      .in("id", ids);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/inventory");
+    return {
+      ok: true,
+      message: `${ids.length} product${ids.length === 1 ? "" : "s"} set to ${status}.`,
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/**
+ * Deletes every selected product.
+ *
+ * The typed confirmation is re-checked here, not just in the dialog — a client
+ * that skips the prompt shouldn't be able to wipe the catalogue.
+ */
+export async function bulkDelete(
+  _previous: BulkActionState,
+  formData: FormData,
+): Promise<BulkActionState> {
+  try {
+    await requireAdmin();
+    const supabase = requireSupabase();
+
+    const ids = selectedIds(formData);
+    if (ids.length === 0) throw new Error("Nothing selected.");
+
+    const confirmation = String(formData.get("confirmation") ?? "").trim();
+    if (confirmation !== DELETE_CONFIRMATION) {
+      throw new Error(`Type ${DELETE_CONFIRMATION} to confirm.`);
+    }
+
+    const { error } = await supabase.from("products").delete().in("id", ids);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/inventory");
+    revalidatePath("/admin");
+    return {
+      ok: true,
+      message: `${ids.length} product${ids.length === 1 ? "" : "s"} deleted.`,
+    };
+  } catch (error) {
+    return actionError(error);
+  }
 }
 
 /** Quick status flip from the products table. */

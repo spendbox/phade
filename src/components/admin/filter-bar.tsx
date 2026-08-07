@@ -4,9 +4,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Search, X } from "lucide-react";
 
-import { cn } from "@/lib/cn";
+import { Dropdown, type DropdownOption } from "@/components/ui/dropdown";
 
-export type FilterOption = { value: string; label: string };
+export type FilterOption = DropdownOption;
 
 export type FilterDefinition = {
   key: string;
@@ -67,59 +67,20 @@ export function FilterBar({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder={searchPlaceholder}
-          className="h-9 w-full rounded-full bg-surface pl-9 pr-3 text-sm text-ink shadow-[0_0_0_1px_rgb(11_11_12_/_0.08)] placeholder:text-ink-muted focus:shadow-[0_0_0_2px_var(--color-series)] focus:outline-none"
+          className="h-9 w-full rounded-full bg-surface pl-9 pr-3 text-sm text-ink shadow-[0_0_0_1px_rgb(11_11_12_/_0.08)] placeholder:text-ink-muted focus:shadow-[0_0_0_2px_var(--color-brand)] focus:outline-none"
         />
       </div>
 
       <div className="no-scrollbar flex items-center gap-2 overflow-x-auto">
-        {filters.map((filter) => {
-          const value = params.get(filter.key) ?? "";
-          return (
-            <label
-              key={filter.key}
-              className={cn(
-                "relative inline-flex h-9 shrink-0 items-center rounded-full pl-3 pr-7 text-[13px] font-medium transition-colors",
-                value
-                  ? "bg-ink text-white"
-                  : "bg-surface text-ink-secondary shadow-[0_0_0_1px_rgb(11_11_12_/_0.08)] hover:text-ink",
-              )}
-            >
-              <span className="pointer-events-none">
-                {value
-                  ? (filter.options.find((option) => option.value === value)
-                      ?.label ?? filter.label)
-                  : filter.label}
-              </span>
-              <select
-                value={value}
-                onChange={(event) => setFilter(filter.key, event.target.value)}
-                aria-label={filter.label}
-                className="absolute inset-0 cursor-pointer appearance-none opacity-0"
-              >
-                <option value="">All {filter.label.toLowerCase()}</option>
-                {filter.options.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <svg
-                aria-hidden
-                viewBox="0 0 12 12"
-                className="pointer-events-none absolute right-2.5 size-3 opacity-60"
-              >
-                <path
-                  d="M3 4.5 6 7.5 9 4.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </label>
-          );
-        })}
+        {filters.map((filter) => (
+          <Dropdown
+            key={filter.key}
+            label={filter.label}
+            value={params.get(filter.key) ?? ""}
+            options={filter.options}
+            onChange={(value) => setFilter(filter.key, value)}
+          />
+        ))}
 
         {(activeCount > 0 || search) && (
           <button
@@ -136,7 +97,9 @@ export function FilterBar({
         )}
       </div>
 
-      {children && <div className="ml-auto flex items-center gap-2">{children}</div>}
+      {children && (
+        <div className="ml-auto flex items-center gap-2">{children}</div>
+      )}
     </div>
   );
 }

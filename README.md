@@ -16,12 +16,12 @@ admin dashboard is complete and usable.
 | --- | --- |
 | **Dashboard** | Revenue over time, order status mix, top sellers, recent orders, low-stock alerts. Switchable 7 / 30 / 90 day window. |
 | **Orders** | Filter by status and type, open an order to see items, totals, payments, delivery address, and change its status. |
-| **Products** | Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name and price side by side — autosaved as you work. AI assistant for descriptions. SKUs generate themselves. |
-| **Categories** | Create and edit categories with a chosen icon; see how many products sit in each. |
-| **Inventory** | Stock on hand and stock value, low/out-of-stock views, one-click ±1, and a full adjustment dialog that records the reason. Every change is logged. |
+| **Products** | Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name, price and stock side by side — autosaved as you work. Bulk-select rows to change status or delete. AI writes descriptions and suggests tags from them. SKUs generate themselves. |
+| **Categories** | Create and edit categories with a chosen icon, and let AI grow a short description into a fuller one. |
+| **Inventory** | Stock on hand and stock value, red/amber/green level indicators, one-click ±1, and a full adjustment dialog that records the reason. The five most recent movements sit on the page, with the full history one click away. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | Which integrations are connected and which environment variables drive them. |
+| **Settings** | The default low-stock alert level, plus which integrations are connected and which environment variables drive them. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -145,6 +145,9 @@ A few decisions worth knowing:
 - **The bulk uploader autosaves to the browser.** Drafts live in `localStorage`
   until you publish, so a closed tab or a refresh doesn't lose a batch. Nothing
   is written to the database until you hit Publish.
+- **Bulk deletes ask for the word.** Deleting a selection needs `DELETE` typed
+  into a dialog, and the server re-checks it — a client that skips the prompt
+  can't wipe the catalogue.
 - **Unconfigured integrations degrade gracefully.** A fresh deployment with no
   Supabase credentials renders setup instructions on each page instead of an
   error.

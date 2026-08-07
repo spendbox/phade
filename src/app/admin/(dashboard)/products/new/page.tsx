@@ -1,14 +1,16 @@
 import { PageHeader } from "@/components/admin/page-header";
 import { ProductUploaderMount } from "@/components/admin/product-uploader-mount";
 import { SetupNotice } from "@/components/admin/setup-notice";
-import { getCategories } from "@/lib/queries";
+import { getCategories, getSubcategories } from "@/lib/queries";
+import { getSettings } from "@/lib/settings";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Add products" };
 
 export default async function NewProductPage() {
-  const { data: categories } = await getCategories();
+  const [{ data: categories }, { data: subcategories }, settings] =
+    await Promise.all([getCategories(), getSubcategories(), getSettings()]);
 
   return (
     <div className="space-y-5">
@@ -22,7 +24,9 @@ export default async function NewProductPage() {
       ) : (
         <ProductUploaderMount
           categories={categories}
+          subcategories={subcategories}
           aiEnabled={Boolean(process.env.OPENAI_API_KEY)}
+          defaultLowStock={settings.lowStockThreshold}
         />
       )}
     </div>

@@ -256,11 +256,16 @@ export async function getDashboard(
 // Products & categories
 // ---------------------------------------------------------------------------
 
+export type ProductRow = ProductWithCategory & {
+  /** Units sold across paid-and-beyond orders. */
+  orderCount: number;
+};
+
 export async function getProducts(filters?: {
   search?: string;
   categoryId?: string;
   status?: string;
-}): Promise<QueryResult<ProductWithCategory[]>> {
+}): Promise<QueryResult<ProductRow[]>> {
   const supabase = getSupabase();
   if (!supabase) return empty([], NOT_CONFIGURED);
 
@@ -276,9 +281,61 @@ export async function getProducts(filters?: {
   if (filters?.categoryId) query = query.eq("category_id", filters.categoryId);
   if (filters?.status) query = query.eq("status", filters.status);
 
-  const { data, error } = await query;
+  const [products, items] = await Promise.all([
+    query,
+    supabase
+      .from("order_items")
+      .select("product_id, quantity, order:orders!inner(status)"),
+  ]);
+
+  if (products.error) return empty([], products.error.message);
+
+  // Order counts are a nice-to-have column: if that join fails, still show the
+  // catalogue rather than an error page.
+  const sold = new Map<string, number>();
+  if (!items.error) {
+    const counted: OrderStatus[] = [
+      "paid",
+      "processing",
+      "shipped",
+      "delivered",
+    ];
+    for (const row of (items.data ?? []) as unknown as {
+      product_id: string | null;
+      quantity: number;
+      order: { status: OrderStatus } | null;
+    }[]) {
+      if (!row.product_id || !row.order) continue;
+      if (!counted.includes(row.order.status)) continue;
+      sold.set(row.product_id, (sold.get(row.product_id) ?? 0) + row.quantity);
+    }
+  }
+
+  return empty(
+    ((products.data ?? []) as unknown as ProductWithCategory[]).map(
+      (product) => ({ ...product, orderCount: sold.get(product.id) ?? 0 }),
+    ),
+  );
+}
+
+/** Existing subcategory values, to suggest while typing a new one. */
+export async function getSubcategories(): Promise<QueryResult<string[]>> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("subcategory")
+    .not("subcategory", "is", null);
+
   if (error) return empty([], error.message);
-  return empty((data ?? []) as unknown as ProductWithCategory[]);
+
+  const unique = new Set(
+    ((data ?? []) as { subcategory: string | null }[])
+      .map((row) => row.subcategory?.trim())
+      .filter((value): value is string => Boolean(value)),
+  );
+  return empty([...unique].sort((a, b) => a.localeCompare(b)));
 }
 
 export async function getProduct(
@@ -392,7 +449,22 @@ export async function getInventory(filters?: {
   return empty(rows);
 }
 
-export async function getRecentMovements(limit = 20) {
+export async function getRecentMovements(limit = 5) {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const { data, error } = await supabase
+    .from("inventory_movements")
+    .select("*, product:products(id, name, sku)")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return empty([], error.message);
+  return empty(data ?? []);
+}
+
+/** The full movement history, for the "View all" page. */
+export async function getMovementHistory(limit = 300) {
   const supabase = getSupabase();
   if (!supabase) return empty([], NOT_CONFIGURED);
 

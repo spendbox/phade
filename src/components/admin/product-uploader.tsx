@@ -10,6 +10,7 @@ import {
   Loader2,
   Plus,
   Sparkles,
+  Tag,
   Trash2,
   Upload,
   X,
@@ -29,7 +30,7 @@ import {
   Select,
   Textarea,
 } from "@/components/ui/field";
-import { describeProduct } from "@/lib/ai-client";
+import { describeProduct, mergeTags, suggestTags } from "@/lib/ai-client";
 import { CategoryIcon } from "@/lib/category-icons";
 import { cn } from "@/lib/cn";
 import { ACCEPTED_MEDIA_TYPES } from "@/lib/media";
@@ -50,6 +51,7 @@ type Draft = {
   stock: string;
   lowStockThreshold: string;
   sku: string;
+  subcategory: string;
   tags: string;
   featured: boolean;
 };
@@ -71,6 +73,7 @@ function newDraft(media: string[], name: string): Draft {
     stock: "",
     lowStockThreshold: "",
     sku: "",
+    subcategory: "",
     tags: "",
     featured: false,
   };
@@ -108,10 +111,14 @@ function readSaved(): Saved | null {
  */
 export function ProductUploader({
   categories,
+  subcategories,
   aiEnabled,
+  defaultLowStock,
 }: {
   categories: Category[];
+  subcategories: string[];
   aiEnabled: boolean;
+  defaultLowStock: number;
 }) {
   // Read once, on the first render — the component never server-renders, so
   // reaching for localStorage here is safe and avoids an empty-then-filled flash.
@@ -216,7 +223,7 @@ export function ProductUploader({
 
   const category = categories.find((item) => item.id === categoryId) ?? null;
   const incomplete = drafts.filter(
-    (draft) => !draft.name.trim() || !draft.price.trim(),
+    (draft) => !draft.name.trim() || !draft.price.trim() || !draft.stock.trim(),
   ).length;
 
   // ---------------------------------------------------------------- step 1
@@ -300,6 +307,12 @@ export function ProductUploader({
           event.target.value = "";
         }}
       />
+
+      <datalist id="phade-subcategories">
+        {subcategories.map((value) => (
+          <option key={value} value={value} />
+        ))}
+      </datalist>
 
       {showRestored && (
         <div className="flex items-start gap-3 rounded-xl bg-brand-soft px-4 py-3">
@@ -459,7 +472,25 @@ export function ProductUploader({
                         />
                       </Field>
 
-                      <Field label="Status">
+                      <Field label="Stock" required>
+                        <NumberInput
+                          min={0}
+                          step={1}
+                          value={draft.stock}
+                          onChange={(event) =>
+                            update(draft.id, { stock: event.target.value })
+                          }
+                          placeholder="0"
+                          aria-invalid={attempted && !draft.stock.trim()}
+                          className={
+                            attempted && !draft.stock.trim()
+                              ? "shadow-[0_0_0_2px_var(--color-critical)]"
+                              : undefined
+                          }
+                        />
+                      </Field>
+
+                      <Field label="Status" className="sm:col-span-2">
                         <Select
                           value={draft.status}
                           onChange={(event) =>
@@ -501,6 +532,7 @@ export function ProductUploader({
                         draft={draft}
                         categoryName={category?.name}
                         aiEnabled={aiEnabled}
+                        defaultLowStock={defaultLowStock}
                         onChange={(patch) => update(draft.id, patch)}
                       />
                     )}
@@ -548,7 +580,7 @@ export function ProductUploader({
             {incomplete > 0 && (
               <span className="text-critical">
                 {" "}
-                · {incomplete} missing a name or price
+                · {incomplete} incomplete
               </span>
             )}
           </p>
@@ -639,15 +671,38 @@ function MoreDetails({
   draft,
   categoryName,
   aiEnabled,
+  defaultLowStock,
   onChange,
 }: {
   draft: Draft;
   categoryName?: string;
   aiEnabled: boolean;
+  defaultLowStock: number;
   onChange: (patch: Partial<Draft>) => void;
 }) {
   const [writing, setWriting] = useState(false);
+  const [tagging, setTagging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function tag() {
+    setTagging(true);
+    setError(null);
+    try {
+      const suggested = await suggestTags({
+        name: draft.name,
+        category: categoryName,
+        current: draft.description,
+      });
+      // Merge rather than replace, so hand-written tags survive.
+      onChange({ tags: mergeTags(draft.tags, suggested) });
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "The assistant couldn't respond.",
+      );
+    } finally {
+      setTagging(false);
+    }
+  }
 
   async function write() {
     setWriting(true);
@@ -704,7 +759,7 @@ function MoreDetails({
 
       {error && <p className="text-xs text-critical">{error}</p>}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Compare at">
           <MoneyInput
             value={draft.compareAtPrice}
@@ -719,15 +774,6 @@ function MoreDetails({
             onChange={(event) => onChange({ costPrice: event.target.value })}
           />
         </Field>
-        <Field label="Stock">
-          <NumberInput
-            min={0}
-            step={1}
-            value={draft.stock}
-            onChange={(event) => onChange({ stock: event.target.value })}
-            placeholder="0"
-          />
-        </Field>
         <Field label="Low stock at">
           <NumberInput
             min={0}
@@ -736,12 +782,20 @@ function MoreDetails({
             onChange={(event) =>
               onChange({ lowStockThreshold: event.target.value })
             }
-            placeholder="5"
+            placeholder={String(defaultLowStock)}
           />
         </Field>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Subcategory" hint="Optional — e.g. Totes, Heels">
+          <Input
+            list="phade-subcategories"
+            value={draft.subcategory}
+            onChange={(event) => onChange({ subcategory: event.target.value })}
+            placeholder="None"
+          />
+        </Field>
         <Field label="SKU" hint="Left blank, we generate one">
           <Input
             value={draft.sku}
@@ -749,14 +803,40 @@ function MoreDetails({
             placeholder="Generated automatically"
           />
         </Field>
-        <Field label="Tags" hint="Comma separated">
-          <Input
-            value={draft.tags}
-            onChange={(event) => onChange({ tags: event.target.value })}
-            placeholder="ankara, party, new-in"
-          />
-        </Field>
       </div>
+
+      <Field
+        label="Tags"
+        hint="Comma separated"
+        action={
+          aiEnabled ? (
+            <button
+              type="button"
+              onClick={() => void tag()}
+              disabled={tagging || !draft.description.trim()}
+              title={
+                draft.description.trim()
+                  ? undefined
+                  : "Write a description first — tags come from it"
+              }
+              className="inline-flex h-7 items-center gap-1.5 rounded-md bg-brand-soft px-2 text-xs font-medium text-brand transition hover:bg-brand/10 disabled:opacity-50"
+            >
+              {tagging ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Tag className="size-3" />
+              )}
+              Suggest tags
+            </button>
+          ) : undefined
+        }
+      >
+        <Input
+          value={draft.tags}
+          onChange={(event) => onChange({ tags: event.target.value })}
+          placeholder="ankara, party, new-in"
+        />
+      </Field>
 
       <label className="flex items-center gap-2 text-sm text-ink">
         <input

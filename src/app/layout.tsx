@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { LOGO_FAVICON } from "@/lib/brand";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,6 +19,11 @@ export const metadata: Metadata = {
     template: "%s · phadewoman",
   },
   description: "phadewoman — coming soon.",
+  icons: {
+    icon: [{ url: LOGO_FAVICON, type: "image/svg+xml" }],
+    shortcut: [{ url: LOGO_FAVICON, type: "image/svg+xml" }],
+    apple: [{ url: LOGO_FAVICON }],
+  },
 };
 
 export const viewport: Viewport = {

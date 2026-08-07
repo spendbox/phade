@@ -107,7 +107,11 @@ export function RowMenu({
           <div
             ref={panelRef}
             role="menu"
-            onClick={() => setOpen(false)}
+            // Deferred, not immediate: menu items include forms whose server
+            // action is dispatched by the click's default action. Closing
+            // synchronously would unmount the form first and the action would
+            // never run — which is exactly how Delete and Duplicate broke.
+            onClick={() => setTimeout(() => setOpen(false), 0)}
             style={{
               top: position.top,
               left: position.left,

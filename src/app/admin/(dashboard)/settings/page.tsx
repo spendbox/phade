@@ -1,18 +1,22 @@
 import { Check, Minus } from "lucide-react";
 
 import { PageHeader } from "@/components/admin/page-header";
+import { SettingsForm } from "@/components/admin/settings-form";
+import { SetupNotice } from "@/components/admin/setup-notice";
 import { Panel } from "@/components/ui/stat-tile";
-import { adminCredentialsState, getSession } from "@/lib/auth";
+import { adminCredentialsState } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { isPaystackConfigured } from "@/lib/paystack";
+import { getSettings } from "@/lib/settings";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const session = await getSession();
   const credentials = adminCredentialsState();
+  const configured = isSupabaseConfigured();
+  const settings = await getSettings();
 
   const integrations = [
     {
@@ -24,10 +28,10 @@ export default async function SettingsPage() {
     },
     {
       name: "Supabase",
-      ready: isSupabaseConfigured(),
+      ready: configured,
       variables: ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
       detail:
-        "Stores products, orders, customers, inventory and payments, plus product images. Run supabase/schema.sql once in the SQL editor to create the tables.",
+        "Stores products, orders, customers, inventory and payments, plus product media. Run supabase/schema.sql once in the SQL editor to create the tables.",
     },
     {
       name: "Paystack",
@@ -37,11 +41,11 @@ export default async function SettingsPage() {
         "Records revenue. Point your Paystack webhook at /api/paystack/webhook, and use “Sync from Paystack” on the Payments page to backfill.",
     },
     {
-      name: "AI description assistant",
+      name: "AI assistant",
       ready: Boolean(process.env.OPENAI_API_KEY),
       variables: ["OPENAI_API_KEY", "OPENAI_MODEL"],
       detail:
-        "Powers the write/improve/shorten buttons on the product description field. OPENAI_MODEL is optional and defaults to gpt-4o-mini. Everything else works without it.",
+        "Powers the write/improve buttons on product and category descriptions, and tag suggestions. OPENAI_MODEL is optional and defaults to gpt-4o-mini.",
     },
   ];
 
@@ -49,23 +53,15 @@ export default async function SettingsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Settings"
-        description="How this dashboard is wired up."
+        description="Store preferences and how this dashboard is wired up."
       />
 
-      <Panel title="Signed in as">
-        <p className="text-sm text-ink">{session?.email}</p>
-        <p className="mt-1 text-sm text-ink-secondary">
-          Admin access is controlled entirely by environment variables — there
-          are no user accounts to manage. To change who can sign in, update{" "}
-          <code className="rounded bg-plane px-1 py-0.5 font-mono text-[12px]">
-            ADMIN_EMAIL
-          </code>{" "}
-          and{" "}
-          <code className="rounded bg-plane px-1 py-0.5 font-mono text-[12px]">
-            ADMIN_PASSWORD
-          </code>{" "}
-          in Vercel → Settings → Environment Variables, then redeploy.
-        </p>
+      <Panel title="Inventory">
+        {configured ? (
+          <SettingsForm lowStockThreshold={settings.lowStockThreshold} />
+        ) : (
+          <SetupNotice description="Connect Supabase to store store-wide preferences." />
+        )}
       </Panel>
 
       <Panel title="Integrations" bodyClassName="p-0">

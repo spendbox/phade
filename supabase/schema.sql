@@ -41,6 +41,8 @@ create table if not exists public.products (
   compare_at_price_kobo bigint,
   cost_price_kobo       bigint,
   sku                   text,
+  -- Free-text refinement inside a category ("Totes", "Heels"). Optional.
+  subcategory           text,
   stock                 integer not null default 0,
   low_stock_threshold   integer not null default 5,
   status                text not null default 'draft'
@@ -51,6 +53,10 @@ create table if not exists public.products (
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
 );
+
+-- For projects created before subcategories existed.
+alter table public.products
+  add column if not exists subcategory text;
 
 create index if not exists products_category_id_idx on public.products (category_id);
 create index if not exists products_status_idx      on public.products (status);
@@ -152,6 +158,22 @@ create table if not exists public.inventory_movements (
 create index if not exists inventory_movements_product_id_idx on public.inventory_movements (product_id, created_at desc);
 
 -- ---------------------------------------------------------------------------
+-- App settings
+--
+-- Preferences the admin can change from the dashboard, rather than by editing
+-- environment variables and redeploying.
+-- ---------------------------------------------------------------------------
+create table if not exists public.app_settings (
+  key        text primary key,
+  value      jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+insert into public.app_settings (key, value) values
+  ('low_stock_threshold', '5'::jsonb)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
 -- updated_at triggers
 -- ---------------------------------------------------------------------------
 create or replace function public.set_updated_at()
@@ -185,6 +207,7 @@ $$;
 -- server only, which bypasses RLS. We enable RLS with no policies so that the
 -- anon/public key can never read or write these tables directly.
 -- ---------------------------------------------------------------------------
+alter table public.app_settings        enable row level security;
 alter table public.categories          enable row level security;
 alter table public.products            enable row level security;
 alter table public.customers           enable row level security;

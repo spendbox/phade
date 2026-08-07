@@ -49,6 +49,8 @@ export type Product = {
   compare_at_price_kobo: number | null;
   cost_price_kobo: number | null;
   sku: string | null;
+  /** Optional free-text refinement inside a category ("Totes", "Heels"). */
+  subcategory: string | null;
   stock: number;
   low_stock_threshold: number;
   status: ProductStatus;
@@ -172,3 +174,9 @@ export const INVENTORY_REASONS: InventoryReason[] = [
   "damage",
   "manual",
 ];
+
+/**
+ * The word an admin must type to confirm a bulk delete. Lives here rather than
+ * with the action because a "use server" file may only export async functions.
+ */
+export const DELETE_CONFIRMATION = "DELETE";

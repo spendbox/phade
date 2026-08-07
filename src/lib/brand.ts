@@ -14,5 +14,9 @@ export const LOGO_MARK =
 export const LOGO_TYPE =
   "https://drowtqlrkzxutgjylbvy.supabase.co/storage/v1/object/public/Website_Assets/PW%20logotype.svg";
 
+/** Full lock-up, used as the browser tab icon. */
+export const LOGO_FAVICON =
+  "https://drowtqlrkzxutgjylbvy.supabase.co/storage/v1/object/public/Website_Assets/PhadeWoman%20Logos.svg";
+
 /** Primary brand colour. Mirrored as `--color-brand` in globals.css. */
 export const BRAND_COLOR = "#A63655";

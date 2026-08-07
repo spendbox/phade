@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { Boxes, Minus, Plus } from "lucide-react";
+import { ArrowUpRight, Boxes, Minus, Plus } from "lucide-react";
 
 import { FilterBar } from "@/components/admin/filter-bar";
 import { PageHeader } from "@/components/admin/page-header";
 import { ErrorNotice, SetupNotice } from "@/components/admin/setup-notice";
 import { StockDialog } from "@/components/admin/stock-dialog";
-import { StockBadge } from "@/components/ui/badge";
+import { StockBadge, StockDot } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Panel, StatTile } from "@/components/ui/stat-tile";
 import { formatNaira, formatNairaCompact, formatNumber, formatRelative } from "@/lib/format";
@@ -27,7 +27,7 @@ export default async function InventoryPage({
 
   const [{ data: rows, error }, { data: movements }] = await Promise.all([
     getInventory({ search: q, view }),
-    getRecentMovements(12),
+    getRecentMovements(5),
   ]);
 
   const configured = isSupabaseConfigured();
@@ -117,10 +117,7 @@ export default async function InventoryPage({
                   <thead className="table-head">
                     <tr className="text-left text-xs font-medium text-ink-secondary">
                       <th className="px-5 py-3 font-medium">Product</th>
-                      <th className="px-3 py-3 text-right font-medium">
-                        On hand
-                      </th>
-                      <th className="px-3 py-3 font-medium">Level</th>
+                      <th className="w-40 px-3 py-3 font-medium">Stock</th>
                       <th className="px-3 py-3 text-right font-medium">Value</th>
                       <th className="px-5 py-3 text-right font-medium">
                         Adjust
@@ -140,14 +137,19 @@ export default async function InventoryPage({
                             </span>
                           </Link>
                         </td>
-                        <td className="px-3 py-3 text-right font-medium tabular-nums text-ink">
-                          {row.stock}
-                        </td>
-                        <td className="px-3 py-3">
-                          <StockBadge
-                            stock={row.stock}
-                            threshold={row.low_stock_threshold}
-                          />
+                        <td className="whitespace-nowrap px-3 py-3">
+                          <span className="flex items-center gap-2.5">
+                            <StockDot
+                              stock={row.stock}
+                              threshold={row.low_stock_threshold}
+                            />
+                            <span className="font-medium tabular-nums text-ink">
+                              {row.stock}
+                            </span>
+                            <span className="text-xs text-ink-muted">
+                              reorder at {row.low_stock_threshold}
+                            </span>
+                          </span>
                         </td>
                         <td className="px-3 py-3 text-right tabular-nums text-ink-secondary">
                           {formatNaira(
@@ -213,7 +215,18 @@ export default async function InventoryPage({
           )}
         </div>
 
-        <Panel title="Recent movements" bodyClassName="p-0">
+        <Panel
+          title="Recent movements"
+          action={
+            <Link
+              href="/admin/inventory/movements"
+              className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink"
+            >
+              View all <ArrowUpRight className="size-3.5" />
+            </Link>
+          }
+          bodyClassName="p-0"
+        >
           {movements.length === 0 ? (
             <p className="px-4 py-5 text-sm text-ink-secondary sm:px-5">
               Stock changes will be listed here.
