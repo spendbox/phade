@@ -3,11 +3,7 @@ import { Pencil, Tags, Trash2 } from "lucide-react";
 
 import { CategoryDialog } from "@/components/admin/category-dialog";
 import { PageHeader } from "@/components/admin/page-header";
-import {
-  ConfirmSubmit,
-  RowMenu,
-  menuItemClass,
-} from "@/components/admin/row-menu";
+import { ConfirmSubmit } from "@/components/admin/row-menu";
 import { ErrorNotice, SetupNotice } from "@/components/admin/setup-notice";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CategoryIcon } from "@/lib/category-icons";
@@ -23,13 +19,14 @@ export const metadata = { title: "Categories" };
 export default async function CategoriesPage() {
   const { data: categories, error } = await getCategoriesWithCounts();
   const configured = isSupabaseConfigured();
+  const aiEnabled = Boolean(process.env.OPENAI_API_KEY);
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Categories"
         description="Group products so customers — and you — can find them fast."
-        actions={<CategoryDialog />}
+        actions={<CategoryDialog aiEnabled={aiEnabled} />}
       />
 
       {!configured && <SetupNotice />}
@@ -41,7 +38,7 @@ export default async function CategoriesPage() {
             icon={<Tags className="size-5" />}
             title="No categories yet"
             description="Create a category, then assign products to it from the product page."
-            action={<CategoryDialog />}
+            action={<CategoryDialog aiEnabled={aiEnabled} />}
           />
         </div>
       ) : (
@@ -63,35 +60,45 @@ export default async function CategoriesPage() {
                   </div>
                 </div>
 
-                <RowMenu label={`Actions for ${category.name}`}>
+                {/* Edit and delete sit on the card itself rather than inside an
+                    overflow menu — a menu that closes on click would unmount
+                    the dialog and the delete form before either could run. */}
+                <div className="flex shrink-0 items-center gap-1">
                   <CategoryDialog
                     category={category}
+                    aiEnabled={aiEnabled}
                     trigger={
-                      <button type="button" className={menuItemClass}>
-                        <Pencil className="size-3.5" />
-                        Edit
+                      <button
+                        type="button"
+                        aria-label={`Edit ${category.name}`}
+                        title="Edit"
+                        className="flex size-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-plane hover:text-ink"
+                      >
+                        <Pencil className="size-4" />
                       </button>
                     }
                   />
+
                   <form action={deleteCategory}>
                     <input type="hidden" name="id" value={category.id} />
                     <ConfirmSubmit
                       message={`Delete "${category.name}"? Its ${category.productCount} product(s) will stay, but lose this category.`}
+                      className="flex size-8 w-8 items-center justify-center rounded-lg p-0 text-ink-muted transition hover:bg-critical-soft hover:text-critical"
                     >
-                      <Trash2 className="size-3.5" />
-                      Delete
+                      <Trash2 className="size-4" />
+                      <span className="sr-only">Delete {category.name}</span>
                     </ConfirmSubmit>
                   </form>
-                </RowMenu>
+                </div>
               </div>
 
               {category.description && (
-                <p className="mt-2 line-clamp-2 text-sm text-ink-secondary">
+                <p className="mt-3 line-clamp-2 text-sm text-ink-secondary">
                   {category.description}
                 </p>
               )}
 
-              <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
+              <div className="mt-auto flex items-center justify-between border-t border-line pt-3 [&:not(:first-child)]:mt-4">
                 <span className="text-xs text-ink-muted">
                   {formatNumber(category.productCount)} product
                   {category.productCount === 1 ? "" : "s"}

@@ -11,9 +11,18 @@ import {
   type ProductFormState,
 } from "@/app/admin/(dashboard)/products/actions";
 import { DescriptionField } from "@/components/admin/description-field";
+import { ColorPicker } from "@/components/admin/color-picker";
+import { SizePicker } from "@/components/admin/size-picker";
 import { ImageUploader } from "@/components/admin/image-uploader";
+import { TagsField } from "@/components/admin/tags-field";
 import { Button, buttonClass } from "@/components/ui/button";
-import { Field, Input, MoneyInput, Select } from "@/components/ui/field";
+import {
+  Field,
+  Input,
+  MoneyInput,
+  NumberInput,
+  Select,
+} from "@/components/ui/field";
 import { Panel } from "@/components/ui/stat-tile";
 import { koboToNairaInput, slugify } from "@/lib/format";
 import type { Category, ProductWithCategory } from "@/lib/types";
@@ -23,11 +32,15 @@ const initialState: ProductFormState = { ok: null };
 export function ProductForm({
   product,
   categories,
+  subcategories,
   aiEnabled,
+  defaultLowStock,
 }: {
   product?: ProductWithCategory;
   categories: Category[];
+  subcategories: string[];
   aiEnabled: boolean;
+  defaultLowStock: number;
 }) {
   const isEdit = Boolean(product);
   const router = useRouter();
@@ -107,6 +120,14 @@ export function ProductForm({
             <ImageUploader initial={product?.images ?? []} />
           </Panel>
 
+          <Panel title="Colours">
+            <ColorPicker initial={product?.colors ?? []} aiEnabled={aiEnabled} />
+          </Panel>
+
+          <Panel title="Sizes">
+            <SizePicker initial={product?.sizes ?? []} />
+          </Panel>
+
           <Panel title="Pricing">
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Price" htmlFor="price" required>
@@ -148,10 +169,9 @@ export function ProductForm({
           <Panel title="Inventory">
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Stock on hand" htmlFor="stock">
-                <Input
+                <NumberInput
                   id="stock"
                   name="stock"
-                  type="number"
                   min={0}
                   step={1}
                   defaultValue={product?.stock ?? 0}
@@ -162,13 +182,12 @@ export function ProductForm({
                 htmlFor="low_stock_threshold"
                 hint="Warn below this"
               >
-                <Input
+                <NumberInput
                   id="low_stock_threshold"
                   name="low_stock_threshold"
-                  type="number"
                   min={0}
                   step={1}
-                  defaultValue={product?.low_stock_threshold ?? 5}
+                  defaultValue={product?.low_stock_threshold ?? defaultLowStock}
                 />
               </Field>
               <Field label="SKU" htmlFor="sku">
@@ -233,16 +252,28 @@ export function ProductForm({
               </Field>
 
               <Field
-                label="Tags"
-                htmlFor="tags"
-                hint="Comma separated — ankara, party, new-in"
+                label="Subcategory"
+                htmlFor="subcategory"
+                hint="Optional — e.g. Totes, Heels"
               >
                 <Input
-                  id="tags"
-                  name="tags"
-                  defaultValue={product?.tags?.join(", ") ?? ""}
+                  id="subcategory"
+                  name="subcategory"
+                  list="phade-subcategories"
+                  defaultValue={product?.subcategory ?? ""}
+                  placeholder="None"
                 />
+                <datalist id="phade-subcategories">
+                  {subcategories.map((value) => (
+                    <option key={value} value={value} />
+                  ))}
+                </datalist>
               </Field>
+
+              <TagsField
+                defaultValue={product?.tags?.join(", ") ?? ""}
+                enabled={aiEnabled}
+              />
 
               <Field label="URL slug" htmlFor="slug" hint="/shop/your-slug">
                 <Input

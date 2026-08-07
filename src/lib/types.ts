@@ -26,6 +26,11 @@ export type InventoryReason =
   | "correction"
   | "damage";
 
+export type ProductColor = { name: string; hex: string };
+
+/** The size run phadewoman stocks. Sizes are optional per product. */
+export const PRODUCT_SIZES = [6, 8, 10, 12, 14, 16, 18] as const;
+
 export type Category = {
   id: string;
   name: string;
@@ -49,11 +54,16 @@ export type Product = {
   compare_at_price_kobo: number | null;
   cost_price_kobo: number | null;
   sku: string | null;
+  /** Optional free-text refinement inside a category ("Totes", "Heels"). */
+  subcategory: string | null;
   stock: number;
   low_stock_threshold: number;
   status: ProductStatus;
   images: string[];
   tags: string[];
+  /** Optional colourways offered for this product. */
+  colors: ProductColor[];
+  sizes: number[];
   featured: boolean;
   created_at: string;
   updated_at: string;
@@ -172,3 +182,82 @@ export const INVENTORY_REASONS: InventoryReason[] = [
   "damage",
   "manual",
 ];
+
+/**
+ * The word an admin must type to confirm a bulk delete. Lives here rather than
+ * with the action because a "use server" file may only export async functions.
+ */
+export const DELETE_CONFIRMATION = "DELETE";
+
+// ---------------------------------------------------------------------------
+// Sales and coupons
+// ---------------------------------------------------------------------------
+
+export type DiscountKind = "percentage" | "fixed";
+export type DiscountScope = "all" | "categories" | "products";
+
+export type Discount = {
+  id: string;
+  name: string;
+  /** Null for an automatic sale; set when a coupon code is required. */
+  code: string | null;
+  description: string | null;
+  kind: DiscountKind;
+  /** Percent (1-100) for a percentage sale, kobo for a fixed one. */
+  value: number;
+  scope: DiscountScope;
+  min_order_kobo: number;
+  usage_limit: number | null;
+  used_count: number;
+  enabled: boolean;
+  starts_at: string;
+  ends_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DiscountWithTargets = Discount & {
+  categoryIds: string[];
+  productIds: string[];
+  /** Names for display, resolved from the join tables. */
+  targetNames: string[];
+};
+
+/** Derived from dates and the enabled flag rather than stored. */
+export type DiscountState = "active" | "scheduled" | "ended" | "paused";
+
+export function discountState(discount: Discount, now = new Date()): DiscountState {
+  if (!discount.enabled) return "paused";
+  if (new Date(discount.starts_at) > now) return "scheduled";
+  if (discount.ends_at && new Date(discount.ends_at) < now) return "ended";
+  return "active";
+}
+
+// ---------------------------------------------------------------------------
+// Carts (uncompleted checkouts)
+// ---------------------------------------------------------------------------
+
+export type CartStatus = "active" | "converted" | "abandoned";
+
+export type CartItem = {
+  product_id: string | null;
+  name: string;
+  quantity: number;
+  unit_price_kobo: number;
+  image_url: string | null;
+};
+
+export type Cart = {
+  id: string;
+  token: string;
+  customer_id: string | null;
+  email: string | null;
+  phone: string | null;
+  status: CartStatus;
+  items: CartItem[];
+  subtotal_kobo: number;
+  order_id: string | null;
+  converted_at: string | null;
+  created_at: string;
+  last_active_at: string;
+};

@@ -21,7 +21,9 @@ const ProductUploader = dynamic(
 
 export function ProductUploaderMount(props: {
   categories: Category[];
+  subcategories: string[];
   aiEnabled: boolean;
+  defaultLowStock: number;
 }) {
   return <ProductUploader {...props} />;
 }

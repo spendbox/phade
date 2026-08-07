@@ -24,6 +24,8 @@ export function RowMenu({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
+  // Once opened, the panel stays mounted — see the note on rendering below.
+  const [everOpened, setEverOpened] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -49,7 +51,10 @@ export function RowMenu({
   }
 
   function toggle() {
-    if (!open) place();
+    if (!open) {
+      place();
+      setEverOpened(true);
+    }
     setOpen((value) => !value);
   }
 
@@ -101,14 +106,26 @@ export function RowMenu({
         <MoreHorizontal className="size-4" />
       </button>
 
-      {open &&
+      {/*
+        Closing hides the panel; it never unmounts it. Menu items are not inert
+        markup — they are forms whose server action is dispatched by the click's
+        default action, and triggers for dialogs that must outlive the menu.
+        Tearing the subtree down on click killed both: the form never submitted
+        (Delete and Duplicate), and the dialog vanished the instant it opened
+        (Edit sale). `display: none` takes the panel out of the layout and out
+        of the tab order while leaving React's tree — and any portal hanging off
+        it — intact.
+      */}
+      {everOpened &&
         typeof document !== "undefined" &&
         createPortal(
           <div
             ref={panelRef}
             role="menu"
+            aria-hidden={!open}
             onClick={() => setOpen(false)}
             style={{
+              display: open ? undefined : "none",
               top: position.top,
               left: position.left,
               width: MENU_WIDTH,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, Star, Trash2 } from "lucide-react";
 
 import { MediaThumb } from "@/components/admin/media-thumb";
@@ -16,11 +16,25 @@ import { uploadMedia } from "@/lib/upload-client";
 export function ImageUploader({
   name = "images",
   initial = [],
+  onChange,
 }: {
   name?: string;
   initial?: string[];
+  /** For callers that own the value rather than reading the hidden input. */
+  onChange?: (media: string[]) => void;
 }) {
   const [media, setMedia] = useState<string[]>(initial);
+
+  // Reported from an effect rather than inside the state updater: uploads land
+  // concurrently, so the updater has to stay a pure function of the previous
+  // value and can't be the place a callback fires.
+  const report = useRef(onChange);
+  useEffect(() => {
+    report.current = onChange;
+  }, [onChange]);
+  useEffect(() => {
+    report.current?.(media);
+  }, [media]);
   const [uploading, setUploading] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);

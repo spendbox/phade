@@ -151,3 +151,15 @@ export function slugify(input: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
 }
+
+/** ISO timestamp -> the "YYYY-MM-DDTHH:mm" a datetime-local input expects. */
+export function toDateTimeLocal(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}

@@ -6,7 +6,8 @@ import { PageHeader } from "@/components/admin/page-header";
 import { ProductForm } from "@/components/admin/product-form";
 import { ConfirmSubmit } from "@/components/admin/row-menu";
 import { ErrorNotice } from "@/components/admin/setup-notice";
-import { getCategories, getProduct } from "@/lib/queries";
+import { getCategories, getProduct, getSubcategories } from "@/lib/queries";
+import { getSettings } from "@/lib/settings";
 import { formatRelative } from "@/lib/format";
 
 import { deleteProduct } from "../actions";
@@ -30,10 +31,13 @@ export default async function EditProductPage({
 }) {
   const { id } = await params;
 
-  const [{ data: product, error }, { data: categories }] = await Promise.all([
-    getProduct(id),
-    getCategories(),
-  ]);
+  const [{ data: product, error }, { data: categories }, { data: subcategories }, settings] =
+    await Promise.all([
+      getProduct(id),
+      getCategories(),
+      getSubcategories(),
+      getSettings(),
+    ]);
 
   if (error) {
     return <ErrorNotice message={error} />;
@@ -70,7 +74,9 @@ export default async function EditProductPage({
       <ProductForm
         product={product}
         categories={categories}
+        subcategories={subcategories}
         aiEnabled={Boolean(process.env.OPENAI_API_KEY)}
+        defaultLowStock={settings.lowStockThreshold}
       />
     </div>
   );

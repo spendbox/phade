@@ -1,7 +1,11 @@
 import { getSupabase } from "@/lib/supabase";
 import type {
+  Cart,
+  CartStatus,
   Category,
   Customer,
+  Discount,
+  DiscountWithTargets,
   Order,
   OrderItem,
   OrderStatus,
@@ -256,11 +260,16 @@ export async function getDashboard(
 // Products & categories
 // ---------------------------------------------------------------------------
 
+export type ProductRow = ProductWithCategory & {
+  /** Units sold across paid-and-beyond orders. */
+  orderCount: number;
+};
+
 export async function getProducts(filters?: {
   search?: string;
   categoryId?: string;
   status?: string;
-}): Promise<QueryResult<ProductWithCategory[]>> {
+}): Promise<QueryResult<ProductRow[]>> {
   const supabase = getSupabase();
   if (!supabase) return empty([], NOT_CONFIGURED);
 
@@ -276,9 +285,61 @@ export async function getProducts(filters?: {
   if (filters?.categoryId) query = query.eq("category_id", filters.categoryId);
   if (filters?.status) query = query.eq("status", filters.status);
 
-  const { data, error } = await query;
+  const [products, items] = await Promise.all([
+    query,
+    supabase
+      .from("order_items")
+      .select("product_id, quantity, order:orders!inner(status)"),
+  ]);
+
+  if (products.error) return empty([], products.error.message);
+
+  // Order counts are a nice-to-have column: if that join fails, still show the
+  // catalogue rather than an error page.
+  const sold = new Map<string, number>();
+  if (!items.error) {
+    const counted: OrderStatus[] = [
+      "paid",
+      "processing",
+      "shipped",
+      "delivered",
+    ];
+    for (const row of (items.data ?? []) as unknown as {
+      product_id: string | null;
+      quantity: number;
+      order: { status: OrderStatus } | null;
+    }[]) {
+      if (!row.product_id || !row.order) continue;
+      if (!counted.includes(row.order.status)) continue;
+      sold.set(row.product_id, (sold.get(row.product_id) ?? 0) + row.quantity);
+    }
+  }
+
+  return empty(
+    ((products.data ?? []) as unknown as ProductWithCategory[]).map(
+      (product) => ({ ...product, orderCount: sold.get(product.id) ?? 0 }),
+    ),
+  );
+}
+
+/** Existing subcategory values, to suggest while typing a new one. */
+export async function getSubcategories(): Promise<QueryResult<string[]>> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("subcategory")
+    .not("subcategory", "is", null);
+
   if (error) return empty([], error.message);
-  return empty((data ?? []) as unknown as ProductWithCategory[]);
+
+  const unique = new Set(
+    ((data ?? []) as { subcategory: string | null }[])
+      .map((row) => row.subcategory?.trim())
+      .filter((value): value is string => Boolean(value)),
+  );
+  return empty([...unique].sort((a, b) => a.localeCompare(b)));
 }
 
 export async function getProduct(
@@ -392,7 +453,22 @@ export async function getInventory(filters?: {
   return empty(rows);
 }
 
-export async function getRecentMovements(limit = 20) {
+export async function getRecentMovements(limit = 5) {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const { data, error } = await supabase
+    .from("inventory_movements")
+    .select("*, product:products(id, name, sku)")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return empty([], error.message);
+  return empty(data ?? []);
+}
+
+/** The full movement history, for the "View all" page. */
+export async function getMovementHistory(limit = 300) {
   const supabase = getSupabase();
   if (!supabase) return empty([], NOT_CONFIGURED);
 
@@ -633,4 +709,230 @@ export async function getCustomer(id: string) {
     customer: customer.data as Customer,
     orders: (orders.data ?? []) as unknown as OrderListRow[],
   });
+}
+
+// ---------------------------------------------------------------------------
+// Sales and coupons
+// ---------------------------------------------------------------------------
+
+export async function getDiscounts(): Promise<
+  QueryResult<DiscountWithTargets[]>
+> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const [discounts, categoryLinks, productLinks] = await Promise.all([
+    supabase.from("discounts").select("*").order("created_at", { ascending: false }),
+    supabase
+      .from("discount_categories")
+      .select("discount_id, category:categories(id, name)"),
+    supabase
+      .from("discount_products")
+      .select("discount_id, product:products(id, name)"),
+  ]);
+
+  if (discounts.error) return empty([], discounts.error.message);
+
+  const categories = new Map<string, { id: string; name: string }[]>();
+  for (const row of (categoryLinks.data ?? []) as unknown as {
+    discount_id: string;
+    category: { id: string; name: string } | null;
+  }[]) {
+    if (!row.category) continue;
+    const list = categories.get(row.discount_id) ?? [];
+    list.push(row.category);
+    categories.set(row.discount_id, list);
+  }
+
+  const products = new Map<string, { id: string; name: string }[]>();
+  for (const row of (productLinks.data ?? []) as unknown as {
+    discount_id: string;
+    product: { id: string; name: string } | null;
+  }[]) {
+    if (!row.product) continue;
+    const list = products.get(row.discount_id) ?? [];
+    list.push(row.product);
+    products.set(row.discount_id, list);
+  }
+
+  return empty(
+    ((discounts.data ?? []) as Discount[]).map((discount) => {
+      const linkedCategories = categories.get(discount.id) ?? [];
+      const linkedProducts = products.get(discount.id) ?? [];
+      return {
+        ...discount,
+        categoryIds: linkedCategories.map((item) => item.id),
+        productIds: linkedProducts.map((item) => item.id),
+        targetNames:
+          discount.scope === "categories"
+            ? linkedCategories.map((item) => item.name)
+            : discount.scope === "products"
+              ? linkedProducts.map((item) => item.name)
+              : [],
+      };
+    }),
+  );
+}
+
+/** Minimal product list for the sale picker. */
+export async function getProductOptions(): Promise<
+  QueryResult<{ id: string; name: string }[]>
+> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name")
+    .neq("status", "archived")
+    .order("name", { ascending: true })
+    .limit(500);
+
+  if (error) return empty([], error.message);
+  return empty((data ?? []) as { id: string; name: string }[]);
+}
+
+// ---------------------------------------------------------------------------
+// Database (spreadsheet)
+// ---------------------------------------------------------------------------
+
+export type SheetRow = ProductWithCategory & {
+  /** Units sold across orders that were actually paid for. */
+  sold: number;
+  /** Naira taken for this product, at the price each order recorded. */
+  revenueKobo: number;
+};
+
+/**
+ * Every product with its trading numbers attached — one read for the whole
+ * sheet, so sales and stock line up with the row they belong to instead of
+ * being fetched per cell.
+ */
+export async function getSheetRows(): Promise<QueryResult<SheetRow[]>> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const [products, items] = await Promise.all([
+    supabase
+      .from("products")
+      .select("*, category:categories(id, name, slug)")
+      .order("created_at", { ascending: false })
+      .limit(1000),
+    supabase
+      .from("order_items")
+      .select(
+        "product_id, quantity, unit_price_kobo, order:orders!inner(status)",
+      ),
+  ]);
+
+  if (products.error) return empty([], products.error.message);
+
+  // Sales are a column, not the point of the page: if the join fails the sheet
+  // still opens with zeroes rather than an error.
+  const sold = new Map<string, { units: number; kobo: number }>();
+  if (!items.error) {
+    const counted: OrderStatus[] = [
+      "paid",
+      "processing",
+      "shipped",
+      "delivered",
+    ];
+    for (const row of (items.data ?? []) as unknown as {
+      product_id: string | null;
+      quantity: number;
+      unit_price_kobo: number;
+      order: { status: OrderStatus } | null;
+    }[]) {
+      if (!row.product_id || !row.order) continue;
+      if (!counted.includes(row.order.status)) continue;
+      const tally = sold.get(row.product_id) ?? { units: 0, kobo: 0 };
+      tally.units += row.quantity;
+      tally.kobo += row.quantity * row.unit_price_kobo;
+      sold.set(row.product_id, tally);
+    }
+  }
+
+  const rows = (products.data ?? []) as unknown as ProductWithCategory[];
+  return empty(
+    rows.map((row) => {
+      const tally = sold.get(row.id);
+      return {
+        ...row,
+        sold: tally?.units ?? 0,
+        revenueKobo: tally?.kobo ?? 0,
+      };
+    }),
+  );
+}
+
+/** Same list, with a thumbnail — for pickers where the picture is the label. */
+export async function getProductPickerOptions(): Promise<
+  QueryResult<{ id: string; name: string; image: string | null }[]>
+> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, images")
+    .neq("status", "archived")
+    .order("name", { ascending: true })
+    .limit(500);
+
+  if (error) return empty([], error.message);
+
+  return empty(
+    ((data ?? []) as { id: string; name: string; images: string[] | null }[]).map(
+      (row) => ({
+        id: row.id,
+        name: row.name,
+        image: row.images?.[0] ?? null,
+      }),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Carts (uncompleted checkouts)
+// ---------------------------------------------------------------------------
+
+/**
+ * A cart counts as abandoned once it has sat untouched past this window without
+ * becoming an order. The storefront can also mark one abandoned explicitly.
+ */
+export const ABANDONED_AFTER_MINUTES = 60;
+
+export type CartRow = Cart & { isAbandoned: boolean };
+
+export async function getCarts(filters?: {
+  status?: string;
+  search?: string;
+}): Promise<QueryResult<CartRow[]>> {
+  const supabase = getSupabase();
+  if (!supabase) return empty([], NOT_CONFIGURED);
+
+  let query = supabase
+    .from("carts")
+    .select("*")
+    .order("last_active_at", { ascending: false })
+    .limit(200);
+
+  if (filters?.status) query = query.eq("status", filters.status as CartStatus);
+  if (filters?.search) query = query.ilike("email", `%${filters.search}%`);
+
+  const { data, error } = await query;
+  if (error) return empty([], error.message);
+
+  const cutoff = Date.now() - ABANDONED_AFTER_MINUTES * 60_000;
+
+  return empty(
+    ((data ?? []) as unknown as Cart[]).map((cart) => ({
+      ...cart,
+      items: Array.isArray(cart.items) ? cart.items : [],
+      isAbandoned:
+        cart.status === "abandoned" ||
+        (cart.status === "active" &&
+          new Date(cart.last_active_at).getTime() < cutoff),
+    })),
+  );
 }
