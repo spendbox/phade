@@ -12,32 +12,25 @@ import { MAX_LINE_QUANTITY, type ShopProduct } from "@/lib/shop";
  * Choosing and buying: colour, size, how many, and the four things a shopper
  * can do about it.
  *
- * It is one component because the pop-up and the product page must behave
- * identically — a size that is required in one and optional in the other is
- * how a shop ends up posting the wrong dress. The pop-up passes `onDone` so it
- * can close itself on "Buy it now"; the page leaves it out.
+ * It is split into a hook and two pieces of UI for one reason. In the pop-up
+ * the choices scroll with the description while the buttons stay pinned to the
+ * foot of the column — two places in the DOM, one piece of state. A sticky
+ * element can never rise above its own parent, so "keep the buttons in view"
+ * cannot be solved by nesting; they have to be a sibling of the scroll area.
+ *
+ * The product page has room for both together, and uses `BuyPanel` for that.
+ * Either way the rules are the same code: a size that is required in the
+ * pop-up is required on the page, which is how a shop avoids posting the wrong
+ * dress.
  */
-export function BuyPanel({
-  product,
-  onDone,
-  stickyActions = false,
-  className,
-}: {
-  product: ShopProduct;
-  onDone?: () => void;
-  /**
-   * Pins the buttons to the foot of the scrolling column they sit in, so a
-   * shopper reading the description never has to scroll back to buy. Sticky
-   * rather than a second fixed bar, so there is still only one set of them.
-   */
-  stickyActions?: boolean;
-  className?: string;
-}) {
+
+export type BuyControls = ReturnType<typeof useBuyControls>;
+
+export function useBuyControls(product: ShopProduct, onDone?: () => void) {
   const router = useRouter();
   const { addToBag, isSaved, toggleSaved, say } = useShop();
 
   const soldOut = product.stock <= 0;
-  const saved = isSaved(product.id);
 
   // One colourway or one size isn't a choice — it's a fact, so it's pre-made.
   const [color, setColor] = useState<string | null>(
@@ -70,30 +63,64 @@ export function BuyPanel({
     return true;
   }
 
-  function buyNow() {
-    if (!add()) return;
-    onDone?.();
-    router.push("/checkout");
-  }
+  return {
+    product,
+    soldOut,
+    saved: isSaved(product.id),
+    color,
+    size,
+    quantity,
+    missing,
+    ceiling,
+    choose(next: { color?: string; size?: number }) {
+      if (next.color !== undefined) setColor(next.color);
+      if (next.size !== undefined) setSize(next.size);
+      setMissing(null);
+    },
+    setQuantity(next: number) {
+      setQuantity(Math.min(Math.max(next, 1), ceiling));
+    },
+    add,
+    toggleSaved: () => toggleSaved(product.id),
+    buyNow() {
+      if (!add()) return;
+      onDone?.();
+      router.push("/checkout");
+    },
+    async share() {
+      const url = `${window.location.origin}/product/${product.slug}`;
 
-  async function share() {
-    const url = `${window.location.origin}/product/${product.slug}`;
-
-    if (typeof navigator.share === "function") {
-      try {
-        await navigator.share({ title: product.name, url });
-        return;
-      } catch {
-        // Cancelled, or refused — fall through to the clipboard.
+      if (typeof navigator.share === "function") {
+        try {
+          await navigator.share({ title: product.name, url });
+          return;
+        } catch {
+          // Cancelled, or refused — fall through to the clipboard.
+        }
       }
-    }
 
-    try {
-      await navigator.clipboard.writeText(url);
-      say("Link copied");
-    } catch {
-      say(url);
-    }
+      try {
+        await navigator.clipboard.writeText(url);
+        say("Link copied");
+      } catch {
+        say(url);
+      }
+    },
+  };
+}
+
+/** Colour, size and quantity. Nothing here commits a shopper to anything. */
+export function BuyChoices({
+  controls,
+  className,
+}: {
+  controls: BuyControls;
+  className?: string;
+}) {
+  const { product, soldOut, color, size, quantity, missing } = controls;
+
+  if (product.colors.length === 0 && product.sizes.length === 0 && soldOut) {
+    return null;
   }
 
   return (
@@ -116,10 +143,7 @@ export function BuyPanel({
                 <button
                   key={option.name}
                   type="button"
-                  onClick={() => {
-                    setColor(option.name);
-                    setMissing(null);
-                  }}
+                  onClick={() => controls.choose({ color: option.name })}
                   aria-pressed={chosen}
                   title={option.name}
                   className={cn(
@@ -158,10 +182,7 @@ export function BuyPanel({
                 <button
                   key={option}
                   type="button"
-                  onClick={() => {
-                    setSize(option);
-                    setMissing(null);
-                  }}
+                  onClick={() => controls.choose({ size: option })}
                   aria-pressed={chosen}
                   className={cn(
                     "h-9 min-w-11 rounded-full px-3 text-sm font-medium transition",
@@ -179,14 +200,14 @@ export function BuyPanel({
       )}
 
       {!soldOut && (
-        <div className="mb-5 flex items-center gap-3">
+        <div className="flex items-center gap-3">
           <span className="text-[13px] font-medium text-ink-secondary">
             Quantity
           </span>
           <div className="flex items-center gap-1 rounded-full bg-canvas-deep p-1">
             <button
               type="button"
-              onClick={() => setQuantity((n) => Math.max(1, n - 1))}
+              onClick={() => controls.setQuantity(quantity - 1)}
               aria-label="Fewer"
               className="flex size-7 items-center justify-center rounded-full bg-canvas text-ink transition active:scale-90"
             >
@@ -197,7 +218,7 @@ export function BuyPanel({
             </span>
             <button
               type="button"
-              onClick={() => setQuantity((n) => Math.min(n + 1, ceiling))}
+              onClick={() => controls.setQuantity(quantity + 1)}
               aria-label="More"
               className="flex size-7 items-center justify-center rounded-full bg-canvas text-ink transition active:scale-90"
             >
@@ -206,58 +227,90 @@ export function BuyPanel({
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      <div
-        className={cn(
-          stickyActions &&
-            "sticky bottom-0 z-10 -mx-5 border-t border-line bg-canvas px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:-mx-7 sm:px-7 sm:pb-5",
-        )}
-      >
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => toggleSaved(product.id)}
-            aria-pressed={saved}
-            aria-label={saved ? "Saved" : "Save"}
-            className="flex size-12 shrink-0 items-center justify-center rounded-full bg-canvas-deep text-ink transition hover:bg-line-strong active:scale-90"
-          >
-            <Heart
-              className={cn("size-5", saved && "fill-brand text-brand")}
-              aria-hidden
-            />
-          </button>
+/** Save, share, add, buy. The row that has to stay within reach. */
+export function BuyActions({
+  controls,
+  className,
+}: {
+  controls: BuyControls;
+  className?: string;
+}) {
+  const { soldOut, saved } = controls;
 
-          <button
-            type="button"
-            onClick={share}
-            aria-label="Share"
-            className="flex size-12 shrink-0 items-center justify-center rounded-full bg-canvas-deep text-ink transition hover:bg-line-strong active:scale-90"
-          >
-            <Share2 className="size-5" aria-hidden />
-          </button>
+  return (
+    <div className={className}>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={controls.toggleSaved}
+          aria-pressed={saved}
+          aria-label={saved ? "Saved" : "Save"}
+          className="flex size-12 shrink-0 items-center justify-center rounded-full bg-canvas-deep text-ink transition hover:bg-line-strong active:scale-90"
+        >
+          <Heart
+            className={cn("size-5", saved && "fill-brand text-brand")}
+            aria-hidden
+          />
+        </button>
 
-          <button
-            type="button"
-            onClick={add}
-            disabled={soldOut}
-            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-noir text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <ShoppingBag className="size-4" aria-hidden />
-            {soldOut ? "Sold out" : "Add to bag"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={controls.share}
+          aria-label="Share"
+          className="flex size-12 shrink-0 items-center justify-center rounded-full bg-canvas-deep text-ink transition hover:bg-line-strong active:scale-90"
+        >
+          <Share2 className="size-5" aria-hidden />
+        </button>
 
-        {!soldOut && (
-          <button
-            type="button"
-            onClick={buyNow}
-            className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-brand-soft text-sm font-semibold text-brand transition hover:bg-brand hover:text-white"
-          >
-            <Check className="size-4" aria-hidden />
-            Buy it now
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={controls.add}
+          disabled={soldOut}
+          className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-noir text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ShoppingBag className="size-4" aria-hidden />
+          {soldOut ? "Sold out" : "Add to bag"}
+        </button>
       </div>
+
+      {!soldOut && (
+        <button
+          type="button"
+          onClick={controls.buyNow}
+          className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-brand-soft text-sm font-semibold text-brand transition hover:bg-brand hover:text-white"
+        >
+          <Check className="size-4" aria-hidden />
+          Buy it now
+        </button>
+      )}
+
+      <p className="mt-2.5 text-center text-[11px] text-ink-muted">
+        {soldOut
+          ? "Message us and we'll tell you when it's back."
+          : "Card, transfer or USSD · Secure checkout with Paystack"}
+      </p>
+    </div>
+  );
+}
+
+/** Both halves together, for a page with room for them. */
+export function BuyPanel({
+  product,
+  className,
+}: {
+  product: ShopProduct;
+  className?: string;
+}) {
+  const controls = useBuyControls(product);
+
+  return (
+    <div className={className}>
+      <BuyChoices controls={controls} className="mb-5" />
+      <BuyActions controls={controls} />
     </div>
   );
 }

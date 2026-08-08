@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { Maximize2, Truck, X } from "lucide-react";
 
-import { BuyPanel } from "@/components/shop/buy-panel";
+import {
+  BuyActions,
+  BuyChoices,
+  useBuyControls,
+} from "@/components/shop/buy-panel";
 import { ProductGallery } from "@/components/shop/product-gallery";
 import { Sheet } from "@/components/shop/sheet";
 import { useShop } from "@/components/shop/shop-provider";
@@ -49,6 +53,7 @@ function Detail({
   product: ShopProduct;
   onClose: () => void;
 }) {
+  const controls = useBuyControls(product, onClose);
   const soldOut = product.stock <= 0;
   const off = percentOff(product);
 
@@ -114,6 +119,8 @@ function Detail({
             )
           )}
 
+          <BuyChoices controls={controls} className="mt-5" />
+
           {product.description && (
             <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-ink-secondary">
               {product.description}
@@ -146,15 +153,13 @@ function Detail({
             <Maximize2 className="size-3.5" aria-hidden />
             Open the full page
           </Link>
-
-          {/* The buttons pin to the foot of this column and stay there. */}
-          <BuyPanel
-            product={product}
-            onDone={onClose}
-            stickyActions
-            className="mt-6"
-          />
         </div>
+
+        {/* Outside the scroll area on purpose: these never scroll away. */}
+        <BuyActions
+          controls={controls}
+          className="border-t border-line bg-canvas px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-7 sm:pb-5"
+        />
       </div>
     </div>
   );

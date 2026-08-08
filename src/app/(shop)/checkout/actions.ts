@@ -265,12 +265,15 @@ export async function placeOrder(
 
     return { ok: true, redirect: authorizationUrl };
   } catch (error) {
+    // Everything a shopper can put right is returned above, by hand. Anything
+    // that reaches here is ours — a missing environment variable, a database
+    // that didn't answer, Paystack refusing the call — and its message is for
+    // the logs, not for someone trying to buy a dress.
+    console.error("[checkout] order failed", error);
     return {
       ok: false,
       error:
-        error instanceof Error
-          ? error.message
-          : "Something went wrong placing that order. Please try again.",
+        "We couldn't complete that order just now. Nothing has been charged — please try again in a moment.",
     };
   }
 }
