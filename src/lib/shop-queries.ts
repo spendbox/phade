@@ -212,14 +212,9 @@ async function loadCatalogue(): Promise<ShopCatalogue> {
   const shopProducts = rows.map((row) => toShopProduct(row, discounts, sold));
 
   const counts = new Map<string, number>();
-  const covers = new Map<string, string>();
   for (const product of shopProducts) {
     if (!product.categoryId) continue;
     counts.set(product.categoryId, (counts.get(product.categoryId) ?? 0) + 1);
-    const cover = product.media[0];
-    if (cover && !covers.has(product.categoryId)) {
-      covers.set(product.categoryId, cover);
-    }
   }
 
   // An empty category is a dead end for a shopper, so it stays off the rail.
@@ -231,7 +226,6 @@ async function loadCatalogue(): Promise<ShopCatalogue> {
       description: category.description,
       icon: category.icon,
       imageUrl: category.image_url,
-      cover: category.image_url ?? covers.get(category.id) ?? null,
       count: counts.get(category.id) ?? 0,
     }))
     .filter((category) => category.count > 0);

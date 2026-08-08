@@ -50,7 +50,10 @@ export function CategoryBar({
               href={`/shop?category=${category.slug}`}
               label={category.name}
               active={active === category.slug}
-              cover={category.cover}
+              // Icons only in the shop. This bar is navigation a shopper reads
+              // at a glance while a grid moves under it, and a row of little
+              // photographs there competes with the photographs they came for.
+              cover={null}
               compact
               icon={<CategoryIcon icon={category.icon} className="size-5" />}
             />

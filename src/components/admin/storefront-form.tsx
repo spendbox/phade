@@ -366,7 +366,10 @@ export function StorefrontForm({
           name="closing"
           copy={content.sections.closing}
           fallback={DEFAULT_SECTIONS.closing}
-          where="The way into the shop, at the foot of the page."
+          where="The way into the shop, at the foot of the page. The heading is the small line above; the sentence below it is the large one."
+          noteLabel="The big line"
+          noteHint="Left empty it counts the shop for itself, and stays right as pieces are added. Write your own and it stays written."
+          notePlaceholder="48 pieces, waiting to be found"
         />
       </Panel>
 
@@ -459,6 +462,9 @@ function SectionFields({
   fallback,
   where,
   cta = true,
+  noteLabel = "Subtext",
+  noteHint = "The line under the heading. Leave it empty for no line at all.",
+  notePlaceholder,
 }: {
   name: string;
   copy: SectionCopy;
@@ -466,7 +472,16 @@ function SectionFields({
   /** Where on the page this section shows up, in a few words. */
   where: string;
   cta?: boolean;
+  noteLabel?: string;
+  noteHint?: string;
+  /** What the shop sees in place of a blank subtext, if it isn't nothing. */
+  notePlaceholder?: string;
 }) {
+  // Held rather than left to the DOM so that "put it back" is a button: a
+  // shop that writes over an automatic line should be able to change its mind
+  // without guessing what the line used to say.
+  const [note, setNote] = useState(copy.note);
+
   return (
     <div className="space-y-4">
       <p className="text-xs text-ink-muted">{where}</p>
@@ -481,16 +496,28 @@ function SectionFields({
       </Field>
 
       <Field
-        label="Subtext"
+        label={noteLabel}
         htmlFor={`${name}_note`}
-        hint="The line under the heading. Leave it empty for no line at all."
+        hint={noteHint}
+        action={
+          note.trim() ? (
+            <button
+              type="button"
+              onClick={() => setNote("")}
+              className="text-xs font-medium text-ink-secondary hover:text-ink"
+            >
+              {notePlaceholder ? "Use the default" : "Clear"}
+            </button>
+          ) : undefined
+        }
       >
         <Textarea
           id={`${name}_note`}
           name={`${name}_note`}
           rows={2}
-          defaultValue={copy.note}
-          placeholder={fallback.note || "Optional"}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder={notePlaceholder ?? fallback.note ?? "Optional"}
         />
       </Field>
 

@@ -4,78 +4,32 @@ import { Plus } from "lucide-react";
 
 import { Media } from "@/components/shop/media";
 import { useShop } from "@/components/shop/shop-provider";
-import { cn } from "@/lib/cn";
 import { formatNairaShort } from "@/lib/format";
-import { isNewIn, percentOff, type ShopProduct } from "@/lib/shop";
+import { percentOff, type ShopProduct } from "@/lib/shop";
 
 /**
- * What just arrived, laid out as a wall rather than a row.
+ * What just landed, on the front page.
  *
- * A rail says "here are ten equal things, keep scrolling". A wall of unequal
- * tiles says one of them matters more, and gives the eye somewhere to go: a
- * tall piece to open on, a wide one to break the rhythm, smaller ones to fill
- * in around them. It is the layout a lookbook has used for a century, and it
- * is what stops a new-in section from reading like a search result.
+ * The tiles are all the same portrait shape, because the clothes are: a dress
+ * photographed head to hem is a tall picture, and a wide tile of one is a
+ * crop of the hem and the ceiling. A mixed wall of tall and wide boxes was
+ * tried here and it fought the photography every time.
  *
- * The names sit on the pictures rather than under them, so the grid stays a
- * grid of clothes. Each tile carries one control — add it — and the picture
- * itself opens the piece.
- */
-
-/**
- * The shape of a full wall, by position: a tall piece to open on, a wide one
- * to break the rhythm, smaller ones filling in around them. Two columns on a
- * phone, three from a laptop up, and every cell accounted for.
- */
-const FULL_WALL = [
-  "row-span-2",
-  "sm:col-span-2 lg:col-span-2",
-  "",
-  "col-span-2 sm:col-span-1",
-  "sm:col-span-2 lg:col-span-2",
-  "",
-];
-
-/**
- * What one tile spans when there aren't enough pieces for the full wall.
+ * The names sit on the pictures rather than under them, so the section reads
+ * as a wall of clothes rather than a list with captions. Each tile carries one
+ * control — add it — and the picture itself opens the piece.
  *
- * The last tile takes whatever is left over, so a row never ends half-empty:
- * an odd number of pieces gives a wide one at the foot on a phone, and the
- * same trick fills the three-across row on a laptop. A wall that stops in the
- * middle of a row is the thing that makes a shop look out of stock.
+ * Nothing wears a "New in" mark: everything under a heading that says New in
+ * is new in, and a badge repeating the heading on every tile is noise. The
+ * shop's own grid still marks them, where the surrounding pieces are not.
  */
-function spanFor(index: number, count: number): string {
-  if (index !== count - 1) return "col-span-1 lg:col-span-1";
-
-  const phone = count % 2 === 1 ? "col-span-2" : "col-span-1";
-  const desk =
-    count % 3 === 1
-      ? "lg:col-span-3"
-      : count % 3 === 2
-        ? "lg:col-span-2"
-        : "lg:col-span-1";
-
-  return `${phone} ${desk}`;
-}
-
-export function ProductMosaic({ products }: { products: ShopProduct[] }) {
-  const shown = products.slice(0, FULL_WALL.length);
-  const count = shown.length;
-
-  if (count === 0) return null;
+export function NewInGrid({ products }: { products: ShopProduct[] }) {
+  if (products.length === 0) return null;
 
   return (
-    <ul className="grid auto-rows-[10.5rem] grid-cols-2 gap-3 px-4 sm:auto-rows-[13rem] sm:gap-4 sm:px-6 lg:grid-cols-3 lg:px-8">
-      {shown.map((product, index) => (
-        <li
-          key={product.id}
-          className={cn(
-            "min-w-0",
-            count === FULL_WALL.length
-              ? FULL_WALL[index]
-              : spanFor(index, count),
-          )}
-        >
+    <ul className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:gap-4 sm:px-6 lg:px-8">
+      {products.map((product, index) => (
+        <li key={product.id} className="min-w-0">
           <Tile product={product} priority={index < 2} />
         </li>
       ))}
@@ -97,12 +51,12 @@ function Tile({
   const needsChoice = product.colors.length > 1 || product.sizes.length > 1;
 
   return (
-    <article className="group relative size-full overflow-hidden rounded-3xl bg-canvas-deep">
+    <article className="group relative aspect-[3/4] overflow-hidden rounded-3xl bg-canvas-deep">
       <Media
         url={product.media[0]}
         alt={product.name}
         priority={priority}
-        sizes="(min-width: 1024px) 40vw, 60vw"
+        sizes="(min-width: 640px) 33vw, 50vw"
         className="size-full transition-transform duration-700 group-hover:scale-105"
       />
 
@@ -118,9 +72,9 @@ function Tile({
         className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-noir/80 via-noir/25 to-transparent"
       />
 
-      {(off !== null || isNewIn(product.createdAt)) && (
-        <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-noir">
-          {off !== null ? product.saleLabel ?? `−${off}%` : "New in"}
+      {off !== null && (
+        <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-brand px-2.5 py-1 text-[11px] font-semibold text-white">
+          {product.saleLabel ?? `−${off}%`}
         </span>
       )}
 

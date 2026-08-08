@@ -50,7 +50,11 @@ export function CategoryStories({
               href={`/shop?category=${category.slug}`}
               label={category.name}
               active={active === category.slug}
-              cover={category.cover}
+              // The category's own picture, uploaded in Settings →
+              // Categories. Not the first product filed under it: a room
+              // should be represented by the photograph the shop chose for it,
+              // and by its icon until one is chosen.
+              cover={category.imageUrl}
               icon={<CategoryIcon icon={category.icon} className="size-6" />}
             />
           </li>

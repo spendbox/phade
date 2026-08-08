@@ -6,7 +6,7 @@ import { AboutSection } from "@/components/shop/about-block";
 import { CategoryStories } from "@/components/shop/category-stories";
 import { FeaturedStack } from "@/components/shop/featured-stack";
 import { ProductRail } from "@/components/shop/product-card";
-import { ProductMosaic } from "@/components/shop/product-mosaic";
+import { NewInGrid } from "@/components/shop/new-in-grid";
 import { ProductRegistry } from "@/components/shop/shop-provider";
 import { StoryHero } from "@/components/shop/story-hero";
 import { bestSellers, featured, getCatalogue, newIn } from "@/lib/shop-queries";
@@ -150,11 +150,20 @@ export default async function LandingPage() {
             </section>
           )}
 
+          {/* The shop's own words come straight after the deck: by here a
+              reader has decided they like the look of the place, and that is
+              the moment they will read a paragraph about who chose it. */}
+          {content.about.enabled && (
+            <div className="mt-14 sm:mt-20">
+              <AboutSection about={content.about} />
+            </div>
+          )}
+
           {fresh.length > 0 && (
             <section className="mt-14 sm:mt-20">
               <Heading copy={sections.newIn} />
               <div className="mt-6">
-                <ProductMosaic products={fresh} />
+                <NewInGrid products={fresh} />
               </div>
               {sections.newIn.ctaLabel && sections.newIn.ctaHref && (
                 <div className="mt-7 flex justify-center">
@@ -167,12 +176,6 @@ export default async function LandingPage() {
                 </div>
               )}
             </section>
-          )}
-
-          {content.about.enabled && (
-            <div className="mt-14 sm:mt-20">
-              <AboutSection about={content.about} />
-            </div>
           )}
 
           {best.length > 0 && (
@@ -188,16 +191,15 @@ export default async function LandingPage() {
             <div className="overflow-hidden rounded-[2rem] bg-canvas-deep px-6 py-12 text-center sm:px-10 sm:py-16">
               <p className="inline-flex items-center gap-2 rounded-full bg-noir/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-secondary">
                 <ShoppingBag className="size-3.5" aria-hidden />
-                {products.length} piece{products.length === 1 ? "" : "s"}
-              </p>
-              <h2 className="mt-5 text-balance text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
                 {sections.closing.heading}
+              </p>
+              {/* Left alone, this counts the shop: a number that is right on
+                  the day a piece is added is worth more than a sentence
+                  someone has to remember to update. Write one and it stays
+                  written, until it is cleared again. */}
+              <h2 className="mx-auto mt-5 max-w-xl text-balance text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+                {sections.closing.note || countLine(products.length)}
               </h2>
-              {sections.closing.note && (
-                <p className="mx-auto mt-3 max-w-md text-pretty text-[15px] leading-relaxed text-ink-secondary">
-                  {sections.closing.note}
-                </p>
-              )}
               {sections.closing.ctaLabel && sections.closing.ctaHref && (
                 <Link
                   href={sections.closing.ctaHref}
@@ -216,6 +218,11 @@ export default async function LandingPage() {
       )}
     </>
   );
+}
+
+/** The last block's line when the shop hasn't written its own. */
+function countLine(pieces: number): string {
+  return `${pieces} piece${pieces === 1 ? "" : "s"}, waiting to be found`;
 }
 
 /**

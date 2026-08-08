@@ -100,7 +100,11 @@ export function ImageUploader({
                 </span>
               )}
 
-              <div className="absolute inset-x-1.5 bottom-1.5 flex justify-end gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+              {/* Always there on a touchscreen, which has no hover and so no
+                  way to summon a button that only appears on one. A pointer
+                  that can hover still gets them out of the way of the
+                  picture. */}
+              <div className="absolute inset-x-1.5 bottom-1.5 flex justify-end gap-1 transition-opacity focus-within:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
                 {index !== 0 && (
                   <button
                     type="button"

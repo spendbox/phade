@@ -16,9 +16,12 @@ export type ShopCategory = {
   slug: string;
   description: string | null;
   icon: string | null;
+  /**
+   * The category's own photograph, uploaded in Settings → Categories. The
+   * front page shows it and falls back to the icon; the shop's own bar shows
+   * the icon either way.
+   */
   imageUrl: string | null;
-  /** Cover taken from the first product in the category when there's no image. */
-  cover: string | null;
   count: number;
 };
 

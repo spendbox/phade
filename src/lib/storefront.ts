@@ -107,7 +107,9 @@ export const DEFAULT_SECTIONS: StorefrontSections = {
     ctaHref: "/shop?sort=best",
   },
   closing: {
-    heading: "The whole shop, one piece at a time",
+    // The heading is the small line above; the subtext is the big one, and
+    // left empty it counts the shop for itself.
+    heading: "The whole shop",
     note: "",
     ctaLabel: "Open the shop",
     ctaHref: "/shop",
