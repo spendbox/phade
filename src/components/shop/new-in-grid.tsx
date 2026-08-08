@@ -30,7 +30,7 @@ export function NewInGrid({ products }: { products: ShopProduct[] }) {
     <ul className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:gap-4 sm:px-6 lg:px-8">
       {products.map((product, index) => (
         <li key={product.id} className="min-w-0">
-          <Tile product={product} priority={index < 2} />
+          <Tile product={product} siblings={products} priority={index < 2} />
         </li>
       ))}
     </ul>
@@ -39,9 +39,11 @@ export function NewInGrid({ products }: { products: ShopProduct[] }) {
 
 function Tile({
   product,
+  siblings,
   priority,
 }: {
   product: ShopProduct;
+  siblings: ShopProduct[];
   priority: boolean;
 }) {
   const { openProduct, addToBag } = useShop();
@@ -62,7 +64,7 @@ function Tile({
 
       <button
         type="button"
-        onClick={() => openProduct(product)}
+        onClick={() => openProduct(product, siblings)}
         className="absolute inset-0 size-full"
         aria-label={`Open ${product.name}, ${formatNairaShort(product.priceKobo)}`}
       />
@@ -107,7 +109,7 @@ function Tile({
           <button
             type="button"
             onClick={() =>
-              needsChoice ? openProduct(product) : addToBag({ product })
+              needsChoice ? openProduct(product, siblings) : addToBag({ product })
             }
             aria-label={
               needsChoice

@@ -28,7 +28,12 @@ export function SearchSelect({
   required = false,
   id,
 }: {
-  name: string;
+  /**
+   * Submits the choice under this name. Optional: a form that carries its own
+   * hidden fields — the checkout does, so that a folded-up step still submits
+   * what was typed into it — passes none.
+   */
+  name?: string;
   options: string[];
   value: string;
   onChange: (next: string) => void;
@@ -97,7 +102,9 @@ export function SearchSelect({
 
   return (
     <div ref={box} className="relative">
-      <input type="hidden" name={name} value={value} required={required} />
+      {name && (
+        <input type="hidden" name={name} value={value} required={required} />
+      )}
 
       <div className="relative">
         <input

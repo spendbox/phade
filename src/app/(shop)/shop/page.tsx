@@ -215,6 +215,7 @@ export default async function ShopPage({
             <ProductCard
               key={product.id}
               product={product}
+              siblings={visible}
               priority={index < 4}
             />
           ))}

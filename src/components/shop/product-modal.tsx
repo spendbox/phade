@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ShoppingBag, Truck, X } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ShoppingBag,
+  Truck,
+  X,
+} from "lucide-react";
 
 import {
   BuyActions,
@@ -36,7 +43,8 @@ import { LOW_STOCK_SHOWS_AT, percentOff, type ShopProduct } from "@/lib/shop";
  * shopper and the next thing they wanted to look at.
  */
 export function ProductModal() {
-  const { viewing, closeProduct } = useShop();
+  const { viewing, closeProduct, stepProduct, viewingAt, viewingOf } =
+    useShop();
   const [added, setAdded] = useState<AddedChoice | null>(null);
 
   // Opening a different product — or closing this one — starts full size
@@ -49,10 +57,17 @@ export function ProductModal() {
     setAdded(null);
   }
 
+  const hasPrev = viewingAt > 0;
+  const hasNext = viewingAt > -1 && viewingAt < viewingOf - 1;
+
+  /** Sideways moves along the row this was opened from, if there is one. */
+  const step = added || viewingOf < 2 ? undefined : stepProduct;
+
   return (
     <Sheet
       open={Boolean(viewing)}
       onClose={closeProduct}
+      onSwipe={step}
       label={viewing?.name ?? "Product"}
       side="center"
       className={cn(
@@ -76,6 +91,10 @@ export function ProductModal() {
             product={viewing}
             onAdded={setAdded}
             onClose={closeProduct}
+            onStep={step}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            position={viewingOf > 1 ? `${viewingAt + 1} of ${viewingOf}` : null}
           />
         ))}
     </Sheet>
@@ -86,10 +105,18 @@ function Detail({
   product,
   onAdded,
   onClose,
+  onStep,
+  hasPrev,
+  hasNext,
+  position,
 }: {
   product: ShopProduct;
   onAdded: (choice: AddedChoice) => void;
   onClose: () => void;
+  onStep?: (by: 1 | -1) => void;
+  hasPrev: boolean;
+  hasNext: boolean;
+  position: string | null;
 }) {
   const controls = useBuyControls(product, onAdded);
   const soldOut = product.stock <= 0;
@@ -103,6 +130,29 @@ function Detail({
       />
 
       <CloseButton onClose={onClose} />
+
+      {/* The row this was opened from, walkable without closing the pop-up.
+          A thumb swipes; a cursor gets these, which sit outside the card on a
+          wide screen and over the picture on a narrow one. */}
+      {onStep && (
+        <>
+          <StepButton
+            side="left"
+            disabled={!hasPrev}
+            onClick={() => onStep(-1)}
+          />
+          <StepButton
+            side="right"
+            disabled={!hasNext}
+            onClick={() => onStep(1)}
+          />
+          {position && (
+            <span className="pointer-events-none absolute left-3 top-3 z-30 rounded-full bg-noir/55 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white backdrop-blur sm:hidden">
+              {position}
+            </span>
+          )}
+        </>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex-1 overflow-y-auto px-5 pt-4 sm:px-7 sm:pt-7">
@@ -279,6 +329,36 @@ function Receipt({
         Back to the product
       </button>
     </div>
+  );
+}
+
+/** One step along the row, for a pointer. */
+function StepButton({
+  side,
+  disabled,
+  onClick,
+}: {
+  side: "left" | "right";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={side === "left" ? "Previous piece" : "Next piece"}
+      className={cn(
+        "absolute top-1/2 z-30 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-canvas/90 text-noir shadow-md ring-1 ring-noir/10 backdrop-blur transition hover:bg-canvas disabled:opacity-0 sm:flex",
+        side === "left" ? "left-3" : "right-3",
+      )}
+    >
+      {side === "left" ? (
+        <ChevronLeft className="size-5" aria-hidden />
+      ) : (
+        <ChevronRight className="size-5" aria-hidden />
+      )}
+    </button>
   );
 }
 

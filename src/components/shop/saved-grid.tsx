@@ -58,7 +58,12 @@ export function SavedGrid({ products }: { products: ShopProduct[] }) {
 
       <div className="mt-4 grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:gap-4 sm:px-6 lg:grid-cols-4 lg:px-8">
         {chosen.map((product, index) => (
-          <ProductCard key={product.id} product={product} priority={index < 4} />
+          <ProductCard
+            key={product.id}
+            product={product}
+            siblings={products}
+            priority={index < 4}
+          />
         ))}
       </div>
     </>

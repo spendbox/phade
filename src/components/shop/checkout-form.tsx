@@ -139,6 +139,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
   // The delivery charge depends on where it's going, so the state field is the
   // one input on this form that changes the total as you use it.
   const [state_, setState] = useState(stored.state);
+  const [note, setNote] = useState("");
 
   const delivering = fulfilment === "shipping";
 
@@ -216,8 +217,25 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
       }}
       className="grid gap-8 px-4 pb-10 pt-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-12 lg:px-8"
     >
+      {/* Every answer, whether or not its step is open.
+          A folded-up step is not rendered — that is what makes the form short —
+          so the inputs a shopper typed into are gone by the time they press
+          Pay. These carry the answers instead, which also means the visible
+          fields are free to be nothing but fields. */}
       <input type="hidden" name="cart_token" value={cartToken} />
       <input type="hidden" name="lines" value={lines} />
+      <input type="hidden" name="fulfilment" value={fulfilment} />
+      <input type="hidden" name="name" value={name.trim()} />
+      <input type="hidden" name="email" value={email.trim()} />
+      <input type="hidden" name="note" value={note.trim()} />
+      {delivering && (
+        <>
+          <input type="hidden" name="line1" value={line1.trim()} />
+          <input type="hidden" name="line2" value={line2.trim()} />
+          <input type="hidden" name="city" value={city.trim()} />
+          <input type="hidden" name="state" value={state_} />
+        </>
+      )}
       {coupon.applied && (
         <input type="hidden" name="coupon" value={coupon.applied.code} />
       )}
@@ -253,7 +271,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Choice
-              name="fulfilment"
+              name="fulfilment_choice"
               value="shipping"
               checked={delivering}
               onChange={() => setFulfilment("shipping")}
@@ -271,7 +289,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
             />
             {shipping.pickupEnabled && (
               <Choice
-                name="fulfilment"
+                name="fulfilment_choice"
                 value="pickup"
                 checked={!delivering}
                 onChange={() => setFulfilment("pickup")}
@@ -309,7 +327,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
             )}
 
             <Text
-              name="name"
+              field="name"
               label="Full name"
               autoComplete="name"
               required
@@ -318,7 +336,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
             />
 
             <Text
-              name="email"
+              field="email"
               label="Email"
               type="email"
               autoComplete="email"
@@ -346,7 +364,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
           >
             <div className="space-y-4">
               <Text
-                name="line1"
+                field="line1"
                 label="Street address"
                 autoComplete="address-line1"
                 required
@@ -354,7 +372,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
                 onChange={(event) => setLine1(event.target.value)}
               />
               <Text
-                name="line2"
+                field="line2"
                 label="Apartment, floor, landmark"
                 autoComplete="address-line2"
                 value={line2}
@@ -362,7 +380,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
               />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Text
-                  name="city"
+                  field="city"
                   label="City"
                   autoComplete="address-level2"
                   required
@@ -379,8 +397,6 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
                   <div className="mt-1.5">
                     <SearchSelect
                       id="state"
-                      name="state"
-                      required
                       options={[...NIGERIAN_STATES]}
                       value={state_}
                       onChange={setState}
@@ -408,7 +424,9 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
           last
         >
           <textarea
-            name="note"
+            id="note"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
             rows={3}
             placeholder="Delivery instructions, a gift note, a preferred day…"
             className="w-full rounded-2xl bg-canvas-deep px-4 py-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand"
@@ -941,27 +959,27 @@ function Choice({
 }
 
 function Text({
-  name,
+  field,
   label,
   hint,
   ...props
 }: React.ComponentPropsWithoutRef<"input"> & {
-  name: string;
+  /** Names the label's target. Not a form name — see the hidden inputs. */
+  field: string;
   label: string;
   hint?: string;
 }) {
   return (
     <div>
       <label
-        htmlFor={name}
+        htmlFor={field}
         className="block text-[13px] font-medium text-ink-secondary"
       >
         {label}
         {props.required && <span className="ml-0.5 text-critical">*</span>}
       </label>
       <input
-        id={name}
-        name={name}
+        id={field}
         className="mt-1.5 h-12 w-full rounded-2xl bg-canvas-deep px-4 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand"
         {...props}
       />

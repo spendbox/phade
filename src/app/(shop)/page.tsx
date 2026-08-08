@@ -118,10 +118,7 @@ export default async function LandingPage() {
               <div className="overflow-hidden rounded-[2rem] bg-noir px-5 py-10 text-white sm:px-10 sm:py-14">
                 <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-14">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50">
-                      {deck.length} piece{deck.length === 1 ? "" : "s"}
-                    </p>
-                    <h2 className="mt-3 text-balance text-3xl font-semibold leading-[1.05] tracking-tight sm:text-4xl lg:text-5xl">
+                    <h2 className="text-balance text-3xl font-semibold leading-[1.05] tracking-tight sm:text-4xl lg:text-5xl">
                       {sections.featured.heading}
                     </h2>
                     {sections.featured.note && (
@@ -187,8 +184,10 @@ export default async function LandingPage() {
             </section>
           )}
 
-          <section className="mt-16 px-4 sm:mt-20 sm:px-6 lg:px-8">
-            <div className="overflow-hidden rounded-[2rem] bg-canvas-deep px-6 py-12 text-center sm:px-10 sm:py-16">
+          {/* Narrow, like the about block: a closing line is read, and the
+              walls of pictures either side of it have had the width. */}
+          <section className="mx-auto mt-16 max-w-4xl px-4 sm:mt-20 sm:px-6 lg:px-8">
+            <div className="overflow-hidden rounded-[2rem] bg-canvas-deep px-6 py-12 text-center sm:px-10 sm:py-14">
               <p className="inline-flex items-center gap-2 rounded-full bg-noir/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-secondary">
                 <ShoppingBag className="size-3.5" aria-hidden />
                 {sections.closing.heading}
