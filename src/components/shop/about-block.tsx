@@ -1,0 +1,82 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+
+import { Media } from "@/components/shop/media";
+import { isVideoUrl } from "@/lib/media";
+import type { AboutBlock as AboutContent } from "@/lib/storefront";
+
+/**
+ * The shop, in its own words.
+ *
+ * A front page that is only products is a catalogue; the reason someone buys
+ * from this shop rather than the next one is usually a sentence about who
+ * chose the clothes and why. Every word and the picture beside them come from
+ * Settings → Storefront, and the picture can be a clip instead — rails moving,
+ * a piece being folded — because that is what a shop's own footage is for.
+ *
+ * Nothing here is rendered at all until the dashboard has something to say, so
+ * an unfilled section is absent rather than empty.
+ */
+export function AboutSection({ about }: { about: AboutContent }) {
+  if (!about.enabled) return null;
+
+  const hasMedia = Boolean(about.mediaUrl);
+  const video = isVideoUrl(about.mediaUrl);
+  const showCta = Boolean(about.ctaLabel && about.ctaHref);
+
+  return (
+    <section className="px-4 sm:px-6 lg:px-8">
+      <div className="overflow-hidden rounded-[2rem] bg-canvas-deep/55">
+        <div className="grid items-stretch gap-0 lg:grid-cols-2">
+          <div className="order-2 flex flex-col justify-center px-6 py-9 sm:px-10 sm:py-12 lg:order-1 lg:px-12">
+            {about.eyebrow && (
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
+                {about.eyebrow}
+              </p>
+            )}
+
+            {about.heading && (
+              <h2 className="mt-3 text-balance text-2xl font-semibold leading-tight tracking-tight text-ink sm:text-3xl lg:text-[2.5rem]">
+                {about.heading}
+              </h2>
+            )}
+
+            {about.body && (
+              <p className="mt-4 max-w-prose whitespace-pre-line text-pretty text-[15px] leading-relaxed text-ink-secondary">
+                {about.body}
+              </p>
+            )}
+
+            {showCta && (
+              <Link
+                href={about.ctaHref}
+                className="group mt-7 inline-flex h-12 w-fit items-center gap-2 rounded-full bg-noir px-6 text-sm font-semibold text-white transition hover:bg-brand"
+              >
+                {about.ctaLabel}
+                <ArrowRight
+                  className="size-4 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </Link>
+            )}
+          </div>
+
+          {hasMedia && (
+            <div className="order-1 min-h-[16rem] lg:order-2 lg:min-h-[30rem]">
+              <Media
+                url={about.mediaUrl}
+                alt=""
+                // A clip here is scenery, so it plays itself, quietly, from the
+                // frame the shop chose rather than whichever one came first.
+                autoPlay={video}
+                poster={about.posterUrl || null}
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                className="size-full min-h-[16rem] lg:min-h-[30rem]"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}

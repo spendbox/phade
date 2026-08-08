@@ -51,6 +51,7 @@ export function Media({
   sizes = "100vw",
   priority = false,
   autoPlay = false,
+  poster,
 }: {
   url: string | null | undefined;
   alt: string;
@@ -59,6 +60,11 @@ export function Media({
   sizes?: string;
   priority?: boolean;
   autoPlay?: boolean;
+  /**
+   * The still to hold on before a clip plays. The first frame of a video is
+   * rarely the frame anyone would have chosen, so the shop can choose one.
+   */
+  poster?: string | null;
 }) {
   if (!url) {
     return (
@@ -77,6 +83,7 @@ export function Media({
     return (
       <video
         src={url}
+        poster={poster ?? undefined}
         className={cn("object-cover", className)}
         muted
         loop

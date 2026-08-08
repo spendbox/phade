@@ -15,6 +15,44 @@ import { getSupabase } from "@/lib/supabase";
 
 export type SocialLink = { platform: SocialPlatform; url: string };
 
+/**
+ * The story the shop tells about itself, halfway down the front page.
+ *
+ * The picture beside it can be a video instead — a rail of clothes moving is
+ * worth more than a still of it — and a video carries a poster, because the
+ * first frame of a clip is rarely the frame anyone would have chosen.
+ */
+export type AboutBlock = {
+  enabled: boolean;
+  eyebrow: string;
+  heading: string;
+  body: string;
+  ctaLabel: string;
+  ctaHref: string;
+  /** An image, or a video told apart by its extension. */
+  mediaUrl: string;
+  /** The still behind a video, before it plays. Ignored for an image. */
+  posterUrl: string;
+};
+
+/**
+ * Every heading a shopper reads down the front page.
+ *
+ * They are copy, not code. A shop that wants "Just landed" where we wrote
+ * "New in" should be able to say so in the dashboard, and a heading left blank
+ * takes its default rather than leaving a hole in the page.
+ */
+export type SectionHeadings = {
+  collections: string;
+  featured: string;
+  newIn: string;
+  /** The line under the New in heading — the season, in a sentence. */
+  newInTagline: string;
+  bestSellers: string;
+  explore: string;
+  closing: string;
+};
+
 export type StorefrontContent = {
   announcement: string;
   announcementEnabled: boolean;
@@ -23,8 +61,9 @@ export type StorefrontContent = {
   heroImages: string[];
   heroCtaLabel: string;
   heroCtaHref: string;
-  featuredHeading: string;
   featuredProductIds: string[];
+  headings: SectionHeadings;
+  about: AboutBlock;
   /** The words that run across the strip under the hero. */
   marquee: string[];
   /** The paragraph beside the logo at the foot of every page. */
@@ -34,6 +73,27 @@ export type StorefrontContent = {
 
 export const STOREFRONT_KEY = "storefront_content";
 
+export const DEFAULT_HEADINGS: SectionHeadings = {
+  collections: "Shop the collections",
+  featured: "Featured",
+  newIn: "New in",
+  newInTagline: "A new season of refined, effortless pieces.",
+  bestSellers: "Best sellers",
+  explore: "Explore everything",
+  closing: "The whole shop",
+};
+
+export const DEFAULT_ABOUT: AboutBlock = {
+  enabled: false,
+  eyebrow: "Our story",
+  heading: "",
+  body: "",
+  ctaLabel: "",
+  ctaHref: "",
+  mediaUrl: "",
+  posterUrl: "",
+};
+
 export const DEFAULT_STOREFRONT: StorefrontContent = {
   announcement: "Free delivery on orders over ₦100,000",
   announcementEnabled: false,
@@ -42,8 +102,9 @@ export const DEFAULT_STOREFRONT: StorefrontContent = {
   heroImages: [],
   heroCtaLabel: "Shop new in",
   heroCtaHref: "/shop",
-  featuredHeading: "Featured",
   featuredProductIds: [],
+  headings: DEFAULT_HEADINGS,
+  about: DEFAULT_ABOUT,
   marquee: ["New in", "Delivered nationwide", "Chosen one piece at a time"],
   footerBlurb:
     "Bags, shoes and ready-to-wear, chosen one piece at a time and delivered across Nigeria.",
@@ -79,6 +140,56 @@ function parseSocials(raw: unknown): SocialLink[] {
   });
 }
 
+function group(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+/**
+ * A heading left blank falls back to ours, so clearing a field can never leave
+ * a section with no name on it.
+ */
+function parseHeadings(raw: unknown, legacyFeatured: unknown): SectionHeadings {
+  const value = group(raw);
+  const pick = (key: keyof SectionHeadings, fallback: string) => {
+    const written = str(value[key], "").trim();
+    return written || fallback;
+  };
+
+  return {
+    collections: pick("collections", DEFAULT_HEADINGS.collections),
+    // Featured had its own top-level field before the rest were editable.
+    featured:
+      pick("featured", "") ||
+      str(legacyFeatured, "").trim() ||
+      DEFAULT_HEADINGS.featured,
+    newIn: pick("newIn", DEFAULT_HEADINGS.newIn),
+    newInTagline: pick("newInTagline", DEFAULT_HEADINGS.newInTagline),
+    bestSellers: pick("bestSellers", DEFAULT_HEADINGS.bestSellers),
+    explore: pick("explore", DEFAULT_HEADINGS.explore),
+    closing: pick("closing", DEFAULT_HEADINGS.closing),
+  };
+}
+
+function parseAbout(raw: unknown): AboutBlock {
+  const value = group(raw);
+  const heading = str(value.heading, "").trim();
+  const body = str(value.body, "").trim();
+
+  return {
+    // A section with nothing to say stays off the page however it is flagged.
+    enabled: value.enabled === true && Boolean(heading || body),
+    eyebrow: str(value.eyebrow, DEFAULT_ABOUT.eyebrow).trim(),
+    heading,
+    body,
+    ctaLabel: str(value.ctaLabel, "").trim(),
+    ctaHref: str(value.ctaHref, "").trim(),
+    mediaUrl: str(value.mediaUrl, "").trim(),
+    posterUrl: str(value.posterUrl, "").trim(),
+  };
+}
+
 /** Anything missing or the wrong shape falls back, so a half-filled row still renders. */
 export function parseStorefront(raw: unknown): StorefrontContent {
   if (typeof raw !== "object" || raw === null) return DEFAULT_STOREFRONT;
@@ -92,11 +203,9 @@ export function parseStorefront(raw: unknown): StorefrontContent {
     heroImages: strList(value.heroImages),
     heroCtaLabel: str(value.heroCtaLabel, DEFAULT_STOREFRONT.heroCtaLabel),
     heroCtaHref: str(value.heroCtaHref, DEFAULT_STOREFRONT.heroCtaHref),
-    featuredHeading: str(
-      value.featuredHeading,
-      DEFAULT_STOREFRONT.featuredHeading,
-    ),
     featuredProductIds: strList(value.featuredProductIds),
+    headings: parseHeadings(value.headings, value.featuredHeading),
+    about: parseAbout(value.about),
     marquee: strList(value.marquee),
     footerBlurb: str(value.footerBlurb, DEFAULT_STOREFRONT.footerBlurb),
     socials: parseSocials(value.socials),
