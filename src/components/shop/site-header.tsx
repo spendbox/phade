@@ -8,24 +8,21 @@ import { Heart, Search, ShoppingBag, X } from "lucide-react";
 import { useShop } from "@/components/shop/shop-provider";
 import { LOGO_TYPE } from "@/lib/brand";
 import { cn } from "@/lib/cn";
-import type { ShopCategory } from "@/lib/shop";
 
 /**
  * The bar across the top of every shop page.
  *
- * On a phone it carries the wordmark and three things you can reach with a
- * thumb; the rest of the navigation lives in the tab bar at the bottom, where
- * a thumb actually is. On a wider screen the categories come up into the bar
- * itself, because there is room and a cursor is happy up there.
+ * The wordmark, and the three things a shopper reaches for from anywhere:
+ * search, what they saved, and the bag.
+ *
+ * It carries no category links. The shop has a rail of them pinned under this
+ * bar and the landing page has a row of rings, so a third copy up here was
+ * only ever repeating what was already on screen.
  */
-export function SiteHeader({ categories }: { categories: ShopCategory[] }) {
+export function SiteHeader() {
   const { count, openBag, saved } = useShop();
   const [searching, setSearching] = useState(false);
   const pathname = usePathname();
-
-  // A tap on a category should feel like it landed before the page arrives.
-  const active = (href: string) =>
-    href === "/shop" ? pathname === "/shop" : pathname.startsWith(href);
 
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
@@ -39,24 +36,6 @@ export function SiteHeader({ categories }: { categories: ShopCategory[] }) {
             fetchPriority="high"
           />
         </Link>
-
-        <nav className="ml-4 hidden flex-1 items-center gap-1 lg:flex">
-          <HeaderLink href="/shop" active={pathname === "/shop"}>
-            Shop all
-          </HeaderLink>
-          {categories.slice(0, 5).map((category) => (
-            <HeaderLink
-              key={category.id}
-              href={`/shop?category=${category.slug}`}
-              active={false}
-            >
-              {category.name}
-            </HeaderLink>
-          ))}
-          <HeaderLink href="/shop?sort=new" active={false}>
-            New in
-          </HeaderLink>
-        </nav>
 
         <div className="ml-auto flex items-center gap-0.5">
           <button
@@ -73,7 +52,7 @@ export function SiteHeader({ categories }: { categories: ShopCategory[] }) {
             aria-label={`Saved${saved.length > 0 ? ` (${saved.length})` : ""}`}
             className={cn(
               "relative flex size-10 items-center justify-center rounded-full transition hover:bg-canvas-deep active:scale-90",
-              active("/saved") ? "text-brand" : "text-ink",
+              pathname === "/saved" ? "text-brand" : "text-ink",
             )}
           >
             <Heart
@@ -100,30 +79,6 @@ export function SiteHeader({ categories }: { categories: ShopCategory[] }) {
 
       {searching && <SearchOverlay onClose={() => setSearching(false)} />}
     </header>
-  );
-}
-
-function HeaderLink({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "rounded-full px-3 py-1.5 text-sm transition-colors",
-        active
-          ? "bg-noir text-white"
-          : "text-ink-secondary hover:bg-canvas-deep hover:text-ink",
-      )}
-    >
-      {children}
-    </Link>
   );
 }
 

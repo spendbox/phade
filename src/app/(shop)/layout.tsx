@@ -1,3 +1,4 @@
+import { BagButton } from "@/components/shop/bag-button";
 import { BagDrawer } from "@/components/shop/bag-drawer";
 import { ProductModal } from "@/components/shop/product-modal";
 import { ShopProvider } from "@/components/shop/shop-provider";
@@ -5,6 +6,7 @@ import { SiteFooter } from "@/components/shop/site-footer";
 import { SiteHeader } from "@/components/shop/site-header";
 import { TabBar } from "@/components/shop/tab-bar";
 import { Toaster } from "@/components/shop/toaster";
+import { getShipping } from "@/lib/shipping";
 import { getCatalogue } from "@/lib/shop-queries";
 import { getStorefront } from "@/lib/storefront";
 
@@ -32,9 +34,10 @@ export default async function ShopLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [content, catalogue] = await Promise.all([
+  const [content, catalogue, shipping] = await Promise.all([
     getStorefront(),
     getCatalogue(),
+    getShipping(),
   ]);
 
   return (
@@ -46,15 +49,20 @@ export default async function ShopLayout({
           </p>
         )}
 
-        <SiteHeader categories={catalogue.categories} />
+        <SiteHeader />
 
         <main className="flex-1">{children}</main>
 
-        <SiteFooter categories={catalogue.categories} content={content} />
+        <SiteFooter
+          categories={catalogue.categories}
+          content={content}
+          shipping={shipping}
+        />
       </div>
 
       <TabBar />
-      <BagDrawer delivery={content} />
+      <BagButton />
+      <BagDrawer shipping={shipping} />
       <ProductModal />
       <Toaster />
     </ShopProvider>

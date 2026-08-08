@@ -168,12 +168,8 @@ export function StoryHero({
 
       <div className="pointer-events-none relative z-20 flex h-full flex-col justify-end p-6 pb-10 sm:p-10 lg:p-14">
         <div className="pointer-events-auto max-w-2xl">
-          <p className="rise text-[11px] font-semibold uppercase tracking-[0.28em] text-white/70">
-            phadewoman
-          </p>
-
           <h1
-            className="rise mt-3 text-balance text-4xl font-semibold leading-[1.03] tracking-tight sm:text-6xl lg:text-7xl"
+            className="rise text-balance text-4xl font-semibold leading-[1.03] tracking-tight sm:text-6xl lg:text-7xl"
             style={{ animationDelay: "60ms" }}
           >
             {content.heroHeadline}

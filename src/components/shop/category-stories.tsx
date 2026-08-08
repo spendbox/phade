@@ -32,7 +32,7 @@ export function CategoryStories({
 
   return (
     <nav aria-label="Categories" className={cn("relative", className)}>
-      <ul className="rail gap-4 px-4 py-1 sm:gap-5 sm:px-6 lg:px-8">
+      <ul className="rail rail-edge gap-4 px-4 py-1 sm:gap-5 sm:px-6 lg:px-8">
         <li>
           <Ring
             href="/shop"
@@ -72,18 +72,24 @@ export function Ring({
   cover,
   icon,
   active,
+  compact = false,
 }: {
   href: string;
   label: string;
   cover: string | null;
   icon: React.ReactNode;
   active: boolean;
+  /** The shorter ring the shop's sticky bar uses, to buy back screen. */
+  compact?: boolean;
 }) {
   return (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className="tap flex w-[4.75rem] flex-col items-center gap-1.5 sm:w-20"
+      className={cn(
+        "tap flex flex-col items-center",
+        compact ? "w-[4.25rem] gap-1" : "w-[4.75rem] gap-1.5 sm:w-20",
+      )}
     >
       <span
         className={cn(
@@ -92,14 +98,14 @@ export function Ring({
         )}
       >
         <span className="story-ring-inner block rounded-full">
-          <span className="flex size-[3.75rem] items-center justify-center overflow-hidden rounded-full bg-canvas-deep text-ink-secondary sm:size-16">
+          <span
+            className={cn(
+              "flex items-center justify-center overflow-hidden rounded-full bg-canvas-deep text-ink-secondary",
+              compact ? "size-11" : "size-[3.75rem] sm:size-16",
+            )}
+          >
             {cover ? (
-              <Media
-                url={cover}
-                alt=""
-                sizes="72px"
-                className="size-full"
-              />
+              <Media url={cover} alt="" sizes="72px" className="size-full" />
             ) : (
               icon
             )}
@@ -109,7 +115,8 @@ export function Ring({
 
       <span
         className={cn(
-          "line-clamp-2 text-center text-[11px] leading-tight",
+          "text-center leading-tight",
+          compact ? "line-clamp-1 text-[10px]" : "line-clamp-2 text-[11px]",
           active ? "font-semibold text-ink" : "text-ink-secondary",
         )}
       >

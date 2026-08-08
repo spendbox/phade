@@ -159,7 +159,7 @@ export function ProductRail({
   priority?: boolean;
 }) {
   return (
-    <div className="rail gap-3 px-4 pb-1 sm:gap-4 sm:px-6 lg:px-8">
+    <div className="rail rail-edge gap-3 px-4 pb-1 sm:gap-4 sm:px-6 lg:px-8">
       {products.map((product, index) => (
         <ProductCard
           key={product.id}

@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 
+import { isSocialPlatform, type SocialPlatform } from "@/components/shop/social-icons";
 import { CATALOGUE_TAG } from "@/lib/shop-queries";
 import { getSupabase } from "@/lib/supabase";
 
@@ -12,6 +13,8 @@ import { getSupabase } from "@/lib/supabase";
  * form, and adding a field later needs no migration.
  */
 
+export type SocialLink = { platform: SocialPlatform; url: string };
+
 export type StorefrontContent = {
   announcement: string;
   announcementEnabled: boolean;
@@ -22,16 +25,17 @@ export type StorefrontContent = {
   heroCtaHref: string;
   featuredHeading: string;
   featuredProductIds: string[];
-  /** Flat delivery charge added at checkout, in kobo. */
-  deliveryFeeKobo: number;
-  /** Spend at or above this (kobo) and delivery is free. 0 turns it off. */
-  freeDeliveryOverKobo: number;
+  /** The words that run across the strip under the hero. */
+  marquee: string[];
+  /** The paragraph beside the logo at the foot of every page. */
+  footerBlurb: string;
+  socials: SocialLink[];
 };
 
 export const STOREFRONT_KEY = "storefront_content";
 
 export const DEFAULT_STOREFRONT: StorefrontContent = {
-  announcement: "Free delivery in Lagos on orders over ₦100,000",
+  announcement: "Free delivery on orders over ₦100,000",
   announcementEnabled: false,
   heroHeadline: "Building something amazing",
   heroSubheadline: "",
@@ -40,8 +44,10 @@ export const DEFAULT_STOREFRONT: StorefrontContent = {
   heroCtaHref: "/shop",
   featuredHeading: "Featured",
   featuredProductIds: [],
-  deliveryFeeKobo: 350_000,
-  freeDeliveryOverKobo: 10_000_000,
+  marquee: ["New in", "Delivered nationwide", "Chosen one piece at a time"],
+  footerBlurb:
+    "Bags, shoes and ready-to-wear, chosen one piece at a time and delivered across Nigeria.",
+  socials: [],
 };
 
 function str(value: unknown, fallback: string): string {
@@ -53,30 +59,24 @@ function strList(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === "string");
 }
 
-/** Money read back from JSON: whole kobo, never negative. */
-function kobo(value: unknown, fallback: number): number {
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount < 0) return fallback;
-  return Math.trunc(amount);
-}
+/** Only links we can put an icon beside, and only ones a browser will follow. */
+function parseSocials(raw: unknown): SocialLink[] {
+  if (!Array.isArray(raw)) return [];
 
-/**
- * What delivery costs this basket. Pickup is always free; a subtotal that
- * clears the threshold is too. Both numbers are set in Settings → Storefront.
- */
-export function deliveryFor(
-  content: Pick<StorefrontContent, "deliveryFeeKobo" | "freeDeliveryOverKobo">,
-  subtotalKobo: number,
-  fulfilment: "shipping" | "pickup",
-): number {
-  if (fulfilment === "pickup") return 0;
-  if (
-    content.freeDeliveryOverKobo > 0 &&
-    subtotalKobo >= content.freeDeliveryOverKobo
-  ) {
-    return 0;
-  }
-  return content.deliveryFeeKobo;
+  const seen = new Set<string>();
+  return raw.flatMap((item): SocialLink[] => {
+    if (typeof item !== "object" || item === null) return [];
+    const value = item as Record<string, unknown>;
+
+    if (!isSocialPlatform(value.platform)) return [];
+    if (seen.has(value.platform)) return [];
+
+    const url = typeof value.url === "string" ? value.url.trim() : "";
+    if (!/^https?:\/\//i.test(url)) return [];
+
+    seen.add(value.platform);
+    return [{ platform: value.platform, url }];
+  });
 }
 
 /** Anything missing or the wrong shape falls back, so a half-filled row still renders. */
@@ -97,14 +97,9 @@ export function parseStorefront(raw: unknown): StorefrontContent {
       DEFAULT_STOREFRONT.featuredHeading,
     ),
     featuredProductIds: strList(value.featuredProductIds),
-    deliveryFeeKobo: kobo(
-      value.deliveryFeeKobo,
-      DEFAULT_STOREFRONT.deliveryFeeKobo,
-    ),
-    freeDeliveryOverKobo: kobo(
-      value.freeDeliveryOverKobo,
-      DEFAULT_STOREFRONT.freeDeliveryOverKobo,
-    ),
+    marquee: strList(value.marquee),
+    footerBlurb: str(value.footerBlurb, DEFAULT_STOREFRONT.footerBlurb),
+    socials: parseSocials(value.socials),
   };
 }
 

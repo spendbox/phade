@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Maximize2, Truck, X } from "lucide-react";
+import { Truck, X } from "lucide-react";
 
 import {
   BuyActions,
@@ -53,7 +52,7 @@ function Detail({
   product: ShopProduct;
   onClose: () => void;
 }) {
-  const controls = useBuyControls(product, onClose);
+  const controls = useBuyControls(product);
   const soldOut = product.stock <= 0;
   const off = percentOff(product);
 
@@ -142,17 +141,9 @@ function Detail({
 
           <p className="mt-4 flex items-center gap-2 rounded-xl bg-canvas-deep/70 px-3 py-2.5 text-[13px] text-ink-secondary">
             <Truck className="size-4 shrink-0 text-ink-muted" aria-hidden />
-            Delivered nationwide. Pickup in Lagos is free at checkout.
+            Delivered nationwide. Collection is free at checkout.
           </p>
 
-          <Link
-            href={`/product/${product.slug}`}
-            onClick={onClose}
-            className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-secondary underline underline-offset-4 transition hover:text-brand"
-          >
-            <Maximize2 className="size-3.5" aria-hidden />
-            Open the full page
-          </Link>
         </div>
 
         {/* Outside the scroll area on purpose: these never scroll away. */}

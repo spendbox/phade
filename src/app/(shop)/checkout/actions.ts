@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { saveCart } from "@/lib/cart-store";
 import { initializeTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { getProductsForPricing } from "@/lib/shop-queries";
-import { deliveryFor, getStorefront } from "@/lib/storefront";
+import { getShipping, NIGERIAN_STATES, quoteDelivery } from "@/lib/shipping";
 import { requireSupabase } from "@/lib/supabase";
 import type { Fulfilment, ShippingAddress } from "@/lib/types";
 
@@ -116,11 +116,23 @@ export async function placeOrder(
       phone,
     };
 
-    if (fulfilment === "shipping" && (!address.line1 || !address.city || !address.state)) {
+    if (
+      fulfilment === "shipping" &&
+      (!address.line1 || !address.city || !address.state)
+    ) {
       return {
         ok: false,
         error: "Add the street, city and state we're delivering to.",
       };
+    }
+
+    // Delivery is priced by state, so an unrecognised one would silently fall
+    // back to the default rate and undercharge for the far end of the country.
+    if (
+      fulfilment === "shipping" &&
+      !NIGERIAN_STATES.some((name) => name === address.state)
+    ) {
+      return { ok: false, error: "Choose a state from the list." };
     }
 
     // ---- price it, from the catalogue rather than from the browser ---------
@@ -154,12 +166,23 @@ export async function placeOrder(
       };
     }
 
-    const content = await getStorefront();
     const subtotal = priced.reduce(
       (total, { line, product }) => total + product.priceKobo * line.quantity,
       0,
     );
-    const shipping = deliveryFor(content, subtotal, fulfilment);
+
+    // Priced here, from the shop's own rules, against the state on this order.
+    // Whatever the browser was showing is a quote; this is the charge.
+    const rules = await getShipping();
+    if (fulfilment === "pickup" && !rules.pickupEnabled) {
+      return { ok: false, error: "Collection isn't available — choose delivery." };
+    }
+
+    const shipping = quoteDelivery(rules, subtotal, {
+      fulfilment,
+      state: address.state,
+    }).feeKobo;
+
     const reference = newReference();
 
     // ---- customer ----------------------------------------------------------

@@ -106,7 +106,7 @@ export async function recordTransaction(
  * movements are the same ones the Inventory page shows, so a sale reads there
  * beside a restock rather than as an unexplained drop.
  */
-async function takeStock(
+export async function takeStock(
   supabase: SupabaseClient,
   orderId: string,
 ): Promise<void> {

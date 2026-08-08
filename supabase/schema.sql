@@ -266,7 +266,16 @@ create table if not exists public.app_settings (
 );
 
 insert into public.app_settings (key, value) values
-  ('low_stock_threshold', '5'::jsonb)
+  ('low_stock_threshold', '5'::jsonb),
+  -- Delivery pricing. Zones are added in Settings -> Shipping; without any,
+  -- everywhere is charged the default. Amounts are kobo.
+  ('shipping_settings', '{
+     "defaultFeeKobo": 500000,
+     "freeOverKobo": 10000000,
+     "zones": [],
+     "pickupEnabled": true,
+     "pickupNote": "Collect from us — we will message you when it is ready."
+   }'::jsonb)
 on conflict (key) do nothing;
 
 -- Common subcategories for this catalogue. Edit them in Settings -> Catalogue.

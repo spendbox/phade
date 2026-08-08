@@ -1,8 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Check, Heart, Share2, ShoppingBag } from "lucide-react";
+import { Heart, Share2, ShoppingBag } from "lucide-react";
 
 import { useShop } from "@/components/shop/shop-provider";
 import { cn } from "@/lib/cn";
@@ -22,12 +21,15 @@ import { MAX_LINE_QUANTITY, type ShopProduct } from "@/lib/shop";
  * Either way the rules are the same code: a size that is required in the
  * pop-up is required on the page, which is how a shop avoids posting the wrong
  * dress.
+ *
+ * There is one button, not two. "Buy it now" beside "Add to bag" asked a
+ * shopper to decide how to buy before they had decided what to buy; adding is
+ * the only verb, and the floating bag takes it from there.
  */
 
 export type BuyControls = ReturnType<typeof useBuyControls>;
 
-export function useBuyControls(product: ShopProduct, onDone?: () => void) {
-  const router = useRouter();
+export function useBuyControls(product: ShopProduct) {
   const { addToBag, isSaved, toggleSaved, say } = useShop();
 
   const soldOut = product.stock <= 0;
@@ -82,11 +84,6 @@ export function useBuyControls(product: ShopProduct, onDone?: () => void) {
     },
     add,
     toggleSaved: () => toggleSaved(product.id),
-    buyNow() {
-      if (!add()) return;
-      onDone?.();
-      router.push("/checkout");
-    },
     async share() {
       const url = `${window.location.origin}/product/${product.slug}`;
 
@@ -276,17 +273,6 @@ export function BuyActions({
           {soldOut ? "Sold out" : "Add to bag"}
         </button>
       </div>
-
-      {!soldOut && (
-        <button
-          type="button"
-          onClick={controls.buyNow}
-          className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-brand-soft text-sm font-semibold text-brand transition hover:bg-brand hover:text-white"
-        >
-          <Check className="size-4" aria-hidden />
-          Buy it now
-        </button>
-      )}
 
       <p className="mt-2.5 text-center text-[11px] text-ink-muted">
         {soldOut

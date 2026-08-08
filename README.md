@@ -19,7 +19,7 @@ buy at `/`, and everything they do shows up at `/admin`.
 | **A product** | Opens as a pop-up over whatever you were reading, never a page — the grid stays scrolled where it was, filters still on. Pictures swipe and snap, a double-tap saves, and Add to bag / Buy it now / save / share sit in a bar that never scrolls away. `/product/[slug]` renders the same thing as a real page, for shared links and search engines. |
 | **Saved** (`/saved`) | Everything hearted on this device. No account needed. |
 | **Bag** | A drawer, not a page, so adding something never costs anyone their place. It shows the delivery charge from the same rules checkout uses, and how much more buys free delivery. |
-| **Checkout** (`/checkout`) | Delivery or pickup, contact details, address, note — filled in from last time, because a returning customer should not retype their address to buy a second dress. Prices are re-derived on the server from the catalogue, so what the browser sends is only ever ids and quantities. Pays through Paystack; the order exists before payment starts. |
+| **Checkout** (`/checkout`) | Delivery or collection, contact details, address, note — filled in from last time, because a returning customer should not retype their address to buy a second dress. Picking a state prices the delivery from the shop's own zones, live. Every figure is re-derived on the server, so what the browser sends is only ever ids and quantities. Pays through Paystack; the order exists before payment starts. |
 | **Order** (`/order/[reference]`) | Where Paystack sends a shopper back to. It verifies the payment directly rather than waiting on the webhook, so the page is right immediately, and empties the bag only once the money has actually arrived. |
 
 Navigation on a phone is a tab bar along the bottom — home, shop, saved, bag —
@@ -40,7 +40,7 @@ because that is where a thumb is. On a wider screen the header takes over.
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | **General** — the default low-stock alert level. **Categories** — categories with a chosen icon (AI can grow a short description into a fuller one) and the subcategory list. **Catalogue** — the shop's colour palette and size run. **Storefront** — announcement bar, hero copy, hero images, call-to-action, featured products, and what delivery costs. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
+| **Settings** | **General** — the default low-stock alert level. **Categories** — categories with a chosen icon (AI can grow a short description into a fuller one) and the subcategory list. **Catalogue** — the shop's colour palette and size run. **Storefront** — announcement bar, hero copy, hero images, call-to-action, featured products, the words that scroll under the hero, the footer blurb and the shop's social links. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state with their own prices, and whether collection is offered. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -203,6 +203,20 @@ A few decisions worth knowing:
   there is no account to attach them to, and a server that can't authenticate
   who is asking has no business handing them back. Card details never touch this
   app at all — they are typed on Paystack's own page.
+- **Delivery is a set of rules, not a number.** Getting a parcel to the next
+  street is not what it costs to get it to Maiduguri, so shipping is zones:
+  each names some states and carries its own price and free-delivery
+  threshold, with a default for anywhere unnamed. The checkout's state field is
+  a list rather than a text box for exactly this reason — "Lagos", "lagos
+  state" and "LAG" are three strings and one place, and a zone can only match
+  the one it was given. `quoteDelivery` is the only thing that prices delivery,
+  so the bag, the checkout and the order it becomes cannot disagree.
+- **An order marked paid by hand counts like any other.** Revenue is the sum of
+  successful payments rather than of orders — an order is a promise, a payment
+  is a fact — so marking one paid in the dashboard writes a payment against it,
+  channel `manual`, on a reference derived from the order's own so doing it
+  twice updates one row instead of inventing a second sale. Stock comes off
+  through the same helper the webhook uses.
 - **The shop is fast because it doesn't ask twice.** The catalogue is cached
   across requests under one tag, so a busy evening isn't five queries per
   visitor — one of them a scan of every order line ever written. Every dashboard

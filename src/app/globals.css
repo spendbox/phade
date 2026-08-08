@@ -175,6 +175,31 @@
     flex: 0 0 auto;
   }
 
+  /* A rail that can be scrolled says so, by fading its last item out against
+     the edge. Without it a row of filters that runs off the screen reads as a
+     row of filters that ends there — the one thing a shopper must not
+     conclude, since the option they want is often the one past the fold. */
+  .rail-edge {
+    position: relative;
+    --rail-edge-color: var(--color-canvas);
+  }
+  .rail-edge::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    right: 0;
+    width: 2.5rem;
+    pointer-events: none;
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--rail-edge-color) 85%
+    );
+  }
+  .rail-edge-deep {
+    --rail-edge-color: var(--color-canvas-deep);
+  }
+
   /* The unopened-story ring. Two rings, not one: the inner gap is the canvas
      showing through, which is what stops it reading as a coloured border. */
   .story-ring {

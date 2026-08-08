@@ -159,7 +159,7 @@ export default async function OrderPage({
         {order.fulfilment === "pickup" ? (
           <p className="mt-2 text-sm text-ink-secondary">
             We&apos;ll message {order.customer?.phone ?? "you"} when it&apos;s
-            ready to collect in Lagos.
+            ready to collect.
           </p>
         ) : (
           <address className="mt-2 not-italic text-sm text-ink-secondary">

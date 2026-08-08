@@ -8,7 +8,7 @@ import { SectionHead } from "@/components/shop/section";
 import { ProductRegistry } from "@/components/shop/shop-provider";
 import { cn } from "@/lib/cn";
 import { bestSellers, getCatalogue, newIn } from "@/lib/shop-queries";
-import { isNewIn, type ShopProduct } from "@/lib/shop";
+import type { ShopProduct } from "@/lib/shop";
 
 export const dynamic = "force-dynamic";
 
@@ -142,7 +142,7 @@ export default async function ShopPage({
             <div
               role="group"
               aria-labelledby="sort-label"
-              className="rail gap-1.5 rounded-full bg-canvas-deep p-1"
+              className="rail rail-edge rail-edge-deep gap-1.5 rounded-full bg-canvas-deep p-1"
             >
               {(Object.keys(SORTS) as Sort[]).map((key) => (
                 <Link
@@ -165,7 +165,7 @@ export default async function ShopPage({
         </div>
 
         {(subs.length > 0 || saleCount > 0 || filtering) && (
-          <div className="rail mt-4 gap-2 pb-1">
+          <div className="rail rail-edge mt-4 gap-2 pb-1">
             {saleCount > 0 && (
               <Chip
                 href={href({ sale: onSaleOnly ? undefined : "1" })}
@@ -240,11 +240,7 @@ export default async function ShopPage({
         <section className="mt-12">
           <SectionHead
             title="Just arrived"
-            note={`Added in the last ${
-              fresh.filter((product) => isNewIn(product.createdAt)).length > 0
-                ? "fortnight"
-                : "while"
-            }.`}
+note="Recently added."
             href="/shop?sort=new"
           />
           <div className="mt-4">

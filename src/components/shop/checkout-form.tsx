@@ -18,7 +18,12 @@ import {
   NO_DETAILS,
   safeDetails,
 } from "@/lib/shopper-details";
-import { deliveryFor, type StorefrontContent } from "@/lib/storefront";
+import {
+  cheapestFee,
+  NIGERIAN_STATES,
+  quoteDelivery,
+  type ShippingSettings,
+} from "@/lib/shipping";
 
 const initial: CheckoutState = { ok: null };
 
@@ -34,7 +39,7 @@ const initial: CheckoutState = { ok: null };
  * a shopper who comes back to try again should find their bag as they left it;
  * the order page clears it once the money has actually arrived.
  */
-export function CheckoutForm({ content }: { content: StorefrontContent }) {
+export function CheckoutForm({ shipping }: { shipping: ShippingSettings }) {
   const { bag, ready } = useShop();
 
   if (!ready) return <div className="min-h-[50dvh]" aria-hidden />;
@@ -63,20 +68,27 @@ export function CheckoutForm({ content }: { content: StorefrontContent }) {
 
   // Mounted only once the browser's own state is readable, so the fields can
   // be uncontrolled and still open with what was typed last time.
-  return <CheckoutFields content={content} />;
+  return <CheckoutFields shipping={shipping} />;
 }
 
-function CheckoutFields({ content }: { content: StorefrontContent }) {
+function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
   const { bag, subtotalKobo, cartToken, count, say } = useShop();
   const [state, formAction, pending] = useActionState(placeOrder, initial);
 
   const stored = safeDetails(usePersistent(detailsStore));
   const [fulfilment, setFulfilment] = useState<"shipping" | "pickup">(
-    stored.fulfilment,
+    shipping.pickupEnabled ? stored.fulfilment : "shipping",
   );
+  // The delivery charge depends on where it's going, so the state field is the
+  // one input on this form that changes the total as you use it.
+  const [state_, setState] = useState(stored.state);
 
-  const shipping = deliveryFor(content, subtotalKobo, fulfilment);
-  const total = subtotalKobo + shipping;
+  const cheapest = cheapestFee(shipping);
+  const quote = quoteDelivery(shipping, subtotalKobo, {
+    fulfilment,
+    state: state_,
+  });
+  const total = subtotalKobo + quote.feeKobo;
 
   // Paystack is a different origin, so this is a real navigation rather than a
   // router push. Internal redirects go the same way for one code path.
@@ -122,20 +134,26 @@ function CheckoutFields({ content }: { content: StorefrontContent }) {
               icon={<Truck className="size-4" aria-hidden />}
               title="Delivered"
               note={
-                shipping === 0
-                  ? "Free on this order"
-                  : `${formatNairaShort(content.deliveryFeeKobo)} nationwide`
+                fulfilment === "pickup"
+                  ? "Anywhere in Nigeria"
+                  : quote.free
+                    ? "Free on this order"
+                    : state_
+                      ? `${formatNairaShort(quote.feeKobo)} to ${state_}`
+                      : `From ${formatNairaShort(cheapest)} — pick a state below`
               }
             />
-            <Choice
-              name="fulfilment"
-              value="pickup"
-              checked={fulfilment === "pickup"}
-              onChange={() => setFulfilment("pickup")}
-              icon={<Store className="size-4" aria-hidden />}
-              title="Picked up"
-              note="Free, from Lagos"
-            />
+            {shipping.pickupEnabled && (
+              <Choice
+                name="fulfilment"
+                value="pickup"
+                checked={fulfilment === "pickup"}
+                onChange={() => setFulfilment("pickup")}
+                icon={<Store className="size-4" aria-hidden />}
+                title="Picked up"
+                note="Free"
+              />
+            )}
           </div>
         </fieldset>
 
@@ -217,13 +235,33 @@ function CheckoutFields({ content }: { content: StorefrontContent }) {
                 required
                 defaultValue={stored.city}
               />
-              <Text
-                name="state"
-                label="State"
-                autoComplete="address-level1"
-                required
-                defaultValue={stored.state}
-              />
+              <div>
+                <label
+                  htmlFor="state"
+                  className="block text-[13px] font-medium text-ink-secondary"
+                >
+                  State<span className="ml-0.5 text-critical">*</span>
+                </label>
+                <select
+                  id="state"
+                  name="state"
+                  required
+                  autoComplete="address-level1"
+                  value={state_}
+                  onChange={(event) => setState(event.target.value)}
+                  className="mt-1.5 h-12 w-full rounded-2xl bg-canvas-deep px-4 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+                >
+                  <option value="">Choose a state</option>
+                  {NIGERIAN_STATES.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-ink-muted">
+                  Delivery is priced from here.
+                </p>
+              </div>
             </div>
           </fieldset>
         )}
@@ -286,12 +324,20 @@ function CheckoutFields({ content }: { content: StorefrontContent }) {
                 {formatNairaShort(subtotalKobo)}
               </dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-ink-secondary">
-                {fulfilment === "pickup" ? "Pickup" : "Delivery"}
+            <div className="flex justify-between gap-3">
+              <dt className="min-w-0 text-ink-secondary">
+                {fulfilment === "pickup"
+                  ? "Pickup"
+                  : state_
+                    ? `Delivery · ${state_}`
+                    : "Delivery"}
               </dt>
-              <dd className="font-medium text-ink tabular-nums">
-                {shipping === 0 ? "Free" : formatNairaShort(shipping)}
+              <dd className="shrink-0 font-medium text-ink tabular-nums">
+                {fulfilment === "shipping" && !state_
+                  ? `from ${formatNairaShort(cheapest)}`
+                  : quote.free
+                    ? "Free"
+                    : formatNairaShort(quote.feeKobo)}
               </dd>
             </div>
             <div className="flex justify-between border-t border-line pt-2 text-base">
@@ -301,6 +347,18 @@ function CheckoutFields({ content }: { content: StorefrontContent }) {
               </dd>
             </div>
           </dl>
+
+          {fulfilment === "pickup" && shipping.pickupNote && (
+            <p className="mt-4 rounded-xl bg-canvas px-3 py-2.5 text-[13px] text-ink-secondary">
+              {shipping.pickupNote}
+            </p>
+          )}
+
+          {quote.toFreeKobo !== null && quote.toFreeKobo > 0 && (
+            <p className="mt-4 rounded-xl bg-brand-soft px-3 py-2.5 text-[13px] text-brand">
+              {formatNairaShort(quote.toFreeKobo)} more and delivery is free.
+            </p>
+          )}
 
           {state.ok === false && (
             <p

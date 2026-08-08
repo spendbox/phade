@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, ShoppingBag } from "lucide-react";
 
 import { CategoryStories } from "@/components/shop/category-stories";
 import { FeedPost } from "@/components/shop/feed-post";
@@ -65,11 +65,9 @@ export default async function LandingPage() {
   // HTML of a page that shows forty of them.
   const onPage = [...posts, ...best, ...fresh, ...explore];
 
-  const marquee = [
-    "New in",
-    ...categories.map((category) => category.name),
-    "Made for Lagos",
-  ];
+  // The words are the shop's own, from Settings → Storefront. Empty means the
+  // owner didn't want a strip, so there isn't one.
+  const marquee = content.marquee;
 
   return (
     <>
@@ -87,6 +85,7 @@ export default async function LandingPage() {
         <EmptyShop />
       ) : (
         <>
+          {marquee.length > 0 && (
           <div className="mt-6 overflow-hidden border-y border-line bg-canvas-deep/50 py-2.5">
             <div className="marquee-track">
               {[0, 1].map((copy) => (
@@ -104,12 +103,12 @@ export default async function LandingPage() {
               ))}
             </div>
           </div>
+          )}
 
           {posts.length > 0 && (
             <section className="mt-10">
               <SectionHead
                 title={content.featuredHeading || "Featured"}
-                note="Tap a picture to open it, without losing this page."
                 href="/shop"
                 hrefLabel="Shop all"
               />
@@ -127,11 +126,7 @@ export default async function LandingPage() {
 
           {best.length > 0 && (
             <section className="mt-12">
-              <SectionHead
-                title="Best sellers"
-                note="What everyone else is taking home."
-                href="/shop?sort=best"
-              />
+              <SectionHead title="Best sellers" href="/shop?sort=best" />
               <div className="mt-4">
                 <ProductRail products={best} />
               </div>
@@ -140,11 +135,7 @@ export default async function LandingPage() {
 
           {fresh.length > 0 && (
             <section className="mt-12">
-              <SectionHead
-                title="New in"
-                note="The most recent arrivals, newest first."
-                href="/shop?sort=new"
-              />
+              <SectionHead title="New in" href="/shop?sort=new" />
               <div className="mt-4">
                 <ProductRail products={fresh} />
               </div>
@@ -153,7 +144,7 @@ export default async function LandingPage() {
 
           {explore.length > 0 && (
             <section className="mt-12">
-              <SectionHead title="Explore" note="A little of everything else." />
+              <SectionHead title="Explore" />
               <div className="mt-4 grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:gap-4 sm:px-6 lg:grid-cols-4 lg:px-8">
                 {explore.map((product) => (
                   <ProductCard key={product.id} product={product} />
@@ -165,17 +156,13 @@ export default async function LandingPage() {
           <section className="mt-14 px-4 sm:px-6 lg:px-8">
             <div className="overflow-hidden rounded-3xl bg-noir px-6 py-12 text-center text-white sm:px-10 sm:py-16">
               <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]">
-                <Sparkles className="size-3.5" aria-hidden />
+                <ShoppingBag className="size-3.5" aria-hidden />
                 The whole shop
               </p>
               <h2 className="mt-5 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                 {products.length} piece{products.length === 1 ? "" : "s"},
                 waiting to be found
               </h2>
-              <p className="mx-auto mt-3 max-w-md text-pretty text-white/70">
-                Filter by category, sort by what&apos;s new or what&apos;s
-                selling, and open anything without losing your place.
-              </p>
               <Link
                 href="/shop"
                 className="group mt-7 inline-flex h-12 items-center gap-2 rounded-full bg-white px-7 text-sm font-semibold text-noir transition hover:bg-brand hover:text-white"

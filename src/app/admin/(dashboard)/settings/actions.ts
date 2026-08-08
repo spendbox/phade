@@ -12,6 +12,12 @@ import {
 import { nairaToKobo } from "@/lib/format";
 import { SETTING_KEYS } from "@/lib/settings";
 import {
+  parseShipping,
+  SHIPPING_KEY,
+  type ShippingSettings,
+} from "@/lib/shipping";
+import {
+  parseStorefront,
   STOREFRONT_KEY,
   type StorefrontContent,
 } from "@/lib/storefront";
@@ -66,6 +72,18 @@ function jsonList(formData: FormData, key: string): string[] {
   }
 }
 
+/** One row per platform, blank rows meaning "not on it". */
+function socialLinks(formData: FormData): { platform: string; url: string }[] {
+  try {
+    const parsed: unknown = JSON.parse(String(formData.get("socials") ?? "[]"));
+    return Array.isArray(parsed)
+      ? (parsed as { platform: string; url: string }[])
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function saveStorefront(
   _previous: StorefrontFormState,
   formData: FormData,
@@ -86,12 +104,6 @@ export async function saveStorefront(
       );
     }
 
-    const deliveryFee = nairaToKobo(String(formData.get("delivery_fee") ?? ""));
-    const freeOver = nairaToKobo(String(formData.get("free_delivery_over") ?? ""));
-    if (deliveryFee < 0 || freeOver < 0) {
-      throw new Error("Delivery amounts can't be negative.");
-    }
-
     const content: StorefrontContent = {
       announcement: String(formData.get("announcement") ?? "").trim(),
       announcementEnabled: formData.get("announcement_enabled") === "on",
@@ -105,8 +117,15 @@ export async function saveStorefront(
         .split(",")
         .map((id) => id.trim())
         .filter(Boolean),
-      deliveryFeeKobo: deliveryFee,
-      freeDeliveryOverKobo: freeOver,
+      // One word per line is easier to edit than a comma-separated string, and
+      // it can't be broken by a word that contains a comma.
+      marquee: String(formData.get("marquee") ?? "")
+        .split("\n")
+        .map((word) => word.trim())
+        .filter(Boolean)
+        .slice(0, 20),
+      footerBlurb: String(formData.get("footer_blurb") ?? "").trim(),
+      socials: parseStorefront({ socials: socialLinks(formData) }).socials,
     };
 
     const { error } = await supabase.from("app_settings").upsert(
@@ -175,6 +194,70 @@ export async function saveCatalogue(
     revalidate("/admin/products/new");
     revalidate("/admin/database");
     return { ok: true, message: "Catalogue updated." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export type ShippingFormState = ActionResult | { ok: null };
+
+/**
+ * Delivery pricing, saved whole.
+ *
+ * The zones arrive as one JSON field rather than a form's worth of indexed
+ * inputs, because they are a list the admin reorders and deletes from — and a
+ * partially-applied save, where a zone kept its price but lost its states,
+ * would quietly overcharge people. `parseShipping` is the same guard the
+ * storefront reads through, so nothing can be stored that the shop can't read.
+ */
+export async function saveShipping(
+  _previous: ShippingFormState,
+  formData: FormData,
+): Promise<ShippingFormState> {
+  try {
+    await requireAdmin();
+    const supabase = requireSupabase();
+
+    let rawZones: unknown = [];
+    try {
+      rawZones = JSON.parse(String(formData.get("zones") ?? "[]"));
+    } catch {
+      throw new Error("Couldn't read those zones. Try again.");
+    }
+
+    if (Array.isArray(rawZones)) {
+      for (const zone of rawZones as Record<string, unknown>[]) {
+        const named = typeof zone?.name === "string" && zone.name.trim();
+        const covers = Array.isArray(zone?.states) && zone.states.length > 0;
+        if (!named || !covers) {
+          throw new Error(
+            "Every zone needs a name and at least one state. Remove the empty one, or fill it in.",
+          );
+        }
+      }
+    }
+
+    const content: ShippingSettings = parseShipping({
+      defaultFeeKobo: nairaToKobo(String(formData.get("default_fee") ?? "")),
+      freeOverKobo: nairaToKobo(String(formData.get("free_over") ?? "")),
+      zones: rawZones,
+      pickupEnabled: formData.get("pickup_enabled") === "on",
+      pickupNote: String(formData.get("pickup_note") ?? "").trim(),
+    });
+
+    const { error } = await supabase.from("app_settings").upsert(
+      {
+        key: SHIPPING_KEY,
+        value: content,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" },
+    );
+    if (error) throw new Error(error.message);
+
+    revalidate("/admin/settings/shipping");
+    revalidate("/");
+    return { ok: true, message: "Shipping updated." };
   } catch (error) {
     return actionError(error);
   }

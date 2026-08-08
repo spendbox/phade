@@ -165,7 +165,7 @@ export default async function ProductPage({
 
           <p className="mt-5 flex items-center gap-2 rounded-xl bg-canvas-deep/70 px-3 py-2.5 text-[13px] text-ink-secondary">
             <Truck className="size-4 shrink-0 text-ink-muted" aria-hidden />
-            Delivered nationwide. Pickup in Lagos is free at checkout.
+            Delivered nationwide. Collection is free at checkout.
           </p>
 
           <BuyPanel product={product} className="mt-6" />

@@ -7,27 +7,27 @@ import { Media } from "@/components/shop/media";
 import { Sheet } from "@/components/shop/sheet";
 import { useShop } from "@/components/shop/shop-provider";
 import { formatNairaShort } from "@/lib/format";
-import { deliveryFor, type StorefrontContent } from "@/lib/storefront";
+import { cheapestFee, type ShippingSettings } from "@/lib/shipping";
 import { lineKey } from "@/lib/shop";
 
 /**
  * The bag, as a drawer over whatever you were looking at.
  *
  * Adding something should never cost a shopper their place in the grid, so the
- * bag never takes over the page until they choose to check out. The delivery
- * line is worked out from the same rules checkout uses, so the total here is
- * the total there.
+ * bag never takes over the page until they choose to check out.
+ *
+ * It quotes delivery "from" rather than exactly, because the exact figure
+ * depends on where the parcel is going and nobody has said yet. Checkout asks,
+ * and the number settles there.
  */
-export function BagDrawer({
-  delivery,
-}: {
-  delivery: Pick<StorefrontContent, "deliveryFeeKobo" | "freeDeliveryOverKobo">;
-}) {
+export function BagDrawer({ shipping }: { shipping: ShippingSettings }) {
   const { bag, bagOpen, closeBag, subtotalKobo, setQuantity, removeLine, count } =
     useShop();
 
-  const shipping = deliveryFor(delivery, subtotalKobo, "shipping");
-  const toFreeDelivery = delivery.freeDeliveryOverKobo - subtotalKobo;
+  const from = cheapestFee(shipping);
+  const freeEverywhere =
+    shipping.freeOverKobo > 0 && subtotalKobo >= shipping.freeOverKobo;
+  const toFreeDelivery = shipping.freeOverKobo - subtotalKobo;
 
   return (
     <Sheet
@@ -147,7 +147,7 @@ export function BagDrawer({
           </ul>
 
           <footer className="border-t border-line bg-canvas px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4">
-            {shipping > 0 && toFreeDelivery > 0 && (
+            {shipping.freeOverKobo > 0 && toFreeDelivery > 0 && (
               <p className="mb-3 rounded-xl bg-brand-soft px-3 py-2 text-xs text-brand">
                 {formatNairaShort(toFreeDelivery)} more for free delivery.
               </p>
@@ -155,7 +155,9 @@ export function BagDrawer({
 
             <dl className="space-y-1.5 text-sm">
               <div className="flex justify-between">
-                <dt className="text-ink-secondary">Subtotal</dt>
+                <dt className="text-ink-secondary">
+                  {count} item{count === 1 ? "" : "s"}
+                </dt>
                 <dd className="font-medium text-ink tabular-nums">
                   {formatNairaShort(subtotalKobo)}
                 </dd>
@@ -163,13 +165,17 @@ export function BagDrawer({
               <div className="flex justify-between">
                 <dt className="text-ink-secondary">Delivery</dt>
                 <dd className="font-medium text-ink tabular-nums">
-                  {shipping === 0 ? "Free" : formatNairaShort(shipping)}
+                  {freeEverywhere
+                    ? "Free"
+                    : from === 0
+                      ? "Free"
+                      : `from ${formatNairaShort(from)}`}
                 </dd>
               </div>
               <div className="flex justify-between border-t border-line pt-2 text-base">
-                <dt className="font-semibold text-ink">Total</dt>
+                <dt className="font-semibold text-ink">Subtotal</dt>
                 <dd className="font-semibold text-ink tabular-nums">
-                  {formatNairaShort(subtotalKobo + shipping)}
+                  {formatNairaShort(subtotalKobo)}
                 </dd>
               </div>
             </dl>

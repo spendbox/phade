@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Code2, LayoutTemplate, Palette, Store, Tags } from "lucide-react";
+import { Code2, LayoutTemplate, Palette, Store, Tags, Truck } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 
@@ -37,6 +37,12 @@ const SECTIONS = [
     label: "Storefront",
     hint: "Hero, banner & featured",
     icon: LayoutTemplate,
+  },
+  {
+    href: "/admin/settings/shipping",
+    label: "Shipping",
+    hint: "Delivery zones & pickup",
+    icon: Truck,
   },
   {
     href: "/admin/settings/developers",
