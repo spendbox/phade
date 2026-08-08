@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, ShoppingBag } from "lucide-react";
 
 import { AboutSection } from "@/components/shop/about-block";
-import { CategoryStories } from "@/components/shop/category-stories";
+import { CollectionRail } from "@/components/shop/collection-rail";
 import { FeaturedStack } from "@/components/shop/featured-stack";
 import { ProductRail } from "@/components/shop/product-card";
 import { NewInGrid } from "@/components/shop/new-in-grid";
@@ -70,14 +70,14 @@ export default async function LandingPage() {
 
       <StoryHero content={content} hasShop={products.length > 0} />
 
-      {/* The rings ride up over the foot of the hero — the seam between the
-          picture and the shop, and the first thing a thumb reaches. */}
+      {/* The collections ride up over the foot of the hero — the seam between
+          the picture and the shop, and the first thing a thumb reaches. */}
       <section className="relative z-30 -mt-8 rounded-t-[2rem] bg-canvas pb-1 pt-7 sm:-mt-10 sm:rounded-t-[2.5rem] sm:pt-9">
         {categories.length > 0 && (
           <>
             <Heading copy={sections.collections} compact />
-            <div className="mt-4">
-              <CategoryStories categories={categories} />
+            <div className="mt-5">
+              <CollectionRail categories={categories} />
             </div>
           </>
         )}

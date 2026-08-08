@@ -7,6 +7,7 @@ import { ProductCard, ProductRail } from "@/components/shop/product-card";
 import { Rail } from "@/components/shop/rail";
 import { SectionHead } from "@/components/shop/section";
 import { ProductRegistry } from "@/components/shop/shop-provider";
+import { CategoryIcon } from "@/lib/category-icons";
 import { cn } from "@/lib/cn";
 import { bestSellers, getCatalogue, newIn } from "@/lib/shop-queries";
 import type { ShopProduct } from "@/lib/shop";
@@ -116,16 +117,26 @@ export default async function ShopPage({
 
       <div className="px-4 pt-5 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-              {term
-                ? `“${params.q?.trim()}”`
-                : (category?.name ?? (onSaleOnly ? "On sale" : "Everything"))}
-            </h1>
-            <p className="mt-1 text-sm text-ink-secondary">
-              {filtered.length} piece{filtered.length === 1 ? "" : "s"}
-              {category?.description && !term && ` · ${category.description}`}
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            {/* The category's icon, at the head of its own page. The rail
+                above shows photographs; this is where the mark belongs. */}
+            {category && !term && (
+              <span className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-2xl bg-canvas-deep text-ink sm:size-12">
+                <CategoryIcon icon={category.icon} className="size-5 sm:size-6" />
+              </span>
+            )}
+
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+                {term
+                  ? `“${params.q?.trim()}”`
+                  : (category?.name ?? (onSaleOnly ? "On sale" : "Everything"))}
+              </h1>
+              <p className="mt-1 text-sm text-ink-secondary">
+                {filtered.length} piece{filtered.length === 1 ? "" : "s"}
+                {category?.description && !term && ` · ${category.description}`}
+              </p>
+            </div>
           </div>
 
           {/* `min-w-0` on the row, a rail around the group: without both, the

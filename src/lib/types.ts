@@ -114,7 +114,10 @@ export type ShippingAddress = {
   city?: string;
   state?: string;
   country?: string;
+  /** The number to ring first. */
   phone?: string;
+  /** Every number given, including the first — a courier's second chance. */
+  phones?: string[];
 };
 
 export type Order = {

@@ -161,11 +161,31 @@
     min-width: 0;
     max-width: 100%;
     overflow-x: auto;
-    scroll-snap-type: x mandatory;
+    /* Proximity, not mandatory: a mandatory rail snaps its first card flush to
+       the scrollport the moment it is laid out, which eats the rail's own left
+       padding and leaves it a few pixels scrolled before anyone has touched
+       it — enough to light the "you can scroll back" fade on a rail that is
+       already at its start. Cards still settle under a thumb. */
+    scroll-snap-type: x proximity;
     scroll-behavior: smooth;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    /* Snap points sit inside the rail's own padding, which is the gutter every
+       rail on the shop carries. Without this the first card wants to sit flush
+       against the scrollport, so a rail nobody has touched starts a gutter's
+       worth scrolled — and says, wrongly, that there is something behind it. */
+    scroll-padding-inline: 1rem;
+  }
+  @media (min-width: 640px) {
+    .rail {
+      scroll-padding-inline: 1.5rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .rail {
+      scroll-padding-inline: 2rem;
+    }
   }
   .rail::-webkit-scrollbar {
     display: none;

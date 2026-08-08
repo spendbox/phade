@@ -8,6 +8,7 @@ import { ErrorNotice } from "@/components/admin/setup-notice";
 import { PaymentStatusBadge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/empty-state";
 import { Panel } from "@/components/ui/stat-tile";
+import { cn } from "@/lib/cn";
 import { formatDateTime, formatNaira } from "@/lib/format";
 import { getOrder } from "@/lib/queries";
 
@@ -229,11 +230,25 @@ export default async function OrderDetailPage({
                         {line}
                       </span>
                     ))}
-                  {address.phone && (
-                    <span className="mt-1 block text-ink-muted">
-                      {address.phone}
-                    </span>
-                  )}
+                  {/* Every number the customer gave, so a courier who can't
+                      get through has somewhere else to try. */}
+                  {(address.phones ?? [address.phone])
+                    .filter((line): line is string => Boolean(line))
+                    .map((line, index) => (
+                      <a
+                        key={line}
+                        href={`tel:${line.replace(/[^\d+]/g, "")}`}
+                        className={cn(
+                          "block text-ink-muted hover:text-ink",
+                          index === 0 && "mt-1",
+                        )}
+                      >
+                        {line}
+                        {index > 0 && (
+                          <span className="ml-1.5 text-xs">(alternate)</span>
+                        )}
+                      </a>
+                    ))}
                 </span>
               </address>
             ) : (

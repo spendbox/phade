@@ -40,6 +40,11 @@ type SubmittedLine = {
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Digits only: "+234 801 234 5678" is eleven digits and four separators. */
+function digits(value: string): number {
+  return (value.match(/\d/g) ?? []).length;
+}
+
 function readLines(raw: FormDataEntryValue | null): SubmittedLine[] {
   try {
     const parsed: unknown = JSON.parse(String(raw ?? "[]"));
@@ -160,7 +165,20 @@ export async function placeOrder(
     const email = String(formData.get("email") ?? "")
       .trim()
       .toLowerCase();
-    const phone = String(formData.get("phone") ?? "").trim();
+
+    // One number or several, dialling code and all. The first is the one a
+    // courier rings; the rest ride along on the order so a busy line isn't a
+    // parcel back at the depot.
+    const phones = [
+      ...formData.getAll("phones"),
+      formData.get("phone") ?? "",
+    ]
+      .map((value) => String(value).trim().slice(0, 40))
+      .filter((value) => digits(value) >= 7)
+      .filter((value, index, all) => all.indexOf(value) === index)
+      .slice(0, 5);
+
+    const phone = phones[0] ?? "";
     const fulfilment: Fulfilment =
       formData.get("fulfilment") === "pickup" ? "pickup" : "shipping";
 
@@ -168,7 +186,7 @@ export async function placeOrder(
     if (!EMAIL.test(email)) {
       return { ok: false, error: "That email address doesn't look right." };
     }
-    if (phone.length < 7) {
+    if (!phone) {
       return { ok: false, error: "Add a phone number we can reach you on." };
     }
 
@@ -179,6 +197,7 @@ export async function placeOrder(
       state: String(formData.get("state") ?? "").trim(),
       country: "Nigeria",
       phone,
+      phones: phones.length > 1 ? phones : undefined,
     };
 
     if (
