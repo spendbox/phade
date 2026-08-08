@@ -2,7 +2,7 @@ import Image from "next/image";
 import { ImageIcon } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { isVideoUrl } from "@/lib/media";
+import { isVideoUrl, objectPosition, readFocus } from "@/lib/media";
 
 /**
  * One frame of product media.
@@ -23,6 +23,9 @@ import { isVideoUrl } from "@/lib/media";
  * listed in `next.config.ts` — falls back to a plain `<img>`. The optimiser
  * refuses hosts it wasn't told about, and a broken picture is worse than an
  * unoptimised one.
+ *
+ * A stored URL may carry how the shop wants it framed (`#pos=top`), which is
+ * read off here and never passed on to the network — see `@/lib/media`.
  */
 
 const STORAGE_HOST = (() => {
@@ -79,10 +82,14 @@ export function Media({
     );
   }
 
-  if (isVideoUrl(url)) {
+  const { src, focus } = readFocus(url);
+  const framing = { objectPosition: objectPosition(focus) };
+
+  if (isVideoUrl(src)) {
     return (
       <video
-        src={url}
+        src={src}
+        style={framing}
         poster={poster ?? undefined}
         className={cn("object-cover", className)}
         muted
@@ -97,15 +104,16 @@ export function Media({
 
   // `fill` needs a positioned box, so the component brings its own rather than
   // asking every caller to remember one.
-  if (isOptimisable(url)) {
+  if (isOptimisable(src)) {
     return (
       <span className={cn("relative block overflow-hidden", className)}>
         <Image
-          src={url}
+          src={src}
           alt={alt}
           fill
           sizes={sizes}
           priority={priority}
+          style={framing}
           className="object-cover"
         />
       </span>
@@ -115,9 +123,10 @@ export function Media({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={url}
+      src={src}
       alt={alt}
       sizes={sizes}
+      style={framing}
       loading={priority ? "eager" : "lazy"}
       fetchPriority={priority ? "high" : "auto"}
       decoding="async"

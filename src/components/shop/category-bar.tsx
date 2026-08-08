@@ -50,7 +50,10 @@ export function CategoryBar({
               href={`/shop?category=${category.slug}`}
               label={category.name}
               active={active === category.slug}
-              cover={category.cover}
+              // The category's own photograph, uploaded in Settings →
+              // Categories, with its icon standing in until there is one. The
+              // icon gets its moment at the head of the category's own page.
+              cover={category.imageUrl}
               compact
               icon={<CategoryIcon icon={category.icon} className="size-5" />}
             />

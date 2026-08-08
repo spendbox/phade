@@ -62,6 +62,19 @@ export async function saveSettings(
 
 export type StorefrontFormState = ActionResult | { ok: null };
 
+/**
+ * The front page's sections, named the same way in the form, in the parser and
+ * in the stored row — so adding one is a field named `<key>_heading` and
+ * nothing else.
+ */
+const SECTION_KEYS = [
+  "collections",
+  "featured",
+  "newIn",
+  "bestSellers",
+  "closing",
+] as const;
+
 function text(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
 }
@@ -100,11 +113,14 @@ export async function saveStorefront(
     if (!headline) throw new Error("The hero needs a headline.");
 
     const ctaHref = text(formData, "hero_cta_href");
-    const aboutHref = text(formData, "about_cta_href");
 
     // Only same-site paths and full URLs — a bare word would send shoppers
     // somewhere the browser resolves unpredictably.
-    for (const link of [ctaHref, aboutHref]) {
+    for (const link of [
+      ctaHref,
+      text(formData, "about_cta_href"),
+      ...SECTION_KEYS.map((key) => text(formData, `${key}_cta_href`)),
+    ]) {
       if (link && !/^(\/|https?:\/\/)/.test(link)) {
         throw new Error(
           "A button link must start with / for a page on this site, or https:// for somewhere else.",
@@ -127,17 +143,19 @@ export async function saveStorefront(
       // Parsed rather than assigned: a heading cleared to nothing takes its
       // default back, and the same guard the storefront reads through is the
       // one that decides what a blank field means.
-      headings: parseStorefront({
-        headings: {
-          collections: text(formData, "heading_collections"),
-          featured: text(formData, "heading_featured"),
-          newIn: text(formData, "heading_new_in"),
-          newInTagline: text(formData, "heading_new_in_tagline"),
-          bestSellers: text(formData, "heading_best_sellers"),
-          explore: text(formData, "heading_explore"),
-          closing: text(formData, "heading_closing"),
-        },
-      }).headings,
+      sections: parseStorefront({
+        sections: Object.fromEntries(
+          SECTION_KEYS.map((key) => [
+            key,
+            {
+              heading: text(formData, `${key}_heading`),
+              note: text(formData, `${key}_note`),
+              ctaLabel: text(formData, `${key}_cta_label`),
+              ctaHref: text(formData, `${key}_cta_href`),
+            },
+          ]),
+        ),
+      }).sections,
       about: parseStorefront({
         about: {
           enabled: formData.get("about_enabled") === "on",
@@ -145,7 +163,7 @@ export async function saveStorefront(
           heading: text(formData, "about_heading"),
           body: text(formData, "about_body"),
           ctaLabel: text(formData, "about_cta_label"),
-          ctaHref: aboutHref,
+          ctaHref: text(formData, "about_cta_href"),
           mediaUrl: jsonList(formData, "about_media")[0] ?? "",
           posterUrl: jsonList(formData, "about_poster")[0] ?? "",
         },

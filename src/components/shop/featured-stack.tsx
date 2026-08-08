@@ -140,7 +140,12 @@ export function FeaturedStack({ products }: { products: ShopProduct[] }) {
                 zIndex: depth - step,
               }}
             >
-              <Card product={product} live={top} muted={!top && !thrown} />
+              <Card
+                product={product}
+                siblings={products}
+                live={top}
+                muted={!top && !thrown}
+              />
             </div>
           );
         })}
@@ -209,10 +214,12 @@ function Throw({
  */
 function Card({
   product,
+  siblings,
   live,
   muted,
 }: {
   product: ShopProduct;
+  siblings: ShopProduct[];
   live: boolean;
   muted: boolean;
 }) {
@@ -267,7 +274,7 @@ function Card({
 
         <button
           type="button"
-          onClick={() => openProduct(product)}
+          onClick={() => openProduct(product, siblings)}
           tabIndex={live ? 0 : -1}
           className="absolute inset-0 size-full"
           aria-label={`Open ${product.name}`}
@@ -292,7 +299,7 @@ function Card({
         <div className="min-w-0 flex-1">
           <button
             type="button"
-            onClick={() => openProduct(product)}
+            onClick={() => openProduct(product, siblings)}
             tabIndex={live ? 0 : -1}
             className="block max-w-full truncate text-left text-[15px] font-semibold text-ink hover:text-brand"
           >
@@ -334,7 +341,7 @@ function Card({
           disabled={soldOut}
           tabIndex={live ? 0 : -1}
           onClick={() =>
-            needsChoice ? openProduct(product) : addToBag({ product })
+            needsChoice ? openProduct(product, siblings) : addToBag({ product })
           }
           className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-noir px-5 text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-40"
         >

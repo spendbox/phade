@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Loader2, Lock, ShoppingBag, Store, Truck, X } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  Lock,
+  Plus,
+  ShoppingBag,
+  Store,
+  Truck,
+  X,
+} from "lucide-react";
 
 import {
   placeOrder,
@@ -10,8 +19,15 @@ import {
   type CheckoutState,
 } from "@/app/(shop)/checkout/actions";
 import { Media } from "@/components/shop/media";
+import { SearchSelect } from "@/components/shop/search-select";
 import { useShop } from "@/components/shop/shop-provider";
 import { usePersistent } from "@/lib/browser-store";
+import {
+  DEFAULT_DIAL,
+  DIAL_CODES,
+  digitCount,
+  splitDial,
+} from "@/lib/dial-codes";
 import { cn } from "@/lib/cn";
 import { formatNairaShort } from "@/lib/format";
 import { lineKey } from "@/lib/shop";
@@ -34,10 +50,10 @@ const initial: CheckoutState = { ok: null };
 /**
  * Checkout.
  *
- * One screen, in the order a person actually answers the questions: how it
- * reaches them, who they are, where it goes, then pay. The bag travels as ids
- * and quantities only — the server prices it — so nothing here is worth
- * tampering with.
+ * One screen, asked one step at a time, in the order a person actually answers
+ * the questions: how it reaches them, who they are, where it goes, then pay.
+ * The bag travels as ids and quantities only — the server prices it — so
+ * nothing here is worth tampering with.
  *
  * The bag is deliberately not emptied on submit. Payment can be abandoned, and
  * a shopper who comes back to try again should find their bag as they left it;
@@ -75,20 +91,83 @@ export function CheckoutForm({ shipping }: { shipping: ShippingSettings }) {
   return <CheckoutFields shipping={shipping} />;
 }
 
+type StepKey = "how" | "who" | "where" | "note";
+
+type Phone = { dial: string; number: string };
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function fullNumber(phone: Phone): string {
+  return `${phone.dial} ${phone.number.trim()}`.trim();
+}
+
+/**
+ * The checkout, as a short conversation rather than a wall of boxes.
+ *
+ * Everything asked here was always asked; the difference is that it is asked
+ * one question at a time. A checkout that opens with fourteen fields is a
+ * checkout a shopper closes — and on a phone the whole form is three screens
+ * of scrolling before the first answer is typed. So each step opens when the
+ * one before it is answered, and folds up into a line once it is, which keeps
+ * both the place they are and the answers they have already given on screen at
+ * once.
+ *
+ * The fields are held in state rather than left to the DOM because the form
+ * has to know when a step is finished. That is the whole reason; nothing else
+ * about the submission changed, and what the server receives is the same set
+ * of names it has always parsed.
+ */
 function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
   const { bag, subtotalKobo, cartToken, count, say } = useShop();
   const [state, formAction, pending] = useActionState(placeOrder, initial);
 
   const stored = safeDetails(usePersistent(detailsStore));
+
   const [fulfilment, setFulfilment] = useState<"shipping" | "pickup">(
     shipping.pickupEnabled ? stored.fulfilment : "shipping",
   );
+  const [name, setName] = useState(stored.name);
+  const [email, setEmail] = useState(stored.email);
+  const [phones, setPhones] = useState<Phone[]>(() =>
+    stored.phones.length > 0
+      ? stored.phones.map(splitDial)
+      : [{ dial: DEFAULT_DIAL, number: "" }],
+  );
+  const [line1, setLine1] = useState(stored.line1);
+  const [line2, setLine2] = useState(stored.line2);
+  const [city, setCity] = useState(stored.city);
   // The delivery charge depends on where it's going, so the state field is the
   // one input on this form that changes the total as you use it.
   const [state_, setState] = useState(stored.state);
+  const [note, setNote] = useState("");
 
-  // The bag, as the server will read it. It is also what a coupon is judged
-  // against, so the two always describe the same order.
+  const delivering = fulfilment === "shipping";
+
+  const whoDone =
+    Boolean(name.trim()) &&
+    EMAIL.test(email.trim()) &&
+    digitCount(phones[0]?.number ?? "") >= 7;
+  const whereDone =
+    !delivering || Boolean(line1.trim() && city.trim() && state_);
+  const ready = whoDone && whereDone;
+
+  const steps: StepKey[] = delivering
+    ? ["how", "who", "where", "note"]
+    : ["how", "who", "note"];
+
+  // Someone returning with their details already filled in shouldn't be walked
+  // through steps they answered last time.
+  const [open, setOpen] = useState<StepKey>(() =>
+    !whoDone ? "who" : !whereDone ? "where" : "note",
+  );
+  // Choosing collection removes a step; it must not stay the open one.
+  if (!steps.includes(open)) setOpen("note");
+
+  const at = (step: StepKey) => steps.indexOf(step);
+  /** A step opens once every step before it has been answered. */
+  const reachable = (step: StepKey) =>
+    (at(step) <= at("who") || whoDone) && (at(step) <= at("where") || whereDone);
+
   const lines = JSON.stringify(
     bag.map((line) => ({
       productId: line.productId,
@@ -115,6 +194,19 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
     if (state.ok === true) window.location.assign(state.redirect);
   }, [state]);
 
+  function forget() {
+    detailsStore.set(NO_DETAILS);
+    setName("");
+    setEmail("");
+    setPhones([{ dial: DEFAULT_DIAL, number: "" }]);
+    setLine1("");
+    setLine2("");
+    setCity("");
+    setState("");
+    setOpen("who");
+    say("Details forgotten on this device");
+  }
+
   return (
     <form
       action={formAction}
@@ -125,27 +217,68 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
       }}
       className="grid gap-8 px-4 pb-10 pt-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-12 lg:px-8"
     >
+      {/* Every answer, whether or not its step is open.
+          A folded-up step is not rendered — that is what makes the form short —
+          so the inputs a shopper typed into are gone by the time they press
+          Pay. These carry the answers instead, which also means the visible
+          fields are free to be nothing but fields. */}
       <input type="hidden" name="cart_token" value={cartToken} />
       <input type="hidden" name="lines" value={lines} />
+      <input type="hidden" name="fulfilment" value={fulfilment} />
+      <input type="hidden" name="name" value={name.trim()} />
+      <input type="hidden" name="email" value={email.trim()} />
+      <input type="hidden" name="note" value={note.trim()} />
+      {delivering && (
+        <>
+          <input type="hidden" name="line1" value={line1.trim()} />
+          <input type="hidden" name="line2" value={line2.trim()} />
+          <input type="hidden" name="city" value={city.trim()} />
+          <input type="hidden" name="state" value={state_} />
+        </>
+      )}
       {coupon.applied && (
         <input type="hidden" name="coupon" value={coupon.applied.code} />
       )}
+      {/* The first number is the one to ring; the rest travel with the order
+          so nobody is undeliverable because one line was busy. */}
+      <input type="hidden" name="phone" value={fullNumber(phones[0])} />
+      {phones
+        .filter((phone) => digitCount(phone.number) >= 7)
+        .map((phone, index) => (
+          <input
+            key={`${phone.dial}-${index}`}
+            type="hidden"
+            name="phones"
+            value={fullNumber(phone)}
+          />
+        ))}
 
-      <div className="space-y-8">
-        <fieldset>
-          <legend className="text-sm font-semibold text-ink">
-            How would you like it?
-          </legend>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="space-y-3">
+        <Step
+          step={1}
+          title="How would you like it?"
+          summary={
+            delivering
+              ? state_
+                ? `Delivered to ${state_}`
+                : "Delivered"
+              : "Collected from us"
+          }
+          open={open === "how"}
+          done
+          onOpen={() => setOpen("how")}
+          onNext={() => setOpen(whoDone && !delivering ? "note" : "who")}
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
             <Choice
-              name="fulfilment"
+              name="fulfilment_choice"
               value="shipping"
-              checked={fulfilment === "shipping"}
+              checked={delivering}
               onChange={() => setFulfilment("shipping")}
               icon={<Truck className="size-4" aria-hidden />}
               title="Delivered"
               note={
-                fulfilment === "pickup"
+                !delivering
                   ? "Anywhere in Nigeria"
                   : quote.free
                     ? "Free on this order"
@@ -156,9 +289,9 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
             />
             {shipping.pickupEnabled && (
               <Choice
-                name="fulfilment"
+                name="fulfilment_choice"
                 value="pickup"
-                checked={fulfilment === "pickup"}
+                checked={!delivering}
                 onChange={() => setFulfilment("pickup")}
                 icon={<Store className="size-4" aria-hidden />}
                 title="Picked up"
@@ -166,128 +299,139 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
               />
             )}
           </div>
-        </fieldset>
+        </Step>
 
-        <fieldset className="space-y-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <legend className="text-sm font-semibold text-ink">
-              Who is it for?
-            </legend>
-
+        <Step
+          step={2}
+          title="Who is it for?"
+          summary={[name, email].filter(Boolean).join(" · ")}
+          open={open === "who"}
+          done={whoDone}
+          locked={!reachable("who")}
+          onOpen={() => setOpen("who")}
+          onNext={() => setOpen(delivering ? "where" : "note")}
+          nextDisabled={!whoDone}
+        >
+          <div className="space-y-4">
             {hasDetails(stored) && (
               <p className="text-xs text-ink-muted">
                 Filled in from last time ·{" "}
                 <button
                   type="button"
-                  onClick={() => {
-                    detailsStore.set(NO_DETAILS);
-                    say("Details forgotten on this device");
-                  }}
+                  onClick={forget}
                   className="underline underline-offset-2 hover:text-ink"
                 >
                   Forget them
                 </button>
               </p>
             )}
-          </div>
 
-          <Text
-            name="name"
-            label="Full name"
-            autoComplete="name"
-            required
-            defaultValue={stored.name}
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
             <Text
-              name="email"
+              field="name"
+              label="Full name"
+              autoComplete="name"
+              required
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+
+            <Text
+              field="email"
               label="Email"
               type="email"
               autoComplete="email"
               required
               hint="Your receipt and updates go here."
-              defaultValue={stored.email}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
-            <Text
-              name="phone"
-              label="Phone"
-              type="tel"
-              autoComplete="tel"
-              required
-              defaultValue={stored.phone}
-            />
+
+            <PhoneFields phones={phones} onChange={setPhones} />
           </div>
-        </fieldset>
+        </Step>
 
-        {fulfilment === "shipping" && (
-          <fieldset className="space-y-4">
-            <legend className="text-sm font-semibold text-ink">
-              Where is it going?
-            </legend>
-
-            <Text
-              name="line1"
-              label="Street address"
-              autoComplete="address-line1"
-              required
-              defaultValue={stored.line1}
-            />
-            <Text
-              name="line2"
-              label="Apartment, floor, landmark"
-              autoComplete="address-line2"
-              defaultValue={stored.line2}
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
+        {delivering && (
+          <Step
+            step={3}
+            title="Where is it going?"
+            summary={[line1, city, state_].filter(Boolean).join(", ")}
+            open={open === "where"}
+            done={whereDone}
+            locked={!reachable("where")}
+            onOpen={() => setOpen("where")}
+            onNext={() => setOpen("note")}
+            nextDisabled={!whereDone}
+          >
+            <div className="space-y-4">
               <Text
-                name="city"
-                label="City"
-                autoComplete="address-level2"
+                field="line1"
+                label="Street address"
+                autoComplete="address-line1"
                 required
-                defaultValue={stored.city}
+                value={line1}
+                onChange={(event) => setLine1(event.target.value)}
               />
-              <div>
-                <label
-                  htmlFor="state"
-                  className="block text-[13px] font-medium text-ink-secondary"
-                >
-                  State<span className="ml-0.5 text-critical">*</span>
-                </label>
-                <select
-                  id="state"
-                  name="state"
+              <Text
+                field="line2"
+                label="Apartment, floor, landmark"
+                autoComplete="address-line2"
+                value={line2}
+                onChange={(event) => setLine2(event.target.value)}
+              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Text
+                  field="city"
+                  label="City"
+                  autoComplete="address-level2"
                   required
-                  autoComplete="address-level1"
-                  value={state_}
-                  onChange={(event) => setState(event.target.value)}
-                  className="mt-1.5 h-12 w-full rounded-2xl bg-canvas-deep px-4 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                >
-                  <option value="">Choose a state</option>
-                  {NIGERIAN_STATES.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-ink-muted">
-                  Delivery is priced from here.
-                </p>
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                />
+                <div>
+                  <label
+                    htmlFor="state"
+                    className="block text-[13px] font-medium text-ink-secondary"
+                  >
+                    State<span className="ml-0.5 text-critical">*</span>
+                  </label>
+                  <div className="mt-1.5">
+                    <SearchSelect
+                      id="state"
+                      options={[...NIGERIAN_STATES]}
+                      value={state_}
+                      onChange={setState}
+                      placeholder="Start typing — Lagos, Kano…"
+                      emptyLabel="No state by that name"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    Delivery is priced from here.
+                  </p>
+                </div>
               </div>
             </div>
-          </fieldset>
+          </Step>
         )}
 
-        <fieldset>
-          <legend className="text-sm font-semibold text-ink">
-            Anything we should know?
-          </legend>
+        <Step
+          step={delivering ? 4 : 3}
+          title="Anything we should know?"
+          summary="Optional"
+          open={open === "note"}
+          done={ready}
+          locked={!reachable("note")}
+          onOpen={() => setOpen("note")}
+          last
+        >
           <textarea
-            name="note"
+            id="note"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
             rows={3}
             placeholder="Delivery instructions, a gift note, a preferred day…"
-            className="mt-3 w-full rounded-2xl bg-canvas-deep px-4 py-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand"
+            className="w-full rounded-2xl bg-canvas-deep px-4 py-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand"
           />
-        </fieldset>
+        </Step>
       </div>
 
       <aside className="lg:sticky lg:top-24 lg:self-start">
@@ -350,14 +494,14 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
             )}
             <div className="flex justify-between gap-3">
               <dt className="min-w-0 text-ink-secondary">
-                {fulfilment === "pickup"
+                {!delivering
                   ? "Pickup"
                   : state_
                     ? `Delivery · ${state_}`
                     : "Delivery"}
               </dt>
               <dd className="shrink-0 font-medium text-ink tabular-nums">
-                {fulfilment === "shipping" && !state_
+                {delivering && !state_
                   ? `from ${formatNairaShort(cheapest)}`
                   : quote.free
                     ? "Free"
@@ -372,7 +516,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
             </div>
           </dl>
 
-          {fulfilment === "pickup" && shipping.pickupNote && (
+          {!delivering && shipping.pickupNote && (
             <p className="mt-4 rounded-xl bg-canvas px-3 py-2.5 text-[13px] text-ink-secondary">
               {shipping.pickupNote}
             </p>
@@ -395,7 +539,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
 
           <button
             type="submit"
-            disabled={pending || state.ok === true}
+            disabled={pending || state.ok === true || !ready}
             className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-noir text-sm font-semibold text-white transition hover:bg-brand disabled:opacity-60"
           >
             {pending || state.ok === true ? (
@@ -408,6 +552,14 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
               : `Pay ${formatNairaShort(total)}`}
           </button>
 
+          {!ready && (
+            <p className="mt-2 text-center text-xs text-ink-muted">
+              {whoDone
+                ? "Add the address above and this opens."
+                : "Answer the steps above and this opens."}
+            </p>
+          )}
+
           <p className="mt-3 text-center text-xs text-ink-muted">
             Card, bank transfer and USSD, handled by Paystack. We never see your
             card details. Your name and address stay on this device so the next
@@ -416,6 +568,199 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
         </div>
       </aside>
     </form>
+  );
+}
+
+/**
+ * One step of the conversation.
+ *
+ * Answered and closed, it is a line you can see at a glance and reopen with a
+ * press. Unreachable, it is a heading and nothing else — visible, so a shopper
+ * knows how much is left, but not open for business until its turn.
+ */
+function Step({
+  step,
+  title,
+  summary,
+  open,
+  done,
+  locked = false,
+  last = false,
+  onOpen,
+  onNext,
+  nextDisabled = false,
+  children,
+}: {
+  step: number;
+  title: string;
+  summary: string;
+  open: boolean;
+  done: boolean;
+  locked?: boolean;
+  last?: boolean;
+  onOpen: () => void;
+  onNext?: () => void;
+  nextDisabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-3xl transition-colors",
+        open ? "bg-canvas-deep/40 p-4 sm:p-5" : "px-4 py-3.5",
+        locked && "opacity-45",
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            "flex size-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold tabular-nums",
+            done && !open
+              ? "bg-noir text-white"
+              : open
+                ? "bg-brand text-white"
+                : "bg-canvas-deep text-ink-muted",
+          )}
+          aria-hidden
+        >
+          {done && !open ? <Check className="size-4" /> : step}
+        </span>
+
+        <h2 className="min-w-0 flex-1 text-sm font-semibold text-ink">
+          {title}
+        </h2>
+
+        {!open && !locked && (
+          <button
+            type="button"
+            onClick={onOpen}
+            className="shrink-0 text-xs font-medium text-ink-secondary underline underline-offset-4 hover:text-ink"
+          >
+            {done ? "Change" : "Open"}
+          </button>
+        )}
+      </div>
+
+      {!open && done && summary && (
+        <p className="mt-1 truncate pl-10 text-[13px] text-ink-secondary">
+          {summary}
+        </p>
+      )}
+
+      {open && (
+        <div className="mt-4">
+          {children}
+
+          {!last && (
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={nextDisabled}
+              className="mt-5 flex h-11 items-center justify-center rounded-full bg-noir px-6 text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Continue
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Phone numbers: the code, the number, and room for a second one.
+ *
+ * A dialling code rather than a free-text box, because "0801…", "234 801…"
+ * and "+234 801…" are the same line written three ways and only one of them
+ * can be rung from abroad. Nigeria is chosen already, since that is where the
+ * parcels go.
+ *
+ * More than one number is not a nicety here: a courier who cannot get through
+ * on the first line is a parcel that goes back to the depot.
+ */
+function PhoneFields({
+  phones,
+  onChange,
+}: {
+  phones: Phone[];
+  onChange: (next: Phone[]) => void;
+}) {
+  function set(index: number, patch: Partial<Phone>) {
+    onChange(
+      phones.map((phone, at) => (at === index ? { ...phone, ...patch } : phone)),
+    );
+  }
+
+  return (
+    <div>
+      <span className="block text-[13px] font-medium text-ink-secondary">
+        Phone<span className="ml-0.5 text-critical">*</span>
+      </span>
+
+      <ul className="mt-1.5 space-y-2">
+        {phones.map((phone, index) => (
+          <li key={index} className="flex gap-2">
+            <label className="sr-only" htmlFor={`dial-${index}`}>
+              Country code
+            </label>
+            <select
+              id={`dial-${index}`}
+              value={phone.dial}
+              onChange={(event) => set(index, { dial: event.target.value })}
+              className="h-12 w-[7.5rem] shrink-0 rounded-2xl bg-canvas-deep px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+            >
+              {DIAL_CODES.map((country) => (
+                <option key={country.iso} value={country.dial}>
+                  {country.flag} {country.dial}
+                </option>
+              ))}
+            </select>
+
+            <label className="sr-only" htmlFor={`phone-${index}`}>
+              {index === 0 ? "Phone number" : `Phone number ${index + 1}`}
+            </label>
+            <input
+              id={`phone-${index}`}
+              type="tel"
+              inputMode="tel"
+              autoComplete={index === 0 ? "tel-national" : "off"}
+              value={phone.number}
+              onChange={(event) => set(index, { number: event.target.value })}
+              placeholder="801 234 5678"
+              className="h-12 min-w-0 flex-1 rounded-2xl bg-canvas-deep px-4 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand"
+            />
+
+            {phones.length > 1 && (
+              <button
+                type="button"
+                onClick={() =>
+                  onChange(phones.filter((_, at) => at !== index))
+                }
+                aria-label={`Remove phone number ${index + 1}`}
+                className="flex size-12 shrink-0 items-center justify-center rounded-2xl text-ink-muted transition hover:bg-canvas-deep hover:text-critical"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {phones.length < 3 && (
+        <button
+          type="button"
+          onClick={() => onChange([...phones, { dial: DEFAULT_DIAL, number: "" }])}
+          className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-secondary transition hover:text-ink"
+        >
+          <Plus className="size-3.5" aria-hidden />
+          Add another number
+        </button>
+      )}
+
+      <p className="mt-1.5 text-xs text-ink-muted">
+        The first one is the number the courier rings.
+      </p>
+    </div>
   );
 }
 
@@ -614,27 +959,27 @@ function Choice({
 }
 
 function Text({
-  name,
+  field,
   label,
   hint,
   ...props
 }: React.ComponentPropsWithoutRef<"input"> & {
-  name: string;
+  /** Names the label's target. Not a form name — see the hidden inputs. */
+  field: string;
   label: string;
   hint?: string;
 }) {
   return (
     <div>
       <label
-        htmlFor={name}
+        htmlFor={field}
         className="block text-[13px] font-medium text-ink-secondary"
       >
         {label}
         {props.required && <span className="ml-0.5 text-critical">*</span>}
       </label>
       <input
-        id={name}
-        name={name}
+        id={field}
         className="mt-1.5 h-12 w-full rounded-2xl bg-canvas-deep px-4 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand"
         {...props}
       />

@@ -24,10 +24,13 @@ import { isNewIn, percentOff, type ShopProduct } from "@/lib/shop";
  */
 export function ProductCard({
   product,
+  siblings,
   priority = false,
   className,
 }: {
   product: ShopProduct;
+  /** The grid or rail this card sits in, so the pop-up can be swiped along it. */
+  siblings?: ShopProduct[];
   priority?: boolean;
   className?: string;
 }) {
@@ -69,7 +72,7 @@ export function ProductCard({
 
         <button
           type="button"
-          onClick={() => openProduct(product)}
+          onClick={() => openProduct(product, siblings)}
           className="tap absolute inset-0 z-10 size-full"
           aria-label={`${product.name}, ${formatNairaShort(product.priceKobo)}`}
         />
@@ -113,7 +116,7 @@ export function ProductCard({
           <button
             type="button"
             onClick={() =>
-              needsChoice ? openProduct(product) : addToBag({ product })
+              needsChoice ? openProduct(product, siblings) : addToBag({ product })
             }
             aria-label={
               needsChoice
@@ -165,6 +168,7 @@ export function ProductRail({
         <ProductCard
           key={product.id}
           product={product}
+          siblings={products}
           priority={priority && index < 3}
           className="w-[45vw] max-w-[15rem] sm:w-52 lg:w-56"
         />

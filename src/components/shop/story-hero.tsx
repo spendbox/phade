@@ -67,7 +67,11 @@ export function StoryHero({
     <section
       aria-label="Featured"
       className="relative isolate min-h-[560px] overflow-hidden bg-noir text-white sm:min-h-[600px] lg:min-h-[680px]"
-      style={{ height: "min(84dvh, 60rem)" }}
+      // `svh`, not `dvh`. A dynamic viewport unit changes height every time a
+      // phone's browser bar hides or reappears on scroll, and since the picture
+      // covers the box, every one of those changes is a lurch of zoom under the
+      // reader's thumb. The small viewport height is the one that holds still.
+      style={{ height: "min(84svh, 60rem)" }}
     >
       {frames.length === 0 ? (
         // No pictures yet: the type carries it, and the shop still opens.

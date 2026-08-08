@@ -20,12 +20,19 @@ import { cn } from "@/lib/cn";
  * let go past a threshold and it goes. That is how every sheet on a phone
  * behaves, and a shopper should not have to hunt for the small ✕ in the corner
  * to get back to the grid.
+ *
+ * Sideways is a different sentence, and a caller can claim it: the product
+ * pop-up uses it to move along the row the piece was tapped out of. A gesture
+ * that starts inside something which scrolls sideways of its own — a gallery,
+ * a rail — belongs to that thing and is left alone.
  */
 
 /** How far down a sheet must be dragged before letting go dismisses it. */
 const DISMISS_AT = 110;
 /** …or how fast it has to be moving, so a short flick counts too. */
 const FLICK_SPEED = 0.55;
+/** How far sideways counts as "the next one". */
+const STEP_AT = 64;
 
 export function Sheet({
   open,
@@ -33,6 +40,7 @@ export function Sheet({
   label,
   side = "right",
   className,
+  onSwipe,
   children,
 }: {
   open: boolean;
@@ -40,10 +48,13 @@ export function Sheet({
   label: string;
   side?: "right" | "center";
   className?: string;
+  /** Sideways, if the caller has something for it to mean. */
+  onSwipe?: (direction: 1 | -1) => void;
   children: React.ReactNode;
 }) {
   const dialog = useRef<HTMLDivElement>(null);
   const [pulled, setPulled] = useState(0);
+  const [slid, setSlid] = useState(0);
 
   useEffect(() => {
     if (!open) return;
@@ -76,8 +87,13 @@ export function Sheet({
     let startX = 0;
     let startedAt = 0;
     let distance = 0;
-    /** Null until the first move decides whether this is a drag at all. */
-    let dragging: boolean | null = null;
+    let sideways = 0;
+    /**
+     * Null until the first move decides which way this gesture is going.
+     * "vertical-only" is a gesture that began inside something which scrolls
+     * sideways of its own, so it may still become a dismissal but never a step.
+     */
+    let axis: "down" | "across" | "neither" | "vertical-only" | null = null;
 
     const onStart = (event: TouchEvent) => {
       if (event.touches.length !== 1) return;
@@ -86,24 +102,38 @@ export function Sheet({
       startX = touch.clientX;
       startedAt = Date.now();
       distance = 0;
+      sideways = 0;
       // A sheet whose content is scrolled down is being read, not dismissed.
       // Only a list already at its top may be pulled away.
-      dragging = atTop(event.target, element) ? null : false;
+      axis = atTop(event.target, element) ? null : "neither";
+      // A gallery or a rail owns sideways within its own bounds.
+      if (axis === null && scrollsSideways(event.target, element)) {
+        axis = "vertical-only";
+      }
     };
 
     const onMove = (event: TouchEvent) => {
-      if (dragging === false || event.touches.length !== 1) return;
+      if (axis === "neither" || event.touches.length !== 1) return;
       const touch = event.touches[0];
       const down = touch.clientY - startY;
-      const sideways = Math.abs(touch.clientX - startX);
+      const across = touch.clientX - startX;
 
-      // The first few pixels decide: mostly downward is a dismissal, anything
-      // else belongs to whatever is underneath — a gallery that swipes, a rail
-      // that scrolls, a list that reads.
-      if (dragging === null) {
-        if (Math.abs(down) < 8 && sideways < 8) return;
-        dragging = down > 0 && down > sideways;
-        if (!dragging) return;
+      // The first few pixels decide: mostly downward is a dismissal, mostly
+      // sideways is the next piece along, and anything else belongs to
+      // whatever is underneath — a rail that scrolls, a list that reads.
+      if (axis === null || axis === "vertical-only") {
+        if (Math.abs(down) < 8 && Math.abs(across) < 8) return;
+        const vertical = Math.abs(down) > Math.abs(across);
+        if (vertical) axis = down > 0 ? "down" : "neither";
+        else axis = onSwipe && axis !== "vertical-only" ? "across" : "neither";
+        if (axis === "neither") return;
+      }
+
+      if (axis === "across") {
+        if (event.cancelable) event.preventDefault();
+        sideways = across;
+        setSlid(across * 0.35);
+        return;
       }
 
       if (down <= 0) {
@@ -120,17 +150,23 @@ export function Sheet({
     };
 
     const onEnd = () => {
-      if (dragging) {
+      if (axis === "across" && Math.abs(sideways) > STEP_AT) {
+        onSwipe?.(sideways < 0 ? 1 : -1);
+      } else if (axis === "down") {
         const speed = distance / Math.max(Date.now() - startedAt, 1);
         if (distance > DISMISS_AT || speed > FLICK_SPEED) {
           setPulled(0);
+          setSlid(0);
           onClose();
           return;
         }
       }
-      dragging = false;
+
+      axis = "neither";
       distance = 0;
+      sideways = 0;
       setPulled(0);
+      setSlid(0);
     };
 
     element.addEventListener("touchstart", onStart, { passive: true });
@@ -144,7 +180,7 @@ export function Sheet({
       element.removeEventListener("touchend", onEnd);
       element.removeEventListener("touchcancel", onEnd);
     };
-  }, [open, onClose]);
+  }, [open, onClose, onSwipe]);
 
   // A sheet that opens is never mid-drag, however the last one was let go of.
   // Adjusted as the change is noticed rather than in an effect, so it can't
@@ -153,6 +189,7 @@ export function Sheet({
   if (wasOpen !== open) {
     setWasOpen(open);
     if (pulled !== 0) setPulled(0);
+    if (slid !== 0) setSlid(0);
   }
 
   if (!open || typeof document === "undefined") return null;
@@ -181,10 +218,14 @@ export function Sheet({
         aria-label={label}
         className={cn(
           "sheet-up relative flex flex-col",
-          pulled === 0 && "transition-transform duration-200",
+          pulled === 0 && slid === 0 && "transition-transform duration-200",
           className,
         )}
-        style={pulled > 0 ? { transform: `translateY(${pulled}px)` } : undefined}
+        style={
+          pulled > 0 || slid !== 0
+            ? { transform: `translate(${slid}px, ${pulled}px)` }
+            : undefined
+        }
       >
         {/* The handle says "this pulls", to a thumb that has met one before. */}
         <span
@@ -205,6 +246,20 @@ export function Sheet({
  * back to the top, and only once it is at the top does the same gesture become
  * "put this away".
  */
+function scrollsSideways(
+  target: EventTarget | null,
+  sheet: HTMLElement,
+): boolean {
+  let node = target instanceof Element ? target : null;
+
+  while (node && node !== sheet.parentElement) {
+    if (node.scrollWidth > node.clientWidth + 1) return true;
+    node = node.parentElement;
+  }
+
+  return false;
+}
+
 function atTop(target: EventTarget | null, sheet: HTMLElement): boolean {
   let node = target instanceof Element ? target : null;
 

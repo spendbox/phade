@@ -25,10 +25,13 @@ export function AboutSection({ about }: { about: AboutContent }) {
   const showCta = Boolean(about.ctaLabel && about.ctaHref);
 
   return (
-    <section className="px-4 sm:px-6 lg:px-8">
+    // Narrower than the walls of pictures around it, and centred. This is the
+    // one part of the page meant to be read rather than scanned, and a line of
+    // prose stretched across a laptop is a line nobody finishes.
+    <section className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
       <div className="overflow-hidden rounded-[2rem] bg-canvas-deep/55">
-        <div className="grid items-stretch gap-0 lg:grid-cols-2">
-          <div className="order-2 flex flex-col justify-center px-6 py-9 sm:px-10 sm:py-12 lg:order-1 lg:px-12">
+        <div className="grid items-stretch gap-0 sm:grid-cols-2">
+          <div className="order-2 flex flex-col justify-center px-6 py-9 sm:order-1 sm:px-8 sm:py-10 lg:px-10">
             {about.eyebrow && (
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
                 {about.eyebrow}
@@ -36,7 +39,7 @@ export function AboutSection({ about }: { about: AboutContent }) {
             )}
 
             {about.heading && (
-              <h2 className="mt-3 text-balance text-2xl font-semibold leading-tight tracking-tight text-ink sm:text-3xl lg:text-[2.5rem]">
+              <h2 className="mt-3 text-balance text-2xl font-semibold leading-tight tracking-tight text-ink sm:text-[1.75rem] lg:text-[2rem]">
                 {about.heading}
               </h2>
             )}
@@ -62,7 +65,7 @@ export function AboutSection({ about }: { about: AboutContent }) {
           </div>
 
           {hasMedia && (
-            <div className="order-1 min-h-[16rem] lg:order-2 lg:min-h-[30rem]">
+            <div className="order-1 min-h-[15rem] sm:order-2 sm:min-h-[22rem]">
               <Media
                 url={about.mediaUrl}
                 alt=""
@@ -70,8 +73,8 @@ export function AboutSection({ about }: { about: AboutContent }) {
                 // frame the shop chose rather than whichever one came first.
                 autoPlay={video}
                 poster={about.posterUrl || null}
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                className="size-full min-h-[16rem] lg:min-h-[30rem]"
+                sizes="(min-width: 640px) 26rem, 100vw"
+                className="size-full min-h-[15rem] sm:min-h-[22rem]"
               />
             </div>
           )}

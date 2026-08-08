@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 
@@ -23,6 +24,7 @@ import { cn } from "@/lib/cn";
 export function Rail({
   as = "div",
   tone = "canvas",
+  arrows = false,
   className,
   shellClassName,
   children,
@@ -32,6 +34,8 @@ export function Rail({
   as?: "div" | "ul";
   /** Which surface the rail sits on, so the fade dissolves into it. */
   tone?: "canvas" | "deep";
+  /** Adds nudge buttons for a pointer, on rails big enough to want them. */
+  arrows?: boolean;
   /** Classes for the scrolling element: gaps and the padding inside it. */
   className?: string;
   /** Classes for the wrapper: margins, background, rounding. */
@@ -87,6 +91,13 @@ export function Rail({
     };
   }, [measure, children]);
 
+  /** Moves the rail by most of a screenful, landing on a snap point. */
+  function nudge(by: 1 | -1) {
+    const element = rail.current;
+    if (!element) return;
+    element.scrollBy({ left: by * element.clientWidth * 0.8, behavior: "smooth" });
+  }
+
   const railClassName = cn("rail", className);
 
   return (
@@ -104,6 +115,44 @@ export function Rail({
           {children}
         </div>
       )}
+
+      {/* Only where there is a pointer, and only towards an edge with
+          something behind it: a thumb already knows what to do here, and a
+          button it can't hover over would just cover a picture. */}
+      {arrows && (edges.start || edges.end) && (
+        <>
+          {edges.start && (
+            <Nudge side="left" onClick={() => nudge(-1)} />
+          )}
+          {edges.end && <Nudge side="right" onClick={() => nudge(1)} />}
+        </>
+      )}
     </div>
+  );
+}
+
+function Nudge({
+  side,
+  onClick,
+}: {
+  side: "left" | "right";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={side === "left" ? "Scroll back" : "Scroll on"}
+      className={cn(
+        "absolute top-1/2 z-10 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-canvas/90 text-noir shadow-md ring-1 ring-noir/10 backdrop-blur transition hover:bg-canvas [@media(hover:hover)]:flex",
+        side === "left" ? "left-2" : "right-2",
+      )}
+    >
+      {side === "left" ? (
+        <ChevronLeft className="size-5" aria-hidden />
+      ) : (
+        <ChevronRight className="size-5" aria-hidden />
+      )}
+    </button>
   );
 }

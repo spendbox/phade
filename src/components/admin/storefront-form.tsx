@@ -19,7 +19,11 @@ import {
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
-import { DEFAULT_HEADINGS, type StorefrontContent } from "@/lib/storefront";
+import {
+  DEFAULT_SECTIONS,
+  type SectionCopy,
+  type StorefrontContent,
+} from "@/lib/storefront";
 
 const initialState: StorefrontFormState = { ok: null };
 
@@ -193,77 +197,61 @@ export function StorefrontForm({
         </Field>
       </Panel>
 
-      <Panel title="Section headings">
-        <div className="space-y-4">
-          <p className="text-xs text-ink-muted">
-            What each part of the front page is called. Clear a field and it
-            goes back to the wording below.
-          </p>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Collections" htmlFor="heading_collections">
-              <Input
-                id="heading_collections"
-                name="heading_collections"
-                defaultValue={content.headings.collections}
-                placeholder={DEFAULT_HEADINGS.collections}
-              />
-            </Field>
-            <Field label="Featured" htmlFor="heading_featured">
-              <Input
-                id="heading_featured"
-                name="heading_featured"
-                defaultValue={content.headings.featured}
-                placeholder={DEFAULT_HEADINGS.featured}
-              />
-            </Field>
-            <Field label="New in" htmlFor="heading_new_in">
-              <Input
-                id="heading_new_in"
-                name="heading_new_in"
-                defaultValue={content.headings.newIn}
-                placeholder={DEFAULT_HEADINGS.newIn}
-              />
-            </Field>
-            <Field label="Best sellers" htmlFor="heading_best_sellers">
-              <Input
-                id="heading_best_sellers"
-                name="heading_best_sellers"
-                defaultValue={content.headings.bestSellers}
-                placeholder={DEFAULT_HEADINGS.bestSellers}
-              />
-            </Field>
-            <Field label="Everything else" htmlFor="heading_explore">
-              <Input
-                id="heading_explore"
-                name="heading_explore"
-                defaultValue={content.headings.explore}
-                placeholder={DEFAULT_HEADINGS.explore}
-              />
-            </Field>
-            <Field label="Closing block" htmlFor="heading_closing">
-              <Input
-                id="heading_closing"
-                name="heading_closing"
-                defaultValue={content.headings.closing}
-                placeholder={DEFAULT_HEADINGS.closing}
-              />
-            </Field>
-          </div>
+      <Panel title="Collections">
+        <SectionFields
+          name="collections"
+          copy={content.sections.collections}
+          fallback={DEFAULT_SECTIONS.collections}
+          where="The ring of categories under the hero."
+          cta={false}
+        />
+      </Panel>
+
+      <Panel title="Featured">
+        <div className="space-y-5">
+          <SectionFields
+            name="featured"
+            copy={content.sections.featured}
+            fallback={DEFAULT_SECTIONS.featured}
+            where="The deck of cards a shopper swipes through."
+          />
 
           <Field
-            label="The line under New in"
-            htmlFor="heading_new_in_tagline"
-            hint="One sentence about the season, over the new-in grid."
+            label="Products"
+            hint={
+              featured.length === 0
+                ? "None chosen — the section stays hidden."
+                : `${featured.length} chosen. They appear in the order you pick them. Only each one's first picture is shown, because the swipe moves between pieces.`
+            }
+            action={
+              featured.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setFeatured([])}
+                  className="text-xs font-medium text-ink-secondary hover:text-ink"
+                >
+                  Clear
+                </button>
+              ) : undefined
+            }
           >
-            <Input
-              id="heading_new_in_tagline"
-              name="heading_new_in_tagline"
-              defaultValue={content.headings.newInTagline}
-              placeholder={DEFAULT_HEADINGS.newInTagline}
+            <FeaturedPicker
+              products={products}
+              selected={featured}
+              onChange={setFeatured}
             />
           </Field>
         </div>
+      </Panel>
+
+      <Panel title="New in">
+        <SectionFields
+          name="newIn"
+          copy={content.sections.newIn}
+          fallback={DEFAULT_SECTIONS.newIn}
+          where="The wall of what arrived most recently."
+        />
       </Panel>
 
       <Panel title="About the shop">
@@ -364,40 +352,25 @@ export function StorefrontForm({
         </div>
       </Panel>
 
-      <Panel title="Featured products">
-        <div className="space-y-4">
-          <p className="text-xs text-ink-muted">
-            These stack as cards a shopper swipes through. Only the first
-            picture of each is shown, so the swipe moves between products
-            rather than through one product&apos;s gallery.
-          </p>
+      <Panel title="Best sellers">
+        <SectionFields
+          name="bestSellers"
+          copy={content.sections.bestSellers}
+          fallback={DEFAULT_SECTIONS.bestSellers}
+          where="The rail of what everyone else is buying."
+        />
+      </Panel>
 
-          <Field
-            label="Products"
-            hint={
-              featured.length === 0
-                ? "None chosen — the section stays hidden."
-                : `${featured.length} chosen. They appear in the order you pick them.`
-            }
-            action={
-              featured.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setFeatured([])}
-                  className="text-xs font-medium text-ink-secondary hover:text-ink"
-                >
-                  Clear
-                </button>
-              ) : undefined
-            }
-          >
-            <FeaturedPicker
-              products={products}
-              selected={featured}
-              onChange={setFeatured}
-            />
-          </Field>
-        </div>
+      <Panel title="The last block">
+        <SectionFields
+          name="closing"
+          copy={content.sections.closing}
+          fallback={DEFAULT_SECTIONS.closing}
+          where="The way into the shop, at the foot of the page. The heading is the small line above; the sentence below it is the large one."
+          noteLabel="The big line"
+          noteHint="Left empty it counts everything in stock for itself, and stays right as pieces sell. Write your own and it stays written."
+          notePlaceholder="142 pieces, waiting to be found"
+        />
       </Panel>
 
       <Panel title="Footer">
@@ -471,6 +444,109 @@ export function StorefrontForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * One section's words: what it is called, the line under it, and the button
+ * out of it.
+ *
+ * The same four fields for every section, in the same order, so the form reads
+ * down the front page rather than asking someone to hold a map of it in their
+ * head. A heading cleared to nothing comes back as the placeholder; a subtext
+ * cleared to nothing stays gone, because "no subtext" is a real choice.
+ */
+function SectionFields({
+  name,
+  copy,
+  fallback,
+  where,
+  cta = true,
+  noteLabel = "Subtext",
+  noteHint = "The line under the heading. Leave it empty for no line at all.",
+  notePlaceholder,
+}: {
+  name: string;
+  copy: SectionCopy;
+  fallback: SectionCopy;
+  /** Where on the page this section shows up, in a few words. */
+  where: string;
+  cta?: boolean;
+  noteLabel?: string;
+  noteHint?: string;
+  /** What the shop sees in place of a blank subtext, if it isn't nothing. */
+  notePlaceholder?: string;
+}) {
+  // Held rather than left to the DOM so that "put it back" is a button: a
+  // shop that writes over an automatic line should be able to change its mind
+  // without guessing what the line used to say.
+  const [note, setNote] = useState(copy.note);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-ink-muted">{where}</p>
+
+      <Field label="Heading" htmlFor={`${name}_heading`}>
+        <Input
+          id={`${name}_heading`}
+          name={`${name}_heading`}
+          defaultValue={copy.heading}
+          placeholder={fallback.heading}
+        />
+      </Field>
+
+      <Field
+        label={noteLabel}
+        htmlFor={`${name}_note`}
+        hint={noteHint}
+        action={
+          note.trim() ? (
+            <button
+              type="button"
+              onClick={() => setNote("")}
+              className="text-xs font-medium text-ink-secondary hover:text-ink"
+            >
+              {notePlaceholder ? "Use the default" : "Clear"}
+            </button>
+          ) : undefined
+        }
+      >
+        <Textarea
+          id={`${name}_note`}
+          name={`${name}_note`}
+          rows={2}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder={notePlaceholder ?? fallback.note ?? "Optional"}
+        />
+      </Field>
+
+      {cta && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Button text"
+            htmlFor={`${name}_cta_label`}
+            hint="Leave blank to hide the button."
+          >
+            <Input
+              id={`${name}_cta_label`}
+              name={`${name}_cta_label`}
+              defaultValue={copy.ctaLabel}
+              placeholder={fallback.ctaLabel}
+            />
+          </Field>
+
+          <Field label="Button link" htmlFor={`${name}_cta_href`}>
+            <Input
+              id={`${name}_cta_href`}
+              name={`${name}_cta_href`}
+              defaultValue={copy.ctaHref}
+              placeholder={fallback.ctaHref}
+            />
+          </Field>
+        </div>
+      )}
+    </div>
   );
 }
 

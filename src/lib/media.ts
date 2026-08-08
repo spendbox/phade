@@ -9,8 +9,70 @@ const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v", ".ogv"];
 
 export function isVideoUrl(url: string | null | undefined): boolean {
   if (!url) return false;
-  const path = url.split("?")[0].toLowerCase();
+  const path = url.split("#")[0].split("?")[0].toLowerCase();
   return VIDEO_EXTENSIONS.some((extension) => path.endsWith(extension));
+}
+
+// ---------------------------------------------------------------------------
+// Where a picture is framed
+// ---------------------------------------------------------------------------
+
+/**
+ * Which part of a picture to keep when a box crops it.
+ *
+ * Every surface in the shop crops: a square tile, a 3:4 card, a hero. A studio
+ * shot of a dress with the model's head near the top loses the head to a
+ * centred crop, and the shop owner is the only person who knows which part of
+ * their own photograph matters. So they choose, once, when they upload it.
+ *
+ * The choice rides along in the URL's fragment — `…/dress.webp#pos=top`.
+ * A fragment is never sent to a server, so the file still resolves exactly as
+ * it did before, every URL already stored keeps working untouched, and no
+ * column had to change shape to hold nine words.
+ */
+export const FOCUS_POSITIONS = {
+  "top-left": "0% 0%",
+  top: "50% 0%",
+  "top-right": "100% 0%",
+  left: "0% 50%",
+  center: "50% 50%",
+  right: "100% 50%",
+  "bottom-left": "0% 100%",
+  bottom: "50% 100%",
+  "bottom-right": "100% 100%",
+} as const;
+
+export type Focus = keyof typeof FOCUS_POSITIONS;
+
+export const FOCUS_KEYS = Object.keys(FOCUS_POSITIONS) as Focus[];
+
+const FOCUS_MARK = "#pos=";
+
+function isFocus(value: string): value is Focus {
+  return value in FOCUS_POSITIONS;
+}
+
+/** Splits a stored URL into the file and how it should be framed. */
+export function readFocus(url: string): { src: string; focus: Focus } {
+  const at = url.indexOf(FOCUS_MARK);
+  if (at === -1) return { src: url, focus: "center" };
+
+  const wanted = url.slice(at + FOCUS_MARK.length);
+  return {
+    src: url.slice(0, at),
+    focus: isFocus(wanted) ? wanted : "center",
+  };
+}
+
+/** Stores a framing choice on a URL. Centre is the default, so it stores none. */
+export function withFocus(url: string, focus: Focus): string {
+  const { src } = readFocus(url);
+  return focus === "center" ? src : `${src}${FOCUS_MARK}${focus}`;
+}
+
+/** The CSS for a framing choice. */
+export function objectPosition(focus: Focus): string {
+  return FOCUS_POSITIONS[focus];
 }
 
 export const ACCEPTED_IMAGE_TYPES = [

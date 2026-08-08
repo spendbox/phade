@@ -161,11 +161,31 @@
     min-width: 0;
     max-width: 100%;
     overflow-x: auto;
-    scroll-snap-type: x mandatory;
+    /* Proximity, not mandatory: a mandatory rail snaps its first card flush to
+       the scrollport the moment it is laid out, which eats the rail's own left
+       padding and leaves it a few pixels scrolled before anyone has touched
+       it — enough to light the "you can scroll back" fade on a rail that is
+       already at its start. Cards still settle under a thumb. */
+    scroll-snap-type: x proximity;
     scroll-behavior: smooth;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    /* Snap points sit inside the rail's own padding, which is the gutter every
+       rail on the shop carries. Without this the first card wants to sit flush
+       against the scrollport, so a rail nobody has touched starts a gutter's
+       worth scrolled — and says, wrongly, that there is something behind it. */
+    scroll-padding-inline: 1rem;
+  }
+  @media (min-width: 640px) {
+    .rail {
+      scroll-padding-inline: 1.5rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .rail {
+      scroll-padding-inline: 2rem;
+    }
   }
   .rail::-webkit-scrollbar {
     display: none;
@@ -336,13 +356,61 @@
   animation: phade-pop 900ms ease-out forwards;
 }
 
+@keyframes phade-drift {
+  0% {
+    transform: translate3d(-6%, -4%, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(6%, 5%, 0) scale(1.18);
+  }
+  100% {
+    transform: translate3d(-4%, 3%, 0) scale(1.05);
+  }
+}
+
+/* The last block on the front page: two soft clouds of brand colour moving
+   slowly behind the type.
+
+   It is deliberately slow and deliberately blurred. The block's job is to say
+   "there is a shop through here" after a page of photographs, and a little
+   life behind the words does that where another photograph would just be one
+   more thing to look at. Painted on a pseudo-element under its own stacking
+   context, so nothing about the text or the button moves — only the light. */
+.shop-glow {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.shop-glow::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  z-index: -1;
+  background:
+    radial-gradient(
+      38% 44% at 26% 32%,
+      color-mix(in oklab, var(--color-brand) 42%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      34% 40% at 76% 68%,
+      color-mix(in oklab, var(--color-noir) 26%, transparent),
+      transparent 72%
+    );
+  filter: blur(46px);
+  opacity: 0.6;
+  animation: phade-drift 26s ease-in-out infinite;
+  will-change: transform;
+}
+
 /* Nobody asked for a moving page. Anyone who has said so gets a still one. */
 @media (prefers-reduced-motion: reduce) {
   .marquee-track,
   .story-fill,
   .rise,
   .sheet-up,
-  .pop-heart {
+  .pop-heart,
+  .shop-glow::before {
     animation: none;
   }
   .rail {
