@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidate } from "@/lib/admin-revalidate";
 
 import { actionError, requireAdmin } from "@/lib/guard";
 import {
@@ -9,8 +9,15 @@ import {
   parseSizeList,
   type CatalogueDefaults,
 } from "@/lib/catalogue-settings";
+import { nairaToKobo } from "@/lib/format";
 import { SETTING_KEYS } from "@/lib/settings";
 import {
+  parseShipping,
+  SHIPPING_KEY,
+  type ShippingSettings,
+} from "@/lib/shipping";
+import {
+  parseStorefront,
   STOREFRONT_KEY,
   type StorefrontContent,
 } from "@/lib/storefront";
@@ -45,8 +52,8 @@ export async function saveSettings(
     );
     if (error) throw new Error(error.message);
 
-    revalidatePath("/admin/settings");
-    revalidatePath("/admin/products/new");
+    revalidate("/admin/settings");
+    revalidate("/admin/products/new");
     return { ok: true, message: "Saved." };
   } catch (error) {
     return actionError(error);
@@ -60,6 +67,18 @@ function jsonList(formData: FormData, key: string): string[] {
     const parsed: unknown = JSON.parse(String(formData.get(key) ?? "[]"));
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((item): item is string => typeof item === "string");
+  } catch {
+    return [];
+  }
+}
+
+/** One row per platform, blank rows meaning "not on it". */
+function socialLinks(formData: FormData): { platform: string; url: string }[] {
+  try {
+    const parsed: unknown = JSON.parse(String(formData.get("socials") ?? "[]"));
+    return Array.isArray(parsed)
+      ? (parsed as { platform: string; url: string }[])
+      : [];
   } catch {
     return [];
   }
@@ -98,6 +117,15 @@ export async function saveStorefront(
         .split(",")
         .map((id) => id.trim())
         .filter(Boolean),
+      // One word per line is easier to edit than a comma-separated string, and
+      // it can't be broken by a word that contains a comma.
+      marquee: String(formData.get("marquee") ?? "")
+        .split("\n")
+        .map((word) => word.trim())
+        .filter(Boolean)
+        .slice(0, 20),
+      footerBlurb: String(formData.get("footer_blurb") ?? "").trim(),
+      socials: parseStorefront({ socials: socialLinks(formData) }).socials,
     };
 
     const { error } = await supabase.from("app_settings").upsert(
@@ -110,8 +138,8 @@ export async function saveStorefront(
     );
     if (error) throw new Error(error.message);
 
-    revalidatePath("/admin/settings/storefront");
-    revalidatePath("/");
+    revalidate("/admin/settings/storefront");
+    revalidate("/");
     return { ok: true, message: "Storefront updated." };
   } catch (error) {
     return actionError(error);
@@ -162,10 +190,74 @@ export async function saveCatalogue(
     );
     if (error) throw new Error(error.message);
 
-    revalidatePath("/admin/settings/catalogue");
-    revalidatePath("/admin/products/new");
-    revalidatePath("/admin/database");
+    revalidate("/admin/settings/catalogue");
+    revalidate("/admin/products/new");
+    revalidate("/admin/database");
     return { ok: true, message: "Catalogue updated." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export type ShippingFormState = ActionResult | { ok: null };
+
+/**
+ * Delivery pricing, saved whole.
+ *
+ * The zones arrive as one JSON field rather than a form's worth of indexed
+ * inputs, because they are a list the admin reorders and deletes from — and a
+ * partially-applied save, where a zone kept its price but lost its states,
+ * would quietly overcharge people. `parseShipping` is the same guard the
+ * storefront reads through, so nothing can be stored that the shop can't read.
+ */
+export async function saveShipping(
+  _previous: ShippingFormState,
+  formData: FormData,
+): Promise<ShippingFormState> {
+  try {
+    await requireAdmin();
+    const supabase = requireSupabase();
+
+    let rawZones: unknown = [];
+    try {
+      rawZones = JSON.parse(String(formData.get("zones") ?? "[]"));
+    } catch {
+      throw new Error("Couldn't read those zones. Try again.");
+    }
+
+    if (Array.isArray(rawZones)) {
+      for (const zone of rawZones as Record<string, unknown>[]) {
+        const named = typeof zone?.name === "string" && zone.name.trim();
+        const covers = Array.isArray(zone?.states) && zone.states.length > 0;
+        if (!named || !covers) {
+          throw new Error(
+            "Every zone needs a name and at least one state. Remove the empty one, or fill it in.",
+          );
+        }
+      }
+    }
+
+    const content: ShippingSettings = parseShipping({
+      defaultFeeKobo: nairaToKobo(String(formData.get("default_fee") ?? "")),
+      freeOverKobo: nairaToKobo(String(formData.get("free_over") ?? "")),
+      zones: rawZones,
+      pickupEnabled: formData.get("pickup_enabled") === "on",
+      pickupNote: String(formData.get("pickup_note") ?? "").trim(),
+    });
+
+    const { error } = await supabase.from("app_settings").upsert(
+      {
+        key: SHIPPING_KEY,
+        value: content,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" },
+    );
+    if (error) throw new Error(error.message);
+
+    revalidate("/admin/settings/shipping");
+    revalidate("/");
+    return { ok: true, message: "Shipping updated." };
   } catch (error) {
     return actionError(error);
   }

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidate } from "@/lib/admin-revalidate";
 
 import { DEFAULT_CATEGORY_ICON, isCategoryIconKey } from "@/lib/category-icons";
 import { actionError, requireAdmin } from "@/lib/guard";
@@ -59,8 +59,8 @@ export async function saveCategory(
       : await supabase.from("categories").insert(payload);
     if (error) throw new Error(error.message);
 
-    revalidatePath("/admin/settings/categories");
-    revalidatePath("/admin/products");
+    revalidate("/admin/settings/categories");
+    revalidate("/admin/products");
     return { ok: true, message: id ? "Category updated." : `${name} added.` };
   } catch (error) {
     return actionError(error);
@@ -78,8 +78,8 @@ export async function deleteCategory(formData: FormData): Promise<void> {
   const { error } = await supabase.from("categories").delete().eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/settings/categories");
-  revalidatePath("/admin/products");
+  revalidate("/admin/settings/categories");
+  revalidate("/admin/products");
 }
 
 // ---------------------------------------------------------------------------
@@ -152,8 +152,8 @@ export async function saveSubcategory(
         .eq("subcategory", previousName);
     }
 
-    revalidatePath("/admin/settings/categories");
-    revalidatePath("/admin/products");
+    revalidate("/admin/settings/categories");
+    revalidate("/admin/products");
     return { ok: true, message: id ? "Subcategory updated." : `${name} added.` };
   } catch (error) {
     return actionError(error);
@@ -172,6 +172,6 @@ export async function deleteSubcategory(formData: FormData): Promise<void> {
   const { error } = await supabase.from("subcategories").delete().eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/settings/categories");
-  revalidatePath("/admin/products");
+  revalidate("/admin/settings/categories");
+  revalidate("/admin/products");
 }

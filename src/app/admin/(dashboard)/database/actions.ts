@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidate } from "@/lib/admin-revalidate";
 
 import { actionError, requireAdmin } from "@/lib/guard";
 import { nairaToKobo, slugify } from "@/lib/format";
@@ -315,10 +315,10 @@ export async function deleteSheetRows(
 }
 
 function revalidateSheet(productId?: string) {
-  revalidatePath("/admin/database");
-  revalidatePath("/admin/products");
-  revalidatePath("/admin/inventory");
-  if (productId) revalidatePath(`/admin/products/${productId}`);
+  revalidate("/admin/database");
+  revalidate("/admin/products");
+  revalidate("/admin/inventory");
+  if (productId) revalidate(`/admin/products/${productId}`);
 }
 
 // ---------------------------------------------------------------------------

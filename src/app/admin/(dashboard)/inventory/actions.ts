@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidate } from "@/lib/admin-revalidate";
 
 import { actionError, requireAdmin } from "@/lib/guard";
 import { requireSupabase } from "@/lib/supabase";
@@ -62,9 +62,9 @@ export async function adjustStock(
       .insert({ product_id: productId, delta, reason, note });
     if (movementError) throw new Error(movementError.message);
 
-    revalidatePath("/admin/inventory");
-    revalidatePath("/admin/products");
-    revalidatePath(`/admin/products/${productId}`);
+    revalidate("/admin/inventory");
+    revalidate("/admin/products");
+    revalidate(`/admin/products/${productId}`);
 
     return {
       ok: true,
@@ -102,5 +102,5 @@ export async function nudgeStock(formData: FormData): Promise<void> {
     note: "Quick adjustment",
   });
 
-  revalidatePath("/admin/inventory");
+  revalidate("/admin/inventory");
 }

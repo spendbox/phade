@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidate } from "@/lib/admin-revalidate";
 
 import { nairaToKobo } from "@/lib/format";
 import { actionError, requireAdmin } from "@/lib/guard";
@@ -139,7 +139,7 @@ export async function saveSale(
       if (error) throw new Error(error.message);
     }
 
-    revalidatePath("/admin/sales");
+    revalidate("/admin/sales");
     return { ok: true, message: id ? "Sale updated." : `${name} started.` };
   } catch (error) {
     return actionError(error);
@@ -167,7 +167,7 @@ export async function toggleSale(formData: FormData): Promise<void> {
     .eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/sales");
+  revalidate("/admin/sales");
 }
 
 export async function deleteSale(formData: FormData): Promise<void> {
@@ -180,5 +180,5 @@ export async function deleteSale(formData: FormData): Promise<void> {
   const { error } = await supabase.from("discounts").delete().eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/sales");
+  revalidate("/admin/sales");
 }

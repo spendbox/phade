@@ -101,6 +101,16 @@ export default async function OrderDetailPage({
                   {formatNaira(order.subtotal_kobo)}
                 </dd>
               </div>
+              {order.discount_kobo > 0 && (
+                <div className="flex justify-between gap-3">
+                  <dt className="min-w-0 truncate text-ink-secondary">
+                    Coupon{order.discount_code ? ` · ${order.discount_code}` : ""}
+                  </dt>
+                  <dd className="shrink-0 tabular-nums text-good-text">
+                    −{formatNaira(order.discount_kobo)}
+                  </dd>
+                </div>
+              )}
               <div className="flex justify-between">
                 <dt className="text-ink-secondary">
                   {order.fulfilment === "pickup" ? "Pickup" : "Shipping"}

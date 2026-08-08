@@ -5,8 +5,25 @@ dashboard at `/admin`. Built with Next.js (App Router) on Vercel, with Supabase
 for the database and image storage, and Paystack for payments. All money is in
 naira.
 
-The storefront currently shows a holding page while the shop is being built. The
-admin dashboard is complete and usable.
+The storefront and the dashboard are both complete: shoppers browse, save and
+buy at `/`, and everything they do shows up at `/admin`.
+
+---
+
+## What's in the shop
+
+| Page | What it does |
+| --- | --- |
+| **Landing** (`/`) | A hero told as a story: every image from Settings → Storefront becomes a frame with its own progress segment, advancing itself, tappable left and right. Categories sit under it as story rings. Featured products are posts. Then best sellers, new in, and everything else. |
+| **Shop** (`/shop`) | The catalogue, with a rail of category rings pinned under the header. Subcategory chips, an on-sale filter, search, and five ways to sort. Any row of filters wider than the screen fades at the edge it can still be scrolled towards, and stops fading once you reach the end. Every choice lives in the URL, so a narrowed shop is a link you can send someone and the back button undoes a filter. |
+| **A product** | Opens as a pop-up over whatever you were reading, never a page — the grid stays scrolled where it was, filters still on. Pictures swipe and snap, with the count on a dark pill so it survives a white studio backdrop; a double-tap saves; add to bag / save / share sit in a bar that never scrolls away. Once something is added the pop-up folds down to a small receipt — what went in, what the bag now holds, and the way back to shopping. `/product/[slug]` renders the same thing as a real page, for shared links and search engines. |
+| **Saved** (`/saved`) | Everything hearted on this device. No account needed. |
+| **Bag** | A drawer, not a page, so adding something never costs anyone their place. It shows the delivery charge from the same rules checkout uses, and how much more buys free delivery. |
+| **Checkout** (`/checkout`) | Delivery or collection, contact details, address, note — filled in from last time, because a returning customer should not retype their address to buy a second dress. Picking a state prices the delivery from the shop's own zones, live. A coupon code from a sale goes in beside the order summary and says what it takes off before anyone commits to it. Every figure is re-derived on the server, so what the browser sends is only ever ids, quantities and a code. Pays through Paystack; the order exists before payment starts. |
+| **Order** (`/order/[reference]`) | Where Paystack sends a shopper back to. It verifies the payment directly rather than waiting on the webhook, so the page is right immediately, and empties the bag only once the money has actually arrived. |
+
+Navigation on a phone is a tab bar along the bottom — home, shop, saved, bag —
+because that is where a thumb is. On a wider screen the header takes over.
 
 ---
 
@@ -23,7 +40,7 @@ admin dashboard is complete and usable.
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | **General** — the default low-stock alert level. **Categories** — categories with a chosen icon (AI can grow a short description into a fuller one) and the subcategory list. **Catalogue** — the shop's colour palette and size run. **Storefront** — announcement bar, hero copy, hero images, call-to-action and featured products. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
+| **Settings** | **General** — the default low-stock alert level. **Categories** — categories with a chosen icon (AI can grow a short description into a fuller one) and the subcategory list. **Catalogue** — the shop's colour palette and size run. **Storefront** — announcement bar, hero copy, hero images, call-to-action, featured products, the words that scroll under the hero, the footer blurb and the shop's social links. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state with their own prices, and whether collection is offered. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -110,7 +127,12 @@ The dashboard is at http://localhost:3000/admin.
 ```
 src/
   app/
-    page.tsx                     Storefront holding page
+    (shop)/                      Everything a shopper sees
+      page.tsx                   Landing page — story hero, category rings, feed
+      shop/                      The catalogue: categories, filters, sorting
+      product/[slug]/            One product, for shared links and search engines
+      saved/  checkout/          Saved pieces, and the way to pay
+      order/[reference]/         Confirmation, after Paystack sends them back
     admin/
       login/                     Sign-in (outside the dashboard shell)
       (dashboard)/               Every dashboard page + its server actions
@@ -121,10 +143,15 @@ src/
       paystack/webhook/          Paystack webhook receiver
   components/
     admin/                       Shell, charts, forms, dialogs
+    shop/                        Hero, rings, cards, pop-up, bag, checkout
     ui/                          Buttons, fields, badges, panels
   lib/
     auth.ts  session.ts          Admin credentials and session cookie
     queries.ts                   All dashboard reads
+    shop-queries.ts  shop.ts     All storefront reads, and what a shopper pays
+    coupons.ts                   What a code is worth against a given bag
+    cart-store.ts                Writing a shopping session, from either caller
+    browser-store.ts             localStorage and media queries, as React reads them
     supabase.ts  paystack.ts     Service clients
     format.ts                    Naira, dates, slugs
     storefront.ts                Shop-front copy, stored as one settings row
@@ -153,10 +180,73 @@ A few decisions worth knowing:
 - **The bulk uploader autosaves to the browser.** Drafts live in `localStorage`
   until you publish, so a closed tab or a refresh doesn't lose a batch. Nothing
   is written to the database until you hit Publish.
-- **Cart tracking is opt-in and closed by default.** `/api/cart` is the one route
-  that writes without an admin session, so it answers `501` until
-  `STOREFRONT_API_KEY` is set and `401` to anyone who doesn't send it. Carts idle
-  for over an hour are counted as abandoned — nothing has to mark them.
+- **The browser never names a price.** Checkout receives product ids and
+  quantities and nothing else; every price, every running sale and the delivery
+  charge are resolved on the server against the catalogue as it stands. A bag is
+  a request, not a quote.
+- **A coupon is worth what the shop says it is worth.** The checkout asks the
+  server what a code does to this exact bag, and asks again whenever the bag
+  changes — but the answer it shows is only a quote. `placeOrder` runs the same
+  check on the lines it is about to charge for, and a code that expired or ran
+  out in between stops the order rather than quietly billing full price. Usage
+  is counted on the pending → paid transition, beside the stock, so a limited
+  code isn't spent by a payment nobody completed.
+- **An order exists before the payment does.** It is written with our own
+  reference, then Paystack is opened with that reference — so an abandoned
+  payment leaves a pending order the dashboard can chase rather than nothing at
+  all, and the webhook finds the order again by the same key. Stock comes off
+  the shelf on the pending → paid transition only, which happens once however
+  many times a webhook is redelivered.
+- **Tapping a product opens a pop-up, not a page.** The address bar still
+  follows, through a `#p=slug` hash: a product is shareable, the back button
+  closes the pop-up instead of leaving the shop, and the grid behind it keeps
+  its scroll position and its filters. A hash rather than a route because a hash
+  change is not a navigation, so nothing re-renders underneath.
+- **The bag lives in the browser, and a copy reaches the server.** There are no
+  shopper accounts, so `localStorage` is the bag — read through
+  `useSyncExternalStore` rather than copied into state on mount, so it is right
+  on the first paint after hydration. A debounced copy goes to the `carts` table
+  so the Checkouts page can see what people left behind. The name, phone and
+  address from the last checkout are kept the same way, and stay in that browser:
+  there is no account to attach them to, and a server that can't authenticate
+  who is asking has no business handing them back. Card details never touch this
+  app at all — they are typed on Paystack's own page.
+- **Delivery is a set of rules, not a number.** Getting a parcel to the next
+  street is not what it costs to get it to Maiduguri, so shipping is zones:
+  each names some states and carries its own price and free-delivery
+  threshold, with a default for anywhere unnamed. The checkout's state field is
+  a list rather than a text box for exactly this reason — "Lagos", "lagos
+  state" and "LAG" are three strings and one place, and a zone can only match
+  the one it was given. `quoteDelivery` is the only thing that prices delivery,
+  so the bag, the checkout and the order it becomes cannot disagree.
+- **An order marked paid by hand counts like any other.** Revenue is the sum of
+  successful payments rather than of orders — an order is a promise, a payment
+  is a fact — so marking one paid in the dashboard writes a payment against it,
+  channel `manual`, on a reference derived from the order's own so doing it
+  twice updates one row instead of inventing a second sale. Stock comes off
+  through the same helper the webhook uses.
+- **The shop is fast because it doesn't ask twice.** The catalogue is cached
+  across requests under one tag, so a busy evening isn't five queries per
+  visitor — one of them a scan of every order line ever written. Every dashboard
+  mutation goes through `src/lib/admin-revalidate.ts`, which drops that tag as
+  well as the dashboard's own paths, so there is no way to add an edit that
+  refreshes the dashboard and leaves the shop stale. The landing page and
+  product pages are rendered once and re-used for up to a minute on top of that.
+- **Product photos are served at the size they're shown.** The uploader stores
+  at 1600px, which is right for a product page and about eight times what a card
+  in a grid needs. `next/image` is pointed at the storage bucket's host — built
+  from `NEXT_PUBLIC_SUPABASE_URL` in `next.config.ts` — so each surface gets the
+  width it renders at, in AVIF or WebP. Anything from another host, or an SVG,
+  falls back to a plain `<img>`, because the optimiser refuses hosts it wasn't
+  told about and a broken picture is worse than an unoptimised one. The hover
+  image on a card is `hidden lg:block` for the same reason: a phone has no
+  hover, and would otherwise download a second photo nobody can see.
+- **Cart tracking is opt-in and closed by default.** `/api/cart` is for a
+  separate front end: it writes without an admin session, so it answers `501`
+  until `STOREFRONT_API_KEY` is set and `401` to anyone who doesn't send it. Our
+  own storefront doesn't use it — it is already on the server, and a shared
+  secret shipped to a browser is not a secret. Carts idle for over an hour are
+  counted as abandoned — nothing has to mark them.
 - **Dialogs are portalled, menus don't unmount.** Every dialog goes through
   `components/ui/modal.tsx`, which renders into `document.body`, and `RowMenu`
   hides its panel rather than tearing it down. A dialog opened from a menu

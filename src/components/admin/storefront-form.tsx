@@ -10,6 +10,12 @@ import {
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { MediaThumb } from "@/components/admin/media-thumb";
 import { Button } from "@/components/ui/button";
+import {
+  SOCIAL_KEYS,
+  SOCIAL_PLATFORMS,
+  SocialIcon,
+  type SocialPlatform,
+} from "@/components/shop/social-icons";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
@@ -24,8 +30,12 @@ export type FeaturedOption = {
 };
 
 /**
- * Everything a shopper reads on the front page, in the order they meet it:
- * the announcement strip, the hero, then what's featured underneath.
+ * Everything a shopper reads on the shop, in the order they meet it: the
+ * announcement strip, the hero, the words that scroll under it, what's
+ * featured, and the footer they land on at the end.
+ *
+ * Delivery is not here — it has its own page, because a price that changes by
+ * destination is a set of rules rather than a line of copy.
  */
 export function StorefrontForm({
   content,
@@ -47,6 +57,11 @@ export function StorefrontForm({
       products.some((product) => product.id === id),
     ),
   );
+  const [socials, setSocials] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      content.socials.map((link) => [link.platform, link.url]),
+    ),
+  );
 
   return (
     <form action={formAction} className="space-y-5">
@@ -54,6 +69,17 @@ export function StorefrontForm({
         type="hidden"
         name="featured_product_ids"
         value={featured.join(",")}
+      />
+      <input
+        type="hidden"
+        name="socials"
+        value={JSON.stringify(
+          SOCIAL_KEYS.flatMap((platform) =>
+            socials[platform]?.trim()
+              ? [{ platform, url: socials[platform].trim() }]
+              : [],
+          ),
+        )}
       />
 
       <Panel title="Announcement bar">
@@ -81,7 +107,7 @@ export function StorefrontForm({
               id="announcement"
               name="announcement"
               defaultValue={content.announcement}
-              placeholder="Free delivery in Lagos on orders over ₦100,000"
+              placeholder="Free delivery on orders over ₦100,000"
             />
           </Field>
         </div>
@@ -109,7 +135,7 @@ export function StorefrontForm({
               name="hero_subheadline"
               rows={2}
               defaultValue={content.heroSubheadline}
-              placeholder="Pieces made for Lagos heat and Lagos evenings."
+              placeholder="Cut and finished for the way you actually dress."
             />
           </Field>
 
@@ -150,6 +176,22 @@ export function StorefrontForm({
         </div>
       </Panel>
 
+      <Panel title="The strip under the hero">
+        <Field
+          label="Words that scroll across"
+          htmlFor="marquee"
+          hint="One per line. Leave it empty and the strip stays hidden."
+        >
+          <Textarea
+            id="marquee"
+            name="marquee"
+            rows={4}
+            defaultValue={content.marquee.join("\n")}
+            placeholder={"New in\nDelivered nationwide\nChosen one piece at a time"}
+          />
+        </Field>
+      </Panel>
+
       <Panel title="Featured products">
         <div className="space-y-4">
           <Field label="Section heading" htmlFor="featured_heading">
@@ -185,6 +227,62 @@ export function StorefrontForm({
               selected={featured}
               onChange={setFeatured}
             />
+          </Field>
+        </div>
+      </Panel>
+
+      <Panel title="Footer">
+        <div className="space-y-4">
+          <Field
+            label="About the shop"
+            htmlFor="footer_blurb"
+            hint="The paragraph beside the logo at the foot of every page."
+          >
+            <Textarea
+              id="footer_blurb"
+              name="footer_blurb"
+              rows={3}
+              defaultValue={content.footerBlurb}
+              placeholder="Bags, shoes and ready-to-wear, chosen one piece at a time."
+            />
+          </Field>
+
+          <Field
+            label="Where else to find you"
+            hint="Paste a full link. Anything left blank stays off the footer."
+          >
+            <ul className="space-y-2">
+              {SOCIAL_KEYS.map((platform: SocialPlatform) => (
+                <li key={platform} className="flex items-center gap-2.5">
+                  <span
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+                      socials[platform]?.trim()
+                        ? "bg-brand-soft text-brand"
+                        : "bg-plane text-ink-muted",
+                    )}
+                    title={SOCIAL_PLATFORMS[platform].label}
+                  >
+                    <SocialIcon platform={platform} className="size-[18px]" />
+                  </span>
+                  <label className="sr-only" htmlFor={`social-${platform}`}>
+                    {SOCIAL_PLATFORMS[platform].label}
+                  </label>
+                  <Input
+                    id={`social-${platform}`}
+                    type="url"
+                    value={socials[platform] ?? ""}
+                    onChange={(event) =>
+                      setSocials((current) => ({
+                        ...current,
+                        [platform]: event.target.value,
+                      }))
+                    }
+                    placeholder={SOCIAL_PLATFORMS[platform].placeholder}
+                  />
+                </li>
+              ))}
+            </ul>
           </Field>
         </div>
       </Panel>
