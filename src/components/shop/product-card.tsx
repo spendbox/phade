@@ -3,6 +3,7 @@
 import { Heart, Plus } from "lucide-react";
 
 import { Media } from "@/components/shop/media";
+import { Rail } from "@/components/shop/rail";
 import { useShop } from "@/components/shop/shop-provider";
 import { cn } from "@/lib/cn";
 import { formatNairaShort } from "@/lib/format";
@@ -159,7 +160,7 @@ export function ProductRail({
   priority?: boolean;
 }) {
   return (
-    <div className="rail rail-edge gap-3 px-4 pb-1 sm:gap-4 sm:px-6 lg:px-8">
+    <Rail className="gap-3 px-4 pb-1 sm:gap-4 sm:px-6 lg:px-8">
       {products.map((product, index) => (
         <ProductCard
           key={product.id}
@@ -170,6 +171,6 @@ export function ProductRail({
       ))}
       {/* A hair of room past the last card, so it can snap clear of the edge. */}
       <div className="w-1 shrink-0" aria-hidden />
-    </div>
+    </Rail>
   );
 }

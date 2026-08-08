@@ -226,6 +226,15 @@ create table if not exists public.discount_products (
   primary key (discount_id, product_id)
 );
 
+-- What a coupon took off an order. Lives here rather than in the orders block
+-- above because the foreign key needs the discounts table to exist first.
+-- The code is copied onto the order as well as linked, so a deleted sale
+-- leaves the receipt still saying what was honoured.
+alter table public.orders
+  add column if not exists discount_kobo bigint not null default 0,
+  add column if not exists discount_code text,
+  add column if not exists discount_id uuid references public.discounts(id) on delete set null;
+
 -- ---------------------------------------------------------------------------
 -- Carts (uncompleted checkouts)
 --

@@ -125,6 +125,10 @@ export type Order = {
   fulfilment: Fulfilment;
   subtotal_kobo: number;
   shipping_kobo: number;
+  /** What a coupon took off, and which one. Zero on most orders. */
+  discount_kobo: number;
+  discount_code: string | null;
+  discount_id: string | null;
   total_kobo: number;
   shipping_address: ShippingAddress | null;
   note: string | null;

@@ -4,6 +4,7 @@ import { SearchX, SlidersHorizontal } from "lucide-react";
 
 import { CategoryBar } from "@/components/shop/category-bar";
 import { ProductCard, ProductRail } from "@/components/shop/product-card";
+import { Rail } from "@/components/shop/rail";
 import { SectionHead } from "@/components/shop/section";
 import { ProductRegistry } from "@/components/shop/shop-provider";
 import { cn } from "@/lib/cn";
@@ -109,9 +110,8 @@ export default async function ShopPage({
     <>
       <ProductRegistry products={onPage} />
 
-      {/* Categories stay put at the top while the grid scrolls under them —
-          changing your mind is one tap, from anywhere on the page — and shrink
-          to a chip row once you're into the grid. */}
+      {/* Categories stay put at the top while the grid scrolls under them, so
+          changing your mind is one tap from anywhere on the page. */}
       <CategoryBar categories={categories} active={category?.slug} />
 
       <div className="px-4 pt-5 sm:px-6 lg:px-8">
@@ -128,7 +128,7 @@ export default async function ShopPage({
             </p>
           </div>
 
-          {/* `min-w-0` on the row, `.rail` on the group: without both, the
+          {/* `min-w-0` on the row, a rail around the group: without both, the
               sort options size to their content and take the page sideways
               with them. */}
           <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
@@ -139,10 +139,12 @@ export default async function ShopPage({
             <span className="sr-only" id="sort-label">
               Sort by
             </span>
-            <div
+            <Rail
               role="group"
               aria-labelledby="sort-label"
-              className="rail rail-edge rail-edge-deep gap-1.5 rounded-full bg-canvas-deep p-1"
+              tone="deep"
+              shellClassName="overflow-hidden rounded-full bg-canvas-deep p-1"
+              className="gap-1.5"
             >
               {(Object.keys(SORTS) as Sort[]).map((key) => (
                 <Link
@@ -160,12 +162,12 @@ export default async function ShopPage({
                   {SORTS[key]}
                 </Link>
               ))}
-            </div>
+            </Rail>
           </div>
         </div>
 
         {(subs.length > 0 || saleCount > 0 || filtering) && (
-          <div className="rail rail-edge mt-4 gap-2 pb-1">
+          <Rail shellClassName="mt-4" className="gap-2 pb-1">
             {saleCount > 0 && (
               <Chip
                 href={href({ sale: onSaleOnly ? undefined : "1" })}
@@ -190,7 +192,7 @@ export default async function ShopPage({
                 Clear all
               </Chip>
             )}
-          </div>
+          </Rail>
         )}
       </div>
 

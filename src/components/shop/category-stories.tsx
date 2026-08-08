@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
 
 import { Media } from "@/components/shop/media";
+import { Rail } from "@/components/shop/rail";
 import { CategoryIcon } from "@/lib/category-icons";
 import { cn } from "@/lib/cn";
 import type { ShopCategory } from "@/lib/shop";
@@ -32,7 +33,7 @@ export function CategoryStories({
 
   return (
     <nav aria-label="Categories" className={cn("relative", className)}>
-      <ul className="rail rail-edge gap-4 px-4 py-1 sm:gap-5 sm:px-6 lg:px-8">
+      <Rail as="ul" className="gap-4 px-4 py-1 sm:gap-5 sm:px-6 lg:px-8">
         <li>
           <Ring
             href="/shop"
@@ -56,7 +57,7 @@ export function CategoryStories({
         ))}
 
         <li aria-hidden className="w-1 shrink-0" />
-      </ul>
+      </Rail>
     </nav>
   );
 }

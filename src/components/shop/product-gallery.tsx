@@ -13,8 +13,14 @@ import type { ShopProduct } from "@/lib/shop";
  *
  * One frame at a time, snapped, swiped with a thumb — the browser does the
  * scrolling, so it has the momentum and the rubber-banding a hand-written
- * carousel never quite gets right. Dots say how many there are. Arrows appear
- * for a cursor, which cannot swipe.
+ * carousel never quite gets right. Arrows appear for a cursor, which cannot
+ * swipe.
+ *
+ * Whatever says "there are more pictures" has to say it over the pictures
+ * themselves, and fashion photography is mostly white studio wall. Plain white
+ * dots disappear into it, so the count and the dots each sit on a dark pill of
+ * their own: the same cue on a black leather bag and on an ivory abaya shot
+ * against paper.
  *
  * Double-tapping saves the product, because that is what double-tapping a
  * photo has meant for a decade, and a shopper should not have to be told.
@@ -44,7 +50,9 @@ export function ProductGallery({
 
     const onScroll = () => {
       const width = element.clientWidth || 1;
-      setIndex(Math.round(element.scrollLeft / width));
+      const at = Math.round(element.scrollLeft / width);
+      // Rubber-banding at either end can scroll past the last frame.
+      setIndex(Math.min(Math.max(at, 0), element.children.length - 1));
     };
     element.addEventListener("scroll", onScroll, { passive: true });
     return () => element.removeEventListener("scroll", onScroll);
@@ -106,17 +114,25 @@ export function ProductGallery({
 
       {media.length > 1 && (
         <>
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
-            {media.map((url, position) => (
-              <span
-                key={`dot-${url}-${position}`}
-                className={cn(
-                  "h-1.5 rounded-full transition-all",
-                  position === index ? "w-4 bg-white" : "w-1.5 bg-white/55",
-                )}
-              />
-            ))}
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+            <span className="flex items-center gap-1.5 rounded-full bg-noir/55 px-2.5 py-1.5 backdrop-blur-sm">
+              {media.map((url, position) => (
+                <span
+                  key={`dot-${url}-${position}`}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all",
+                    position === index ? "w-4 bg-white" : "w-1.5 bg-white/60",
+                  )}
+                />
+              ))}
+            </span>
           </div>
+
+          {/* The count, not just the position: "1/5" is what tells a shopper
+              there is anything to swipe to in the first place. */}
+          <span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-noir/55 px-2 py-1 text-[11px] font-semibold tabular-nums text-white backdrop-blur-sm">
+            {Math.min(index + 1, media.length)}/{media.length}
+          </span>
 
           <Arrow side="left" onClick={() => go(-1)} disabled={index === 0} />
           <Arrow
@@ -149,7 +165,9 @@ function Arrow({
       disabled={disabled}
       aria-label={side === "left" ? "Previous image" : "Next image"}
       className={cn(
-        "absolute top-1/2 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full bg-canvas/80 text-noir backdrop-blur transition hover:bg-canvas disabled:opacity-0 sm:flex",
+        // Ringed and shadowed rather than merely tinted: a translucent white
+        // button on a white photograph is not a button anyone can see.
+        "absolute top-1/2 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full bg-canvas/90 text-noir shadow-md ring-1 ring-noir/10 backdrop-blur transition hover:bg-canvas disabled:opacity-0 sm:flex",
         side === "left" ? "left-2" : "right-2",
       )}
     >

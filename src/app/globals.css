@@ -175,29 +175,57 @@
     flex: 0 0 auto;
   }
 
-  /* A rail that can be scrolled says so, by fading its last item out against
-     the edge. Without it a row of filters that runs off the screen reads as a
-     row of filters that ends there — the one thing a shopper must not
-     conclude, since the option they want is often the one past the fold. */
-  .rail-edge {
+  /* A rail that can still be scrolled says so, by fading out against the edge
+     it can be scrolled towards. Without it a row of filters that runs off the
+     screen reads as a row of filters that ends there — the one thing a shopper
+     must not conclude, since the option they want is often the one past the
+     fold.
+
+     The fades belong to the wrapper, not to the rail. An absolutely-positioned
+     child of a scroll container is placed against its content rather than its
+     viewport, so a gradient inside the rail rides along with the last item and
+     leaves it permanently washed out — a fade that describes nothing. The
+     wrapper doesn't scroll, so its edges stay where the eye expects them, and
+     `@/components/shop/rail` flags which ones have anything behind them. */
+  .rail-shell {
     position: relative;
+    min-width: 0;
+    max-width: 100%;
     --rail-edge-color: var(--color-canvas);
   }
-  .rail-edge::after {
+  .rail-shell-deep {
+    --rail-edge-color: var(--color-canvas-deep);
+  }
+  .rail-shell::before,
+  .rail-shell::after {
     content: "";
     position: absolute;
     inset-block: 0;
-    right: 0;
+    z-index: 1;
     width: 2.5rem;
+    opacity: 0;
     pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+  .rail-shell::before {
+    left: 0;
+    background: linear-gradient(
+      to left,
+      transparent,
+      var(--rail-edge-color) 85%
+    );
+  }
+  .rail-shell::after {
+    right: 0;
     background: linear-gradient(
       to right,
       transparent,
       var(--rail-edge-color) 85%
     );
   }
-  .rail-edge-deep {
-    --rail-edge-color: var(--color-canvas-deep);
+  .rail-shell[data-from-start]::before,
+  .rail-shell[data-more]::after {
+    opacity: 1;
   }
 
   /* The unopened-story ring. Two rings, not one: the inner gap is the canvas

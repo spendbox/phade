@@ -1,6 +1,7 @@
 import { LayoutGrid } from "lucide-react";
 
 import { Ring } from "@/components/shop/category-stories";
+import { Rail } from "@/components/shop/rail";
 import { CategoryIcon } from "@/lib/category-icons";
 import type { ShopCategory } from "@/lib/shop";
 
@@ -13,8 +14,9 @@ import type { ShopCategory } from "@/lib/shop";
  * changes shape as you scroll is a bar you stop trusting. It is simply shorter
  * now, which was the actual problem.
  *
- * No client JavaScript: sticky positioning is a CSS problem, and the only
- * reason this was ever a client component was the collapsing.
+ * The bar itself stays on the server — sticky positioning is a CSS problem.
+ * Only the rail inside it is a client component, and only so the edge fade can
+ * tell the truth about whether there are categories past the fold.
  */
 export function CategoryBar({
   categories,
@@ -30,7 +32,7 @@ export function CategoryBar({
       aria-label="Categories"
       className="sticky top-14 z-30 border-b border-line/70 bg-canvas/95 py-2 backdrop-blur-md sm:top-16"
     >
-      <ul className="rail rail-edge gap-4 px-4 sm:gap-5 sm:px-6 lg:px-8">
+      <Rail as="ul" className="gap-4 px-4 sm:gap-5 sm:px-6 lg:px-8">
         <li>
           <Ring
             href="/shop"
@@ -57,7 +59,7 @@ export function CategoryBar({
 
         {/* Room past the last ring, so it can settle clear of the edge. */}
         <li aria-hidden className="w-1 shrink-0" />
-      </ul>
+      </Rail>
     </nav>
   );
 }

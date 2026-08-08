@@ -127,6 +127,19 @@ export default async function OrderPage({
               {formatNairaShort(order.subtotal_kobo)}
             </dd>
           </div>
+          {order.discount_kobo > 0 && (
+            <div className="flex justify-between gap-3">
+              <dt className="min-w-0 truncate text-ink-secondary">
+                Coupon
+                {order.discount_code && (
+                  <span className="text-ink-muted"> · {order.discount_code}</span>
+                )}
+              </dt>
+              <dd className="shrink-0 font-medium text-good-text tabular-nums">
+                −{formatNairaShort(order.discount_kobo)}
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt className="text-ink-secondary">
               {order.fulfilment === "pickup" ? "Pickup" : "Delivery"}

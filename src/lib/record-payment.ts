@@ -74,8 +74,10 @@ export async function recordTransaction(
       .eq("id", orderId);
 
     // Only on the pending -> paid transition, which happens once however many
-    // times the webhook is redelivered, so stock can't be taken twice.
+    // times the webhook is redelivered, so stock can't be taken twice, and a
+    // coupon can't be counted twice either.
     await takeStock(supabase, orderId);
+    await countCouponUse(supabase, orderId);
   }
 
   // 3. Payment — upsert on reference so redelivered webhooks don't duplicate.
@@ -95,6 +97,44 @@ export async function recordTransaction(
     },
     { onConflict: "reference" },
   );
+}
+
+/**
+ * Marks a coupon as claimed once, by an order that was actually paid for.
+ *
+ * Counted here rather than at checkout because a limited code should not be
+ * eaten by a payment nobody completed. Every step is allowed to fail quietly:
+ * a usage counter is bookkeeping, and it must never be the reason a payment
+ * fails to record.
+ */
+async function countCouponUse(
+  supabase: SupabaseClient,
+  orderId: string,
+): Promise<void> {
+  const { data: order, error } = await supabase
+    .from("orders")
+    .select("discount_id")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  const discountId = (order?.discount_id as string | null) ?? null;
+  if (error || !discountId) return;
+
+  const { data: discount } = await supabase
+    .from("discounts")
+    .select("used_count")
+    .eq("id", discountId)
+    .maybeSingle();
+
+  if (!discount) return;
+
+  // Read then write. Two orders paid in the same instant could land on the
+  // same number, which spends a limited code once more than intended — a far
+  // smaller problem than a shop that can't take money.
+  await supabase
+    .from("discounts")
+    .update({ used_count: ((discount.used_count as number) ?? 0) + 1 })
+    .eq("id", discountId);
 }
 
 /**

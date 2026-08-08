@@ -15,11 +15,11 @@ buy at `/`, and everything they do shows up at `/admin`.
 | Page | What it does |
 | --- | --- |
 | **Landing** (`/`) | A hero told as a story: every image from Settings → Storefront becomes a frame with its own progress segment, advancing itself, tappable left and right. Categories sit under it as story rings. Featured products are posts. Then best sellers, new in, and everything else. |
-| **Shop** (`/shop`) | The catalogue, with a rail of category rings pinned under the header — it collapses to a chip row once you're into the grid, so navigation you've already read stops taking up a third of the screen. Subcategory chips, an on-sale filter, search, and five ways to sort. Every choice lives in the URL, so a narrowed shop is a link you can send someone and the back button undoes a filter. |
-| **A product** | Opens as a pop-up over whatever you were reading, never a page — the grid stays scrolled where it was, filters still on. Pictures swipe and snap, a double-tap saves, and Add to bag / Buy it now / save / share sit in a bar that never scrolls away. `/product/[slug]` renders the same thing as a real page, for shared links and search engines. |
+| **Shop** (`/shop`) | The catalogue, with a rail of category rings pinned under the header. Subcategory chips, an on-sale filter, search, and five ways to sort. Any row of filters wider than the screen fades at the edge it can still be scrolled towards, and stops fading once you reach the end. Every choice lives in the URL, so a narrowed shop is a link you can send someone and the back button undoes a filter. |
+| **A product** | Opens as a pop-up over whatever you were reading, never a page — the grid stays scrolled where it was, filters still on. Pictures swipe and snap, with the count on a dark pill so it survives a white studio backdrop; a double-tap saves; add to bag / save / share sit in a bar that never scrolls away. Once something is added the pop-up folds down to a small receipt — what went in, what the bag now holds, and the way back to shopping. `/product/[slug]` renders the same thing as a real page, for shared links and search engines. |
 | **Saved** (`/saved`) | Everything hearted on this device. No account needed. |
 | **Bag** | A drawer, not a page, so adding something never costs anyone their place. It shows the delivery charge from the same rules checkout uses, and how much more buys free delivery. |
-| **Checkout** (`/checkout`) | Delivery or collection, contact details, address, note — filled in from last time, because a returning customer should not retype their address to buy a second dress. Picking a state prices the delivery from the shop's own zones, live. Every figure is re-derived on the server, so what the browser sends is only ever ids and quantities. Pays through Paystack; the order exists before payment starts. |
+| **Checkout** (`/checkout`) | Delivery or collection, contact details, address, note — filled in from last time, because a returning customer should not retype their address to buy a second dress. Picking a state prices the delivery from the shop's own zones, live. A coupon code from a sale goes in beside the order summary and says what it takes off before anyone commits to it. Every figure is re-derived on the server, so what the browser sends is only ever ids, quantities and a code. Pays through Paystack; the order exists before payment starts. |
 | **Order** (`/order/[reference]`) | Where Paystack sends a shopper back to. It verifies the payment directly rather than waiting on the webhook, so the page is right immediately, and empties the bag only once the money has actually arrived. |
 
 Navigation on a phone is a tab bar along the bottom — home, shop, saved, bag —
@@ -149,6 +149,7 @@ src/
     auth.ts  session.ts          Admin credentials and session cookie
     queries.ts                   All dashboard reads
     shop-queries.ts  shop.ts     All storefront reads, and what a shopper pays
+    coupons.ts                   What a code is worth against a given bag
     cart-store.ts                Writing a shopping session, from either caller
     browser-store.ts             localStorage and media queries, as React reads them
     supabase.ts  paystack.ts     Service clients
@@ -183,6 +184,13 @@ A few decisions worth knowing:
   quantities and nothing else; every price, every running sale and the delivery
   charge are resolved on the server against the catalogue as it stands. A bag is
   a request, not a quote.
+- **A coupon is worth what the shop says it is worth.** The checkout asks the
+  server what a code does to this exact bag, and asks again whenever the bag
+  changes — but the answer it shows is only a quote. `placeOrder` runs the same
+  check on the lines it is about to charge for, and a code that expired or ran
+  out in between stops the order rather than quietly billing full price. Usage
+  is counted on the pending → paid transition, beside the stock, so a limited
+  code isn't spent by a payment nobody completed.
 - **An order exists before the payment does.** It is written with our own
   reference, then Paystack is opened with that reference — so an abandoned
   payment leaves a pending order the dashboard can chase rather than nothing at

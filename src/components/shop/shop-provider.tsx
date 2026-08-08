@@ -108,6 +108,12 @@ export type AddToBagInput = {
   color?: string | null;
   size?: number | null;
   quantity?: number;
+  /**
+   * Skips the toast. For callers that confirm the addition themselves — the
+   * pop-up folds down into a receipt — where a toast on top of it would be the
+   * same news twice.
+   */
+  quiet?: boolean;
 };
 
 type ShopContextValue = {
@@ -283,7 +289,13 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   }, [toast]);
 
   const addToBag = useCallback(
-    ({ product, color = null, size = null, quantity = 1 }: AddToBagInput) => {
+    ({
+      product,
+      color = null,
+      size = null,
+      quantity = 1,
+      quiet = false,
+    }: AddToBagInput) => {
       const line: BagLine = {
         productId: product.id,
         slug: product.slug,
@@ -314,7 +326,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
 
-      say(`${product.name} added to your bag`);
+      if (!quiet) say(`${product.name} added to your bag`);
     },
     [say],
   );

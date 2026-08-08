@@ -29,7 +29,22 @@ import { MAX_LINE_QUANTITY, type ShopProduct } from "@/lib/shop";
 
 export type BuyControls = ReturnType<typeof useBuyControls>;
 
-export function useBuyControls(product: ShopProduct) {
+/** What a shopper settled on, handed back the moment it lands in the bag. */
+export type AddedChoice = {
+  color: string | null;
+  size: number | null;
+  quantity: number;
+};
+
+export function useBuyControls(
+  product: ShopProduct,
+  /**
+   * Told when something is actually added. A caller that takes this on also
+   * takes on saying so — the toast stands down, because the pop-up answers by
+   * folding itself down into a receipt instead.
+   */
+  onAdded?: (choice: AddedChoice) => void,
+) {
   const { addToBag, isSaved, toggleSaved, say } = useShop();
 
   const soldOut = product.stock <= 0;
@@ -61,7 +76,8 @@ export function useBuyControls(product: ShopProduct) {
     }
 
     setMissing(null);
-    addToBag({ product, color, size, quantity });
+    addToBag({ product, color, size, quantity, quiet: Boolean(onAdded) });
+    onAdded?.({ color, size, quantity });
     return true;
   }
 

@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
-import { Loader2, Lock, ShoppingBag, Store, Truck } from "lucide-react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { Loader2, Lock, ShoppingBag, Store, Truck, X } from "lucide-react";
 
-import { placeOrder, type CheckoutState } from "@/app/(shop)/checkout/actions";
+import {
+  placeOrder,
+  tryCoupon,
+  type CheckoutState,
+} from "@/app/(shop)/checkout/actions";
 import { Media } from "@/components/shop/media";
 import { useShop } from "@/components/shop/shop-provider";
 import { usePersistent } from "@/lib/browser-store";
@@ -83,12 +87,27 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
   // one input on this form that changes the total as you use it.
   const [state_, setState] = useState(stored.state);
 
+  // The bag, as the server will read it. It is also what a coupon is judged
+  // against, so the two always describe the same order.
+  const lines = JSON.stringify(
+    bag.map((line) => ({
+      productId: line.productId,
+      quantity: line.quantity,
+      color: line.color,
+      size: line.size,
+    })),
+  );
+
+  const coupon = useCoupon(lines);
+
   const cheapest = cheapestFee(shipping);
+  // Delivery is quoted on the merchandise total, before the coupon — the same
+  // way the server prices it, so this figure is never a surprise.
   const quote = quoteDelivery(shipping, subtotalKobo, {
     fulfilment,
     state: state_,
   });
-  const total = subtotalKobo + quote.feeKobo;
+  const total = subtotalKobo - (coupon.applied?.amountKobo ?? 0) + quote.feeKobo;
 
   // Paystack is a different origin, so this is a real navigation rather than a
   // router push. Internal redirects go the same way for one code path.
@@ -107,18 +126,10 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
       className="grid gap-8 px-4 pb-10 pt-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-12 lg:px-8"
     >
       <input type="hidden" name="cart_token" value={cartToken} />
-      <input
-        type="hidden"
-        name="lines"
-        value={JSON.stringify(
-          bag.map((line) => ({
-            productId: line.productId,
-            quantity: line.quantity,
-            color: line.color,
-            size: line.size,
-          })),
-        )}
-      />
+      <input type="hidden" name="lines" value={lines} />
+      {coupon.applied && (
+        <input type="hidden" name="coupon" value={coupon.applied.code} />
+      )}
 
       <div className="space-y-8">
         <fieldset>
@@ -317,6 +328,8 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
             ))}
           </ul>
 
+          <CouponField coupon={coupon} />
+
           <dl className="mt-5 space-y-1.5 border-t border-line pt-4 text-sm">
             <div className="flex justify-between">
               <dt className="text-ink-secondary">Subtotal</dt>
@@ -324,6 +337,17 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
                 {formatNairaShort(subtotalKobo)}
               </dd>
             </div>
+            {coupon.applied && (
+              <div className="flex justify-between gap-3">
+                <dt className="min-w-0 truncate text-ink-secondary">
+                  {coupon.applied.name}
+                  <span className="text-ink-muted"> · {coupon.applied.code}</span>
+                </dt>
+                <dd className="shrink-0 font-medium text-good-text tabular-nums">
+                  −{formatNairaShort(coupon.applied.amountKobo)}
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between gap-3">
               <dt className="min-w-0 text-ink-secondary">
                 {fulfilment === "pickup"
@@ -392,6 +416,150 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
         </div>
       </aside>
     </form>
+  );
+}
+
+type Applied = { code: string; name: string; amountKobo: number };
+
+type Coupon = ReturnType<typeof useCoupon>;
+
+/**
+ * A coupon code, checked by the shop rather than by the browser.
+ *
+ * The code alone is state; what it is worth is always the server's answer to
+ * this exact bag. So it is re-checked whenever the bag changes — a shopper who
+ * opens the drawer and drops a dress that the code depended on is told, rather
+ * than finding out at the payment page that the total moved.
+ */
+function useCoupon(lines: string) {
+  // Every press of Apply is its own attempt, timestamp and all, so retyping a
+  // code that failed a moment ago actually asks again.
+  const [attempt, setAttempt] = useState<{ code: string; at: number } | null>(
+    null,
+  );
+  const [applied, setApplied] = useState<Applied | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    if (!attempt) return;
+
+    let cancelled = false;
+
+    void tryCoupon({ code: attempt.code, lines })
+      .then((result) => {
+        if (cancelled) return;
+        setApplied(result.ok ? result : null);
+        setError(result.ok ? null : result.error);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setApplied(null);
+        setError("We couldn't check that code just now.");
+      })
+      .finally(() => {
+        if (!cancelled) setChecking(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt, lines]);
+
+  return {
+    applied,
+    error,
+    checking,
+    apply(raw: string) {
+      const code = raw.trim().toUpperCase();
+      if (!code) {
+        setError("Type a code first.");
+        return;
+      }
+      setAttempt({ code, at: Date.now() });
+      setError(null);
+      setChecking(true);
+    },
+    clear() {
+      setAttempt(null);
+      setApplied(null);
+      setError(null);
+      setChecking(false);
+    },
+  };
+}
+
+/** Where a code from a sale gets typed in. */
+function CouponField({ coupon }: { coupon: Coupon }) {
+  const field = useRef<HTMLInputElement>(null);
+  const { applied, error, checking } = coupon;
+
+  if (applied) {
+    return (
+      <div className="mt-5 flex items-center gap-2 rounded-2xl bg-brand-soft px-3 py-2.5">
+        <p className="min-w-0 flex-1 text-[13px] text-brand">
+          <span className="font-semibold">{applied.code}</span> applied ·{" "}
+          {formatNairaShort(applied.amountKobo)} off
+        </p>
+        <button
+          type="button"
+          onClick={coupon.clear}
+          aria-label={`Remove coupon ${applied.code}`}
+          className="flex size-7 shrink-0 items-center justify-center rounded-full text-brand transition hover:bg-canvas"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+      </div>
+    );
+  }
+
+  const send = () => coupon.apply(field.current?.value ?? "");
+
+  return (
+    <div className="mt-5">
+      <label
+        htmlFor="coupon"
+        className="block text-[13px] font-medium text-ink-secondary"
+      >
+        Coupon code
+      </label>
+      <div className="mt-1.5 flex gap-2">
+        <input
+          id="coupon"
+          ref={field}
+          name="coupon_input"
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          placeholder="From a sale or a post"
+          // Enter inside a form submits it, and this field is a guest in the
+          // checkout form — so Enter applies the code instead of paying.
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            send();
+          }}
+          className="h-11 min-w-0 flex-1 rounded-2xl bg-canvas-deep px-4 text-sm uppercase tracking-wide text-ink placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand"
+        />
+        <button
+          type="button"
+          onClick={send}
+          disabled={checking}
+          className="h-11 shrink-0 rounded-full px-4 text-sm font-medium text-ink ring-1 ring-inset ring-line-strong transition hover:bg-canvas-deep disabled:opacity-60"
+        >
+          {checking ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+          ) : (
+            "Apply"
+          )}
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-1.5 text-xs text-critical">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
