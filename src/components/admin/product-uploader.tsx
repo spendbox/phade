@@ -37,7 +37,7 @@ import {
 import { describeProduct, mergeTags, suggestTags } from "@/lib/ai-client";
 import { CategoryIcon } from "@/lib/category-icons";
 import { cn } from "@/lib/cn";
-import { ACCEPTED_MEDIA_TYPES } from "@/lib/media";
+import { isPickableMedia, PICKABLE_MEDIA_TYPES } from "@/lib/media";
 import { uploadMedia } from "@/lib/upload-client";
 import type { Category, ProductColor, ProductStatus } from "@/lib/types";
 
@@ -190,9 +190,7 @@ export function ProductUploader({
   }
 
   async function handleFiles(files: FileList | File[]) {
-    const list = [...files].filter((file) =>
-      ACCEPTED_MEDIA_TYPES.includes(file.type),
-    );
+    const list = [...files].filter(isPickableMedia);
     if (list.length === 0) return;
 
     const target = addToDraftRef.current;
@@ -309,7 +307,7 @@ export function ProductUploader({
       <input
         ref={fileInputRef}
         type="file"
-        accept={ACCEPTED_MEDIA_TYPES.join(",")}
+        accept={PICKABLE_MEDIA_TYPES.join(",")}
         multiple
         className="hidden"
         onChange={(event) => {

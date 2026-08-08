@@ -5,7 +5,7 @@ import { ImagePlus, Loader2, Star, Trash2 } from "lucide-react";
 
 import { MediaThumb } from "@/components/admin/media-thumb";
 import { cn } from "@/lib/cn";
-import { ACCEPTED_MEDIA_TYPES } from "@/lib/media";
+import { isPickableMedia, PICKABLE_MEDIA_TYPES } from "@/lib/media";
 import { uploadMedia } from "@/lib/upload-client";
 
 /**
@@ -16,10 +16,15 @@ import { uploadMedia } from "@/lib/upload-client";
 export function ImageUploader({
   name = "images",
   initial = [],
+  limit,
+  hint = "Images are resized automatically, iPhone HEIC photos converted — the first one is the cover.",
   onChange,
 }: {
   name?: string;
   initial?: string[];
+  /** How many files this field holds. One, for a single picture or clip. */
+  limit?: number;
+  hint?: string;
   /** For callers that own the value rather than reading the hidden input. */
   onChange?: (media: string[]) => void;
 }) {
@@ -40,37 +45,48 @@ export function ImageUploader({
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const upload = useCallback(async (files: FileList | File[]) => {
-    const list = [...files].filter((file) =>
-      ACCEPTED_MEDIA_TYPES.includes(file.type),
-    );
-    if (list.length === 0) return;
+  const room = limit ? Math.max(limit - media.length, 0) : Infinity;
+  const full = room === 0;
 
-    setError(null);
-    setUploading((count) => count + list.length);
+  const upload = useCallback(
+    async (files: FileList | File[]) => {
+      const list = [...files].filter(isPickableMedia).slice(0, room);
+      if (list.length === 0) return;
 
-    await Promise.all(
-      list.map(async (file) => {
-        try {
-          const url = await uploadMedia(file);
-          setMedia((current) => [...current, url]);
-        } catch (cause) {
-          setError(
-            cause instanceof Error ? cause.message : "That file didn't upload.",
-          );
-        } finally {
-          setUploading((count) => count - 1);
-        }
-      }),
-    );
-  }, []);
+      setError(null);
+      setUploading((count) => count + list.length);
+
+      await Promise.all(
+        list.map(async (file) => {
+          try {
+            const url = await uploadMedia(file);
+            setMedia((current) => [...current, url]);
+          } catch (cause) {
+            setError(
+              cause instanceof Error
+                ? cause.message
+                : "That file didn't upload.",
+            );
+          } finally {
+            setUploading((count) => count - 1);
+          }
+        }),
+      );
+    },
+    [room],
+  );
 
   return (
     <div className="space-y-3">
       <input type="hidden" name={name} value={JSON.stringify(media)} />
 
       {media.length > 0 && (
-        <ul className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
+        <ul
+          className={cn(
+            "grid gap-2.5",
+            limit === 1 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-3 sm:grid-cols-4",
+          )}
+        >
           {media.map((url, index) => (
             <li
               key={url}
@@ -78,7 +94,7 @@ export function ImageUploader({
             >
               <MediaThumb url={url} className="size-full" />
 
-              {index === 0 && (
+              {index === 0 && limit !== 1 && (
                 <span className="absolute left-1.5 top-1.5 rounded bg-ink/80 px-1.5 py-0.5 text-[10px] font-medium text-white">
                   Cover
                 </span>
@@ -118,6 +134,9 @@ export function ImageUploader({
         </ul>
       )}
 
+      {/* A field that holds one file has nowhere to put a second, so the
+          dropzone goes away rather than failing silently on the next drop. */}
+      {!full && (
       <div
         onDragOver={(event) => {
           event.preventDefault();
@@ -145,7 +164,9 @@ export function ImageUploader({
         <p className="mt-2 text-sm text-ink-secondary">
           {uploading > 0
             ? `Uploading ${uploading} file${uploading === 1 ? "" : "s"}…`
-            : "Drop photos or videos here"}
+            : limit === 1
+              ? "Drop a photo or a video here"
+              : "Drop photos or videos here"}
         </p>
 
         <button
@@ -153,18 +174,16 @@ export function ImageUploader({
           onClick={() => inputRef.current?.click()}
           className="mt-1 text-sm font-medium text-brand hover:underline"
         >
-          or choose files
+          {limit === 1 ? "or choose a file" : "or choose files"}
         </button>
 
-        <p className="mt-1 text-xs text-ink-muted">
-          Images are resized automatically — the first one is the cover.
-        </p>
+        <p className="mt-1 text-xs text-ink-muted">{hint}</p>
 
         <input
           ref={inputRef}
           type="file"
-          accept={ACCEPTED_MEDIA_TYPES.join(",")}
-          multiple
+          accept={PICKABLE_MEDIA_TYPES.join(",")}
+          multiple={limit !== 1}
           className="hidden"
           onChange={(event) => {
             if (event.target.files) void upload(event.target.files);
@@ -172,6 +191,7 @@ export function ImageUploader({
           }}
         />
       </div>
+      )}
 
       {error && (
         <p role="alert" className="text-sm text-critical">

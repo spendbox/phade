@@ -26,10 +26,44 @@ export const ACCEPTED_VIDEO_TYPES = [
   "video/quicktime",
 ];
 
+/** What may be stored, and so what the upload endpoint will sign for. */
 export const ACCEPTED_MEDIA_TYPES = [
   ...ACCEPTED_IMAGE_TYPES,
   ...ACCEPTED_VIDEO_TYPES,
 ];
+
+/**
+ * HEIC — what an iPhone actually takes photographs in.
+ *
+ * It is missing from the list above on purpose: half the browsers in the world
+ * can't display one, so a HEIC that reached the storefront would be a broken
+ * picture for the shopper rather than a photograph. It is converted in the
+ * browser before it is uploaded (see `@/lib/upload-client`), and what lands in
+ * storage is a WebP like everything else.
+ *
+ * The extensions matter as much as the types: asked for a `.heic`, Chrome on
+ * Windows hands over a file whose `type` is the empty string.
+ */
+export const HEIC_TYPES = ["image/heic", "image/heif", "image/heic-sequence"];
+const HEIC_EXTENSIONS = [".heic", ".heif"];
+
+export function isHeicFile(file: { name: string; type: string }): boolean {
+  if (HEIC_TYPES.includes(file.type.toLowerCase())) return true;
+  const name = file.name.toLowerCase();
+  return HEIC_EXTENSIONS.some((extension) => name.endsWith(extension));
+}
+
+/** What a file picker will let someone choose — storable, or convertible. */
+export const PICKABLE_MEDIA_TYPES = [
+  ...ACCEPTED_MEDIA_TYPES,
+  ...HEIC_TYPES,
+  ...HEIC_EXTENSIONS,
+];
+
+/** The picker's filter, which a `type` of "" must still be able to pass. */
+export function isPickableMedia(file: { name: string; type: string }): boolean {
+  return ACCEPTED_MEDIA_TYPES.includes(file.type) || isHeicFile(file);
+}
 
 /** Matches Supabase Storage's default per-file ceiling. */
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;

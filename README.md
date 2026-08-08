@@ -14,10 +14,11 @@ buy at `/`, and everything they do shows up at `/admin`.
 
 | Page | What it does |
 | --- | --- |
-| **Landing** (`/`) | A hero told as a story: every image from Settings → Storefront becomes a frame with its own progress segment, advancing itself, tappable left and right. Categories sit under it as story rings. Featured products are posts. Then best sellers, new in, and everything else. |
+| **Landing** (`/`) | Built as a magazine rather than a catalogue. A hero told as a story: every image from Settings → Storefront becomes a frame with its own progress segment, advancing itself, tappable left and right. Then the collections, at the size a collection deserves — big picture tiles laid out so no row is ever left half-empty. Featured pieces are a deck of cards you throw sideways, one at a time, on the one dark panel in an ivory page. What just landed is a wall of unequal tiles rather than another rail. The shop's own words sit in the middle, beside a picture or a clip it chose. Then best sellers, everything else, and the way into the shop. Every heading on it is editable. |
 | **Shop** (`/shop`) | The catalogue, with a rail of category rings pinned under the header. Subcategory chips, an on-sale filter, search, and five ways to sort. Any row of filters wider than the screen fades at the edge it can still be scrolled towards, and stops fading once you reach the end. Every choice lives in the URL, so a narrowed shop is a link you can send someone and the back button undoes a filter. |
 | **A product** | Opens as a pop-up over whatever you were reading, never a page — the grid stays scrolled where it was, filters still on. Pictures swipe and snap, with the count on a dark pill so it survives a white studio backdrop; a double-tap saves; add to bag / save / share sit in a bar that never scrolls away. Once something is added the pop-up folds down to a small receipt — what went in, what the bag now holds, and the way back to shopping. `/product/[slug]` renders the same thing as a real page, for shared links and search engines. |
 | **Saved** (`/saved`) | Everything hearted on this device. No account needed. |
+| **Any sheet** | The bag and the product pop-up both rise from the bottom of a phone, and both are put away the same way: drag down and it follows your thumb, let go past the halfway point — or flick it — and it goes. A sheet whose contents are scrolled is being read, so the pull scrolls it back to the top first and only then becomes a dismissal. |
 | **Bag** | A drawer, not a page, so adding something never costs anyone their place. It shows the delivery charge from the same rules checkout uses, and how much more buys free delivery. |
 | **Checkout** (`/checkout`) | Delivery or collection, contact details, address, note — filled in from last time, because a returning customer should not retype their address to buy a second dress. Picking a state prices the delivery from the shop's own zones, live. A coupon code from a sale goes in beside the order summary and says what it takes off before anyone commits to it. Every figure is re-derived on the server, so what the browser sends is only ever ids, quantities and a code. Pays through Paystack; the order exists before payment starts. |
 | **Order** (`/order/[reference]`) | Where Paystack sends a shopper back to. It verifies the payment directly rather than waiting on the webhook, so the page is right immediately, and empties the bag only once the money has actually arrived. |
@@ -40,7 +41,7 @@ because that is where a thumb is. On a wider screen the header takes over.
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | **General** — the default low-stock alert level. **Categories** — categories with a chosen icon (AI can grow a short description into a fuller one) and the subcategory list. **Catalogue** — the shop's colour palette and size run. **Storefront** — announcement bar, hero copy, hero images, call-to-action, featured products, the words that scroll under the hero, the footer blurb and the shop's social links. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state with their own prices, and whether collection is offered. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
+| **Settings** | **General** — the default low-stock alert level. **Categories** — categories with a chosen icon (AI can grow a short description into a fuller one) and the subcategory list. **Catalogue** — the shop's colour palette and size run. **Storefront** — announcement bar, hero copy, hero images, call-to-action, every section heading on the front page and the line under New in, the about section (its words, its button, and a picture or a video with the placeholder frame of your choosing), featured products, the words that scroll under the hero, the footer blurb and the shop's social links. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state with their own prices, and whether collection is offered. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -143,7 +144,7 @@ src/
       paystack/webhook/          Paystack webhook receiver
   components/
     admin/                       Shell, charts, forms, dialogs
-    shop/                        Hero, rings, cards, pop-up, bag, checkout
+    shop/                        Hero, collections, deck, wall, pop-up, bag, checkout
     ui/                          Buttons, fields, badges, panels
   lib/
     auth.ts  session.ts          Admin credentials and session cookie
@@ -177,6 +178,14 @@ A few decisions worth knowing:
   signed URL and PUTs the file itself, so videos aren't limited by the
   serverless request body size. Images are downscaled before they leave the
   browser; videos are stored as-is.
+- **HEIC is converted, not refused.** It is what an iPhone takes photographs
+  in, so rejecting it asks a shop owner to do the computer's job. What lands in
+  storage is always a WebP, because half the browsers in the world can't
+  display a HEIC and a shopper would get a broken picture rather than a
+  photograph. Safari decodes it natively; everywhere else lazy-loads a decoder,
+  downloaded only by the shop that actually uploads one. A `.heic` whose type
+  the browser reports as the empty string — Chrome on Windows does this — is
+  recognised by its extension.
 - **The bulk uploader autosaves to the browser.** Drafts live in `localStorage`
   until you publish, so a closed tab or a refresh doesn't lose a batch. Nothing
   is written to the database until you hit Publish.

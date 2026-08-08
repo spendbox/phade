@@ -1,6 +1,6 @@
 import { LayoutGrid } from "lucide-react";
 
-import { Ring } from "@/components/shop/category-stories";
+import { Ring } from "@/components/shop/category-ring";
 import { Rail } from "@/components/shop/rail";
 import { CategoryIcon } from "@/lib/category-icons";
 import type { ShopCategory } from "@/lib/shop";

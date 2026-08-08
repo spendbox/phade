@@ -19,7 +19,7 @@ import {
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
-import type { StorefrontContent } from "@/lib/storefront";
+import { DEFAULT_HEADINGS, type StorefrontContent } from "@/lib/storefront";
 
 const initialState: StorefrontFormState = { ok: null };
 
@@ -57,6 +57,7 @@ export function StorefrontForm({
       products.some((product) => product.id === id),
     ),
   );
+  const [aboutOn, setAboutOn] = useState(content.about.enabled);
   const [socials, setSocials] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       content.socials.map((link) => [link.platform, link.url]),
@@ -192,16 +193,184 @@ export function StorefrontForm({
         </Field>
       </Panel>
 
-      <Panel title="Featured products">
+      <Panel title="Section headings">
         <div className="space-y-4">
-          <Field label="Section heading" htmlFor="featured_heading">
+          <p className="text-xs text-ink-muted">
+            What each part of the front page is called. Clear a field and it
+            goes back to the wording below.
+          </p>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Collections" htmlFor="heading_collections">
+              <Input
+                id="heading_collections"
+                name="heading_collections"
+                defaultValue={content.headings.collections}
+                placeholder={DEFAULT_HEADINGS.collections}
+              />
+            </Field>
+            <Field label="Featured" htmlFor="heading_featured">
+              <Input
+                id="heading_featured"
+                name="heading_featured"
+                defaultValue={content.headings.featured}
+                placeholder={DEFAULT_HEADINGS.featured}
+              />
+            </Field>
+            <Field label="New in" htmlFor="heading_new_in">
+              <Input
+                id="heading_new_in"
+                name="heading_new_in"
+                defaultValue={content.headings.newIn}
+                placeholder={DEFAULT_HEADINGS.newIn}
+              />
+            </Field>
+            <Field label="Best sellers" htmlFor="heading_best_sellers">
+              <Input
+                id="heading_best_sellers"
+                name="heading_best_sellers"
+                defaultValue={content.headings.bestSellers}
+                placeholder={DEFAULT_HEADINGS.bestSellers}
+              />
+            </Field>
+            <Field label="Everything else" htmlFor="heading_explore">
+              <Input
+                id="heading_explore"
+                name="heading_explore"
+                defaultValue={content.headings.explore}
+                placeholder={DEFAULT_HEADINGS.explore}
+              />
+            </Field>
+            <Field label="Closing block" htmlFor="heading_closing">
+              <Input
+                id="heading_closing"
+                name="heading_closing"
+                defaultValue={content.headings.closing}
+                placeholder={DEFAULT_HEADINGS.closing}
+              />
+            </Field>
+          </div>
+
+          <Field
+            label="The line under New in"
+            htmlFor="heading_new_in_tagline"
+            hint="One sentence about the season, over the new-in grid."
+          >
             <Input
-              id="featured_heading"
-              name="featured_heading"
-              defaultValue={content.featuredHeading}
-              placeholder="Featured"
+              id="heading_new_in_tagline"
+              name="heading_new_in_tagline"
+              defaultValue={content.headings.newInTagline}
+              placeholder={DEFAULT_HEADINGS.newInTagline}
             />
           </Field>
+        </div>
+      </Panel>
+
+      <Panel title="About the shop">
+        <div className="space-y-4">
+          <label className="flex items-center gap-2.5 text-sm">
+            <input
+              type="checkbox"
+              name="about_enabled"
+              checked={aboutOn}
+              onChange={(event) => setAboutOn(event.target.checked)}
+              className="size-4 rounded border-line-strong accent-brand"
+            />
+            <span className="font-medium text-ink">Show the section</span>
+            <span className="text-ink-muted">Halfway down the front page</span>
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Small line above"
+              htmlFor="about_eyebrow"
+              hint="Optional — a word or two."
+            >
+              <Input
+                id="about_eyebrow"
+                name="about_eyebrow"
+                defaultValue={content.about.eyebrow}
+                placeholder="Our story"
+              />
+            </Field>
+
+            <Field label="Heading" htmlFor="about_heading">
+              <Input
+                id="about_heading"
+                name="about_heading"
+                defaultValue={content.about.heading}
+                placeholder="The essence of modern dressing"
+              />
+            </Field>
+          </div>
+
+          <Field label="What you want them to know" htmlFor="about_body">
+            <Textarea
+              id="about_body"
+              name="about_body"
+              rows={5}
+              defaultValue={content.about.body}
+              placeholder="Who the shop is for, where the pieces come from, why they were chosen."
+            />
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Button text"
+              htmlFor="about_cta_label"
+              hint="Leave blank to hide the button."
+            >
+              <Input
+                id="about_cta_label"
+                name="about_cta_label"
+                defaultValue={content.about.ctaLabel}
+                placeholder="Learn more"
+              />
+            </Field>
+
+            <Field label="Button link" htmlFor="about_cta_href">
+              <Input
+                id="about_cta_href"
+                name="about_cta_href"
+                defaultValue={content.about.ctaHref}
+                placeholder="/shop"
+              />
+            </Field>
+          </div>
+
+          <Field
+            label="Picture or video"
+            hint="A video plays quietly on a loop beside the words."
+          >
+            <ImageUploader
+              name="about_media"
+              limit={1}
+              initial={content.about.mediaUrl ? [content.about.mediaUrl] : []}
+              hint="One photo, or one clip — MP4, WebM or MOV."
+            />
+          </Field>
+
+          <Field
+            label="Video placeholder"
+            hint="The still shown before a video plays. Ignored when the file above is a photo."
+          >
+            <ImageUploader
+              name="about_poster"
+              limit={1}
+              initial={content.about.posterUrl ? [content.about.posterUrl] : []}
+              hint="One photo — the frame you'd have chosen."
+            />
+          </Field>
+        </div>
+      </Panel>
+
+      <Panel title="Featured products">
+        <div className="space-y-4">
+          <p className="text-xs text-ink-muted">
+            These stack as cards a shopper swipes through. Only the first
+            picture of each is shown, so the swipe moves between products
+            rather than through one product&apos;s gallery.
+          </p>
 
           <Field
             label="Products"
