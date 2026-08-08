@@ -10,9 +10,10 @@ import {
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { MediaThumb } from "@/components/admin/media-thumb";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { Field, Input, MoneyInput, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
+import { koboToNairaInput } from "@/lib/format";
 import type { StorefrontContent } from "@/lib/storefront";
 
 const initialState: StorefrontFormState = { ok: null };
@@ -146,6 +147,34 @@ export function StorefrontForm({
             hint="The first is the main hero. Add more and they run as a set."
           >
             <ImageUploader name="hero_images" initial={content.heroImages} />
+          </Field>
+        </div>
+      </Panel>
+
+      <Panel title="Delivery">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Delivery charge"
+            htmlFor="delivery_fee"
+            hint="Added to every order that isn't collected in person."
+          >
+            <MoneyInput
+              id="delivery_fee"
+              name="delivery_fee"
+              defaultValue={koboToNairaInput(content.deliveryFeeKobo)}
+            />
+          </Field>
+
+          <Field
+            label="Free delivery over"
+            htmlFor="free_delivery_over"
+            hint="Spend this much and delivery is free. Set 0 to always charge."
+          >
+            <MoneyInput
+              id="free_delivery_over"
+              name="free_delivery_over"
+              defaultValue={koboToNairaInput(content.freeDeliveryOverKobo)}
+            />
           </Field>
         </div>
       </Panel>

@@ -83,6 +83,41 @@ export async function listTransactions(options?: {
   return data ?? [];
 }
 
+/**
+ * Opens a payment for an order that already exists in our tables.
+ *
+ * The reference is ours, not Paystack's, which is what lets the webhook find
+ * the order again when the money lands — `recordTransaction` matches on it.
+ */
+export async function initializeTransaction(options: {
+  email: string;
+  amountKobo: number;
+  reference: string;
+  callbackUrl: string;
+  metadata?: Record<string, unknown>;
+}): Promise<{ authorizationUrl: string; reference: string }> {
+  const { data } = await call<{
+    authorization_url: string;
+    access_code: string;
+    reference: string;
+  }>("/transaction/initialize", {
+    method: "POST",
+    body: JSON.stringify({
+      email: options.email,
+      amount: options.amountKobo,
+      reference: options.reference,
+      currency: "NGN",
+      callback_url: options.callbackUrl,
+      metadata: options.metadata,
+    }),
+  });
+
+  return {
+    authorizationUrl: data.authorization_url,
+    reference: data.reference,
+  };
+}
+
 export async function verifyTransaction(
   reference: string,
 ): Promise<PaystackTransaction> {

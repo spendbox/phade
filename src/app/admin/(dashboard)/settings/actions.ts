@@ -9,6 +9,7 @@ import {
   parseSizeList,
   type CatalogueDefaults,
 } from "@/lib/catalogue-settings";
+import { nairaToKobo } from "@/lib/format";
 import { SETTING_KEYS } from "@/lib/settings";
 import {
   STOREFRONT_KEY,
@@ -85,6 +86,12 @@ export async function saveStorefront(
       );
     }
 
+    const deliveryFee = nairaToKobo(String(formData.get("delivery_fee") ?? ""));
+    const freeOver = nairaToKobo(String(formData.get("free_delivery_over") ?? ""));
+    if (deliveryFee < 0 || freeOver < 0) {
+      throw new Error("Delivery amounts can't be negative.");
+    }
+
     const content: StorefrontContent = {
       announcement: String(formData.get("announcement") ?? "").trim(),
       announcementEnabled: formData.get("announcement_enabled") === "on",
@@ -98,6 +105,8 @@ export async function saveStorefront(
         .split(",")
         .map((id) => id.trim())
         .filter(Boolean),
+      deliveryFeeKobo: deliveryFee,
+      freeDeliveryOverKobo: freeOver,
     };
 
     const { error } = await supabase.from("app_settings").upsert(

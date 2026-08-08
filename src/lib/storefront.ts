@@ -18,6 +18,10 @@ export type StorefrontContent = {
   heroCtaHref: string;
   featuredHeading: string;
   featuredProductIds: string[];
+  /** Flat delivery charge added at checkout, in kobo. */
+  deliveryFeeKobo: number;
+  /** Spend at or above this (kobo) and delivery is free. 0 turns it off. */
+  freeDeliveryOverKobo: number;
 };
 
 export const STOREFRONT_KEY = "storefront_content";
@@ -32,6 +36,8 @@ export const DEFAULT_STOREFRONT: StorefrontContent = {
   heroCtaHref: "/shop",
   featuredHeading: "Featured",
   featuredProductIds: [],
+  deliveryFeeKobo: 350_000,
+  freeDeliveryOverKobo: 10_000_000,
 };
 
 function str(value: unknown, fallback: string): string {
@@ -41,6 +47,32 @@ function str(value: unknown, fallback: string): string {
 function strList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
+}
+
+/** Money read back from JSON: whole kobo, never negative. */
+function kobo(value: unknown, fallback: number): number {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) return fallback;
+  return Math.trunc(amount);
+}
+
+/**
+ * What delivery costs this basket. Pickup is always free; a subtotal that
+ * clears the threshold is too. Both numbers are set in Settings → Storefront.
+ */
+export function deliveryFor(
+  content: Pick<StorefrontContent, "deliveryFeeKobo" | "freeDeliveryOverKobo">,
+  subtotalKobo: number,
+  fulfilment: "shipping" | "pickup",
+): number {
+  if (fulfilment === "pickup") return 0;
+  if (
+    content.freeDeliveryOverKobo > 0 &&
+    subtotalKobo >= content.freeDeliveryOverKobo
+  ) {
+    return 0;
+  }
+  return content.deliveryFeeKobo;
 }
 
 /** Anything missing or the wrong shape falls back, so a half-filled row still renders. */
@@ -61,6 +93,14 @@ export function parseStorefront(raw: unknown): StorefrontContent {
       DEFAULT_STOREFRONT.featuredHeading,
     ),
     featuredProductIds: strList(value.featuredProductIds),
+    deliveryFeeKobo: kobo(
+      value.deliveryFeeKobo,
+      DEFAULT_STOREFRONT.deliveryFeeKobo,
+    ),
+    freeDeliveryOverKobo: kobo(
+      value.freeDeliveryOverKobo,
+      DEFAULT_STOREFRONT.freeDeliveryOverKobo,
+    ),
   };
 }
 

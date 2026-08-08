@@ -50,6 +50,14 @@
   --color-critical: #d03b3b;
   --color-critical-soft: #fceaea;
   --color-good-text: #006300;
+
+  /* Storefront
+     The shop is warmer than the dashboard on purpose — it is a place to
+     linger, not a place to work. Ivory canvas, near-black type, wine accent. */
+  --color-canvas: #f7f5f2;
+  --color-canvas-deep: #ece7e0;
+  --color-noir: #0c0c0d;
+  --color-noir-soft: #191a1c;
 }
 
 @layer base {
@@ -131,4 +139,154 @@
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Storefront
+
+   The shop borrows three moves from the apps people already have open all day:
+   a ring around a story you haven't opened, a rail you flick sideways through,
+   and a full-bleed frame you swipe. Everything here serves one of those, and
+   every one of them is a plain CSS affordance — no carousel library, no
+   scroll-jacking, and the browser keeps doing the scrolling it is good at.
+--------------------------------------------------------------------------- */
+@layer components {
+  /* A rail: flick sideways, each card settles under your thumb. */
+  .rail {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .rail::-webkit-scrollbar {
+    display: none;
+  }
+  .rail > * {
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+  }
+
+  /* The unopened-story ring. Two rings, not one: the inner gap is the canvas
+     showing through, which is what stops it reading as a coloured border. */
+  .story-ring {
+    background: conic-gradient(
+      from 150deg,
+      var(--color-brand),
+      #e0a3b4,
+      #c9a227,
+      var(--color-brand)
+    );
+    padding: 2px;
+  }
+  .story-ring-inner {
+    background: var(--color-canvas);
+    padding: 2px;
+  }
+
+  /* Cards lift a little under a cursor and press in under a thumb. */
+  .tap {
+    transition:
+      transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 180ms ease;
+  }
+  .tap:active {
+    transform: scale(0.985);
+  }
+}
+
+@keyframes phade-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Duplicate the strip in the markup, then slide exactly half of it. */
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: phade-marquee 34s linear infinite;
+}
+
+@keyframes phade-story-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.story-fill {
+  transform-origin: left;
+  animation: phade-story-fill linear forwards;
+}
+
+@keyframes phade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: phade-rise 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes phade-sheet-up {
+  from {
+    transform: translateY(4%);
+    opacity: 0.6;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.sheet-up {
+  animation: phade-sheet-up 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes phade-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* The heart that blooms over a double-tapped photo. */
+.pop-heart {
+  animation: phade-pop 900ms ease-out forwards;
+}
+
+/* Nobody asked for a moving page. Anyone who has said so gets a still one. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track,
+  .story-fill,
+  .rise,
+  .sheet-up,
+  .pop-heart {
+    animation: none;
+  }
+  .rail {
+    scroll-behavior: auto;
+  }
 }
