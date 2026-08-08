@@ -36,21 +36,29 @@ export type AboutBlock = {
 };
 
 /**
- * Every heading a shopper reads down the front page.
+ * One section of the front page, in words.
  *
- * They are copy, not code. A shop that wants "Just landed" where we wrote
- * "New in" should be able to say so in the dashboard, and a heading left blank
- * takes its default rather than leaving a hole in the page.
+ * All of it is copy, not code: the name of the section, the line under it, and
+ * the button out of it. A shop that wants "Just landed" where we wrote "New
+ * in" should be able to say so from the dashboard, and anything left blank
+ * takes its default rather than leaving a hole in the page — except the
+ * button, which is hidden entirely when it has no words, because an unnamed
+ * button is worse than no button.
  */
-export type SectionHeadings = {
-  collections: string;
-  featured: string;
-  newIn: string;
-  /** The line under the New in heading — the season, in a sentence. */
-  newInTagline: string;
-  bestSellers: string;
-  explore: string;
-  closing: string;
+export type SectionCopy = {
+  heading: string;
+  note: string;
+  ctaLabel: string;
+  ctaHref: string;
+};
+
+/** The front page's sections, in the order a shopper meets them. */
+export type StorefrontSections = {
+  collections: SectionCopy;
+  featured: SectionCopy;
+  newIn: SectionCopy;
+  bestSellers: SectionCopy;
+  closing: SectionCopy;
 };
 
 export type StorefrontContent = {
@@ -62,7 +70,7 @@ export type StorefrontContent = {
   heroCtaLabel: string;
   heroCtaHref: string;
   featuredProductIds: string[];
-  headings: SectionHeadings;
+  sections: StorefrontSections;
   about: AboutBlock;
   /** The words that run across the strip under the hero. */
   marquee: string[];
@@ -73,14 +81,37 @@ export type StorefrontContent = {
 
 export const STOREFRONT_KEY = "storefront_content";
 
-export const DEFAULT_HEADINGS: SectionHeadings = {
-  collections: "Shop the collections",
-  featured: "Featured",
-  newIn: "New in",
-  newInTagline: "A new season of refined, effortless pieces.",
-  bestSellers: "Best sellers",
-  explore: "Explore everything",
-  closing: "The whole shop",
+export const DEFAULT_SECTIONS: StorefrontSections = {
+  collections: {
+    heading: "Shop by collection",
+    note: "",
+    ctaLabel: "",
+    ctaHref: "",
+  },
+  featured: {
+    heading: "Featured",
+    note: "Swipe a card away to meet the next one. Tap it to see every photograph, the colours and the sizes.",
+    ctaLabel: "Shop everything",
+    ctaHref: "/shop",
+  },
+  newIn: {
+    heading: "New in",
+    note: "A new season of refined, effortless pieces.",
+    ctaLabel: "View all",
+    ctaHref: "/shop?sort=new",
+  },
+  bestSellers: {
+    heading: "Best sellers",
+    note: "",
+    ctaLabel: "See all",
+    ctaHref: "/shop?sort=best",
+  },
+  closing: {
+    heading: "The whole shop, one piece at a time",
+    note: "",
+    ctaLabel: "Open the shop",
+    ctaHref: "/shop",
+  },
 };
 
 export const DEFAULT_ABOUT: AboutBlock = {
@@ -103,7 +134,7 @@ export const DEFAULT_STOREFRONT: StorefrontContent = {
   heroCtaLabel: "Shop new in",
   heroCtaHref: "/shop",
   featuredProductIds: [],
-  headings: DEFAULT_HEADINGS,
+  sections: DEFAULT_SECTIONS,
   about: DEFAULT_ABOUT,
   marquee: ["New in", "Delivered nationwide", "Chosen one piece at a time"],
   footerBlurb:
@@ -147,45 +178,94 @@ function group(value: unknown): Record<string, unknown> {
 }
 
 /**
- * A heading left blank falls back to ours, so clearing a field can never leave
- * a section with no name on it.
+ * One section's words.
+ *
+ * A blank heading or note falls back to ours, so clearing a field can never
+ * leave a section with no name on it. A button, though, is only rendered when
+ * it has both a label and somewhere to go: hiding it is a real choice a shop
+ * might want to make, and there is no sensible default for "nowhere".
  */
-function parseHeadings(raw: unknown, legacyFeatured: unknown): SectionHeadings {
+function parseSection(
+  raw: unknown,
+  fallback: SectionCopy,
+  legacyHeading?: unknown,
+): SectionCopy {
   const value = group(raw);
-  const pick = (key: keyof SectionHeadings, fallback: string) => {
-    const written = str(value[key], "").trim();
-    return written || fallback;
-  };
+  // Whether this section has ever been through the form. Until it has, the
+  // page shows our words; once it has, it shows exactly what was typed —
+  // including the blanks, since clearing a subtext or a button is a decision
+  // and a default that grew back would be a field that can't be turned off.
+  const edited = Object.keys(value).length > 0;
+
+  const heading = str(value.heading, "").trim();
 
   return {
-    collections: pick("collections", DEFAULT_HEADINGS.collections),
-    // Featured had its own top-level field before the rest were editable.
-    featured:
-      pick("featured", "") ||
-      str(legacyFeatured, "").trim() ||
-      DEFAULT_HEADINGS.featured,
-    newIn: pick("newIn", DEFAULT_HEADINGS.newIn),
-    newInTagline: pick("newInTagline", DEFAULT_HEADINGS.newInTagline),
-    bestSellers: pick("bestSellers", DEFAULT_HEADINGS.bestSellers),
-    explore: pick("explore", DEFAULT_HEADINGS.explore),
-    closing: pick("closing", DEFAULT_HEADINGS.closing),
+    heading: heading || str(legacyHeading, "").trim() || fallback.heading,
+    note: edited ? str(value.note, "").trim() : fallback.note,
+    ctaLabel: edited ? str(value.ctaLabel, "").trim() : fallback.ctaLabel,
+    ctaHref: edited ? str(value.ctaHref, "").trim() : fallback.ctaHref,
   };
+}
+
+/**
+ * The sections, with one eye on what an earlier shape of this row called them.
+ * Headings lived in their own flat group for a while, and the featured
+ * heading was a top-level field before that.
+ */
+function parseSections(
+  raw: unknown,
+  legacyHeadings: unknown,
+  legacyFeatured: unknown,
+): StorefrontSections {
+  const value = group(raw);
+  const old = group(legacyHeadings);
+  const saved = (key: keyof StorefrontSections) => value[key];
+
+  const sections: StorefrontSections = {
+    collections: parseSection(
+      saved("collections"),
+      DEFAULT_SECTIONS.collections,
+      old.collections,
+    ),
+    featured: parseSection(
+      saved("featured"),
+      DEFAULT_SECTIONS.featured,
+      old.featured ?? legacyFeatured,
+    ),
+    newIn: parseSection(saved("newIn"), DEFAULT_SECTIONS.newIn, old.newIn),
+    bestSellers: parseSection(
+      saved("bestSellers"),
+      DEFAULT_SECTIONS.bestSellers,
+      old.bestSellers,
+    ),
+    closing: parseSection(saved("closing"), DEFAULT_SECTIONS.closing, old.closing),
+  };
+
+  // The line under New in was a heading of its own once.
+  const tagline = str(old.newInTagline, "").trim();
+  if (tagline && !group(saved("newIn")).note) {
+    sections.newIn = { ...sections.newIn, note: tagline };
+  }
+
+  return sections;
 }
 
 function parseAbout(raw: unknown): AboutBlock {
   const value = group(raw);
   const heading = str(value.heading, "").trim();
   const body = str(value.body, "").trim();
+  const mediaUrl = str(value.mediaUrl, "").trim();
 
   return {
-    // A section with nothing to say stays off the page however it is flagged.
-    enabled: value.enabled === true && Boolean(heading || body),
+    // A section with nothing in it at all stays off the page however it is
+    // flagged — but a picture on its own is something, so that counts.
+    enabled: value.enabled === true && Boolean(heading || body || mediaUrl),
     eyebrow: str(value.eyebrow, DEFAULT_ABOUT.eyebrow).trim(),
     heading,
     body,
     ctaLabel: str(value.ctaLabel, "").trim(),
     ctaHref: str(value.ctaHref, "").trim(),
-    mediaUrl: str(value.mediaUrl, "").trim(),
+    mediaUrl,
     posterUrl: str(value.posterUrl, "").trim(),
   };
 }
@@ -204,7 +284,11 @@ export function parseStorefront(raw: unknown): StorefrontContent {
     heroCtaLabel: str(value.heroCtaLabel, DEFAULT_STOREFRONT.heroCtaLabel),
     heroCtaHref: str(value.heroCtaHref, DEFAULT_STOREFRONT.heroCtaHref),
     featuredProductIds: strList(value.featuredProductIds),
-    headings: parseHeadings(value.headings, value.featuredHeading),
+    sections: parseSections(
+      value.sections,
+      value.headings,
+      value.featuredHeading,
+    ),
     about: parseAbout(value.about),
     marquee: strList(value.marquee),
     footerBlurb: str(value.footerBlurb, DEFAULT_STOREFRONT.footerBlurb),

@@ -23,31 +23,58 @@ import { isNewIn, percentOff, type ShopProduct } from "@/lib/shop";
  */
 
 /**
- * The shape of the wall, by position. Only used once there are enough pieces
- * to fill it; a handful of products get even tiles instead of a hole where a
- * tall one should have been.
+ * The shape of a full wall, by position: a tall piece to open on, a wide one
+ * to break the rhythm, smaller ones filling in around them. Two columns on a
+ * phone, three from a laptop up, and every cell accounted for.
  */
-const SPANS = [
+const FULL_WALL = [
   "row-span-2",
-  "sm:col-span-2",
+  "sm:col-span-2 lg:col-span-2",
   "",
   "col-span-2 sm:col-span-1",
-  "sm:col-span-2",
+  "sm:col-span-2 lg:col-span-2",
   "",
 ];
 
-export function ProductMosaic({ products }: { products: ShopProduct[] }) {
-  const shown = products.slice(0, SPANS.length);
-  const shaped = shown.length === SPANS.length;
+/**
+ * What one tile spans when there aren't enough pieces for the full wall.
+ *
+ * The last tile takes whatever is left over, so a row never ends half-empty:
+ * an odd number of pieces gives a wide one at the foot on a phone, and the
+ * same trick fills the three-across row on a laptop. A wall that stops in the
+ * middle of a row is the thing that makes a shop look out of stock.
+ */
+function spanFor(index: number, count: number): string {
+  if (index !== count - 1) return "col-span-1 lg:col-span-1";
 
-  if (shown.length === 0) return null;
+  const phone = count % 2 === 1 ? "col-span-2" : "col-span-1";
+  const desk =
+    count % 3 === 1
+      ? "lg:col-span-3"
+      : count % 3 === 2
+        ? "lg:col-span-2"
+        : "lg:col-span-1";
+
+  return `${phone} ${desk}`;
+}
+
+export function ProductMosaic({ products }: { products: ShopProduct[] }) {
+  const shown = products.slice(0, FULL_WALL.length);
+  const count = shown.length;
+
+  if (count === 0) return null;
 
   return (
     <ul className="grid auto-rows-[10.5rem] grid-cols-2 gap-3 px-4 sm:auto-rows-[13rem] sm:gap-4 sm:px-6 lg:grid-cols-3 lg:px-8">
       {shown.map((product, index) => (
         <li
           key={product.id}
-          className={cn("min-w-0", shaped && SPANS[index])}
+          className={cn(
+            "min-w-0",
+            count === FULL_WALL.length
+              ? FULL_WALL[index]
+              : spanFor(index, count),
+          )}
         >
           <Tile product={product} priority={index < 2} />
         </li>
