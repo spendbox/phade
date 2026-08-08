@@ -11,7 +11,15 @@ import { StoryHero } from "@/components/shop/story-hero";
 import { bestSellers, featured, getCatalogue, newIn } from "@/lib/shop-queries";
 import { getStorefront } from "@/lib/storefront";
 
-export const dynamic = "force-dynamic";
+/**
+ * Rendered once and re-used for up to a minute. Nothing on this route depends
+ * on who is asking — the bag and the saved list live in the browser — so a
+ * shopper should not wait for it to be built again. Any dashboard change drops
+ * the cache immediately through `revalidate` in `@/lib/admin-revalidate`, so
+ * the minute is a ceiling for edits made straight in the database, not a delay
+ * on the shop's own work.
+ */
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "phadewoman",
@@ -52,6 +60,11 @@ export default async function LandingPage() {
     .filter((product) => !shownAbove.has(product.id))
     .slice(0, 12);
 
+  // Only what this page can actually open goes into the pop-up's registry.
+  // Sending the whole catalogue would put every product in the shop into the
+  // HTML of a page that shows forty of them.
+  const onPage = [...posts, ...best, ...fresh, ...explore];
+
   const marquee = [
     "New in",
     ...categories.map((category) => category.name),
@@ -60,7 +73,7 @@ export default async function LandingPage() {
 
   return (
     <>
-      <ProductRegistry products={products} />
+      <ProductRegistry products={onPage} />
 
       <StoryHero content={content} hasShop={products.length > 0} />
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidate } from "@/lib/admin-revalidate";
 import { redirect } from "next/navigation";
 
 import { actionError, requireAdmin } from "@/lib/guard";
@@ -191,8 +191,8 @@ export async function createProduct(
       });
     }
 
-    revalidatePath("/admin/products");
-    revalidatePath("/admin/inventory");
+    revalidate("/admin/products");
+    revalidate("/admin/inventory");
     return { ok: true, message: `${parsed.name} created.` };
   } catch (error) {
     return actionError(error);
@@ -321,9 +321,9 @@ export async function createProductsBulk(
       }
     }
 
-    revalidatePath("/admin/products");
-    revalidatePath("/admin/inventory");
-    revalidatePath("/admin");
+    revalidate("/admin/products");
+    revalidate("/admin/inventory");
+    revalidate("/admin");
 
     return {
       ok: true,
@@ -377,9 +377,9 @@ export async function updateProduct(
       });
     }
 
-    revalidatePath("/admin/products");
-    revalidatePath(`/admin/products/${id}`);
-    revalidatePath("/admin/inventory");
+    revalidate("/admin/products");
+    revalidate(`/admin/products/${id}`);
+    revalidate("/admin/inventory");
     return { ok: true, message: "Changes saved." };
   } catch (error) {
     return actionError(error);
@@ -396,8 +396,8 @@ export async function deleteProduct(formData: FormData): Promise<void> {
   const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/products");
-  revalidatePath("/admin/inventory");
+  revalidate("/admin/products");
+  revalidate("/admin/inventory");
   // Called from both the list and the edit page — the edit page no longer
   // exists once the product is gone, so always land on the list.
   redirect("/admin/products");
@@ -437,7 +437,7 @@ export async function duplicateProduct(formData: FormData): Promise<void> {
   });
   if (insertError) throw new Error(insertError.message);
 
-  revalidatePath("/admin/products");
+  revalidate("/admin/products");
 }
 
 export type BulkActionState = ActionResult | { ok: null };
@@ -470,8 +470,8 @@ export async function bulkSetStatus(
       .in("id", ids);
     if (error) throw new Error(error.message);
 
-    revalidatePath("/admin/products");
-    revalidatePath("/admin/inventory");
+    revalidate("/admin/products");
+    revalidate("/admin/inventory");
     return {
       ok: true,
       message: `${ids.length} product${ids.length === 1 ? "" : "s"} set to ${status}.`,
@@ -506,9 +506,9 @@ export async function bulkDelete(
     const { error } = await supabase.from("products").delete().in("id", ids);
     if (error) throw new Error(error.message);
 
-    revalidatePath("/admin/products");
-    revalidatePath("/admin/inventory");
-    revalidatePath("/admin");
+    revalidate("/admin/products");
+    revalidate("/admin/inventory");
+    revalidate("/admin");
     return {
       ok: true,
       message: `${ids.length} product${ids.length === 1 ? "" : "s"} deleted.`,
@@ -535,5 +535,5 @@ export async function setProductStatus(formData: FormData): Promise<void> {
     .eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/products");
+  revalidate("/admin/products");
 }

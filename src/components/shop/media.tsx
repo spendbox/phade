@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { ImageIcon } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -11,21 +12,49 @@ import { isVideoUrl } from "@/lib/media";
  * place. Clips play the way they do in a feed: muted, looping, inline, never
  * asking permission and never making a sound.
  *
- * These are plain `<img>` tags rather than `next/image`. The media lives in a
- * Supabase bucket whose URL is set per deployment, which the image optimiser
- * would need listed in `next.config.ts` at build time — so optimising it here
- * would mean a shop that breaks whenever the project it points at changes.
+ * Photos from the shop's own bucket go through `next/image`, which is the
+ * single biggest thing standing between a grid of forty products and a phone
+ * on Nigerian mobile data. The uploader stores at 1600px; a card renders at
+ * about 180. Without this, every card downloads the full thing — twice, with
+ * the hover image — and the shop feels slow for reasons no amount of clever
+ * rendering can fix.
+ *
+ * Anything else — an SVG, a brand asset, a URL from somewhere we haven't
+ * listed in `next.config.ts` — falls back to a plain `<img>`. The optimiser
+ * refuses hosts it wasn't told about, and a broken picture is worse than an
+ * unoptimised one.
  */
+
+const STORAGE_HOST = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname;
+  } catch {
+    return null;
+  }
+})();
+
+/** SVGs are excluded: the optimiser won't touch them without loosening its CSP. */
+function isOptimisable(url: string): boolean {
+  if (!STORAGE_HOST) return false;
+  if (url.split("?")[0].toLowerCase().endsWith(".svg")) return false;
+  try {
+    return new URL(url).hostname === STORAGE_HOST;
+  } catch {
+    return false;
+  }
+}
+
 export function Media({
   url,
   alt,
   className,
-  sizes,
+  sizes = "100vw",
   priority = false,
   autoPlay = false,
 }: {
   url: string | null | undefined;
   alt: string;
+  /** Sizes and effects for the box. The picture inside always covers it. */
   className?: string;
   sizes?: string;
   priority?: boolean;
@@ -33,14 +62,14 @@ export function Media({
 }) {
   if (!url) {
     return (
-      <div
+      <span
         className={cn(
           "flex items-center justify-center bg-canvas-deep text-ink-muted",
           className,
         )}
       >
         <ImageIcon className="size-6" aria-hidden />
-      </div>
+      </span>
     );
   }
 
@@ -56,6 +85,23 @@ export function Media({
         preload={autoPlay ? "auto" : "metadata"}
         aria-label={alt}
       />
+    );
+  }
+
+  // `fill` needs a positioned box, so the component brings its own rather than
+  // asking every caller to remember one.
+  if (isOptimisable(url)) {
+    return (
+      <span className={cn("relative block overflow-hidden", className)}>
+        <Image
+          src={url}
+          alt={alt}
+          fill
+          sizes={sizes}
+          priority={priority}
+          className="object-cover"
+        />
+      </span>
     );
   }
 

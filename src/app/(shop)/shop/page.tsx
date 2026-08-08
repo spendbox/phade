@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SearchX, SlidersHorizontal } from "lucide-react";
 
-import { CategoryStories } from "@/components/shop/category-stories";
+import { CategoryBar } from "@/components/shop/category-bar";
 import { ProductCard, ProductRail } from "@/components/shop/product-card";
 import { SectionHead } from "@/components/shop/section";
 import { ProductRegistry } from "@/components/shop/shop-provider";
@@ -34,7 +34,18 @@ type Query = {
   q?: string;
   sort?: string;
   sale?: string;
+  show?: string;
 };
+
+/**
+ * How many products a page carries before it asks whether you want more.
+ *
+ * Not a limit on the shop — a limit on one page of it. Every card is a picture,
+ * a price and four interactive controls, and a phone asked to lay out three
+ * hundred of them at once will drop frames doing it. Shoppers who want the rest
+ * say so, and the URL remembers that they did.
+ */
+const PAGE_SIZE = 48;
 
 /**
  * The shop.
@@ -73,6 +84,14 @@ export default async function ShopPage({
     sort,
   );
 
+  const asked = Number.parseInt(params.show ?? "", 10);
+  const showing =
+    Number.isFinite(asked) && asked > 0
+      ? Math.min(asked, filtered.length)
+      : Math.min(PAGE_SIZE, filtered.length);
+  const visible = filtered.slice(0, showing);
+  const more = filtered.length - showing;
+
   const subs = category ? (subcategories[category.slug] ?? []) : [];
   const filtering = Boolean(category || sub || term || onSaleOnly);
   const saleCount = products.filter((product) => product.saleLabel).length;
@@ -81,17 +100,19 @@ export default async function ShopPage({
   const best = filtering ? [] : bestSellers(products, 10);
   const fresh = filtering ? [] : newIn(products, 10);
 
+  // The pop-up only needs what this page can open, not the whole catalogue.
+  const onPage = [...visible, ...best, ...fresh];
+
   const href = (next: Query) => buildHref({ ...params, ...next });
 
   return (
     <>
-      <ProductRegistry products={products} />
+      <ProductRegistry products={onPage} />
 
       {/* Categories stay put at the top while the grid scrolls under them —
-          changing your mind is one tap, from anywhere on the page. */}
-      <div className="sticky top-14 z-30 border-b border-line/70 bg-canvas/90 py-3 backdrop-blur-md sm:top-16">
-        <CategoryStories categories={categories} active={category?.slug} />
-      </div>
+          changing your mind is one tap, from anywhere on the page — and shrink
+          to a chip row once you're into the grid. */}
+      <CategoryBar categories={categories} active={category?.slug} />
 
       <div className="px-4 pt-5 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -107,7 +128,10 @@ export default async function ShopPage({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* `min-w-0` on the row, `.rail` on the group: without both, the
+              sort options size to their content and take the page sideways
+              with them. */}
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
             <SlidersHorizontal
               className="size-4 shrink-0 text-ink-muted"
               aria-hidden
@@ -174,13 +198,28 @@ export default async function ShopPage({
         <Nothing filtering={filtering} />
       ) : (
         <div className="mt-5 grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:gap-4 sm:px-6 lg:grid-cols-4 lg:px-8">
-          {filtered.map((product, index) => (
+          {visible.map((product, index) => (
             <ProductCard
               key={product.id}
               product={product}
               priority={index < 4}
             />
           ))}
+        </div>
+      )}
+
+      {more > 0 && (
+        <div className="mt-8 flex flex-col items-center gap-2">
+          <p className="text-[13px] text-ink-muted tabular-nums">
+            Showing {showing} of {filtered.length}
+          </p>
+          <Link
+            href={href({ show: String(showing + PAGE_SIZE) })}
+            scroll={false}
+            className="inline-flex h-11 items-center rounded-full px-6 text-sm font-medium text-ink ring-1 ring-inset ring-line-strong transition hover:bg-canvas-deep"
+          >
+            Show {Math.min(more, PAGE_SIZE)} more
+          </Link>
         </div>
       )}
 

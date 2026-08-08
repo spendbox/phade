@@ -1,3 +1,7 @@
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
+
+import { CATALOGUE_TAG } from "@/lib/shop-queries";
 import { getSupabase } from "@/lib/supabase";
 
 /**
@@ -104,7 +108,7 @@ export function parseStorefront(raw: unknown): StorefrontContent {
   };
 }
 
-export async function getStorefront(): Promise<StorefrontContent> {
+async function loadStorefront(): Promise<StorefrontContent> {
   const supabase = getSupabase();
   if (!supabase) return DEFAULT_STOREFRONT;
 
@@ -117,3 +121,17 @@ export async function getStorefront(): Promise<StorefrontContent> {
   if (error || !data) return DEFAULT_STOREFRONT;
   return parseStorefront((data as { value: unknown }).value);
 }
+
+/**
+ * One row of JSON that every shop page needs — the layout for the announcement
+ * and the delivery rules, the landing page for the hero. Cached the same way
+ * and under the same tag as the catalogue: per request so the layout and the
+ * page share one read, and across requests so a busy evening isn't one query
+ * per visitor for a row that only changes when someone submits a form.
+ */
+export const getStorefront = cache(async function getStorefront(): Promise<StorefrontContent> {
+  return unstable_cache(loadStorefront, ["storefront-content"], {
+    revalidate: 60,
+    tags: [CATALOGUE_TAG],
+  })();
+});

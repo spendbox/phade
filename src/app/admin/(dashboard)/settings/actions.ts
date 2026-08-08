@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidate } from "@/lib/admin-revalidate";
 
 import { actionError, requireAdmin } from "@/lib/guard";
 import {
@@ -46,8 +46,8 @@ export async function saveSettings(
     );
     if (error) throw new Error(error.message);
 
-    revalidatePath("/admin/settings");
-    revalidatePath("/admin/products/new");
+    revalidate("/admin/settings");
+    revalidate("/admin/products/new");
     return { ok: true, message: "Saved." };
   } catch (error) {
     return actionError(error);
@@ -119,8 +119,8 @@ export async function saveStorefront(
     );
     if (error) throw new Error(error.message);
 
-    revalidatePath("/admin/settings/storefront");
-    revalidatePath("/");
+    revalidate("/admin/settings/storefront");
+    revalidate("/");
     return { ok: true, message: "Storefront updated." };
   } catch (error) {
     return actionError(error);
@@ -171,9 +171,9 @@ export async function saveCatalogue(
     );
     if (error) throw new Error(error.message);
 
-    revalidatePath("/admin/settings/catalogue");
-    revalidatePath("/admin/products/new");
-    revalidatePath("/admin/database");
+    revalidate("/admin/settings/catalogue");
+    revalidate("/admin/products/new");
+    revalidate("/admin/database");
     return { ok: true, message: "Catalogue updated." };
   } catch (error) {
     return actionError(error);

@@ -61,7 +61,12 @@ export function CategoryStories({
   );
 }
 
-function Ring({
+/**
+ * One ring. Exported because the shop's collapsing bar builds its own row out
+ * of these — two rows of rings that drifted apart would be worse than one
+ * component used twice.
+ */
+export function Ring({
   href,
   label,
   cover,

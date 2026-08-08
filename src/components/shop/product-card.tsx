@@ -39,7 +39,11 @@ export function ProductCard({
   const needsChoice = product.colors.length > 1 || product.sizes.length > 1;
 
   return (
-    <article className={cn("group", className)}>
+    // `isolate` gives the card its own stacking context. Without it the save
+    // and add buttons (z-30, inside the card) compete with the sticky category
+    // bar (z-30, above the page) — same level, later in the DOM, so a card
+    // would paint over the navigation it was supposed to scroll under.
+    <article className={cn("group isolate", className)}>
       <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-canvas-deep">
         <Media
           url={product.media[0]}
@@ -51,12 +55,14 @@ export function ProductCard({
 
         {product.media[1] && (
           // The second photo on hover — the closest a mouse gets to turning a
-          // garment around.
+          // garment around. `hidden lg:block` is not styling: a phone has no
+          // hover, and without it every card in the grid downloads a second
+          // picture nobody can ever see.
           <Media
             url={product.media[1]}
             alt=""
-            sizes="(min-width: 1024px) 25vw, 45vw"
-            className="absolute inset-0 size-full opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+            sizes="25vw"
+            className="absolute inset-0 hidden size-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 lg:block"
           />
         )}
 

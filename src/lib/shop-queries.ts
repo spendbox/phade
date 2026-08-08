@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 
 import { getSupabase } from "@/lib/supabase";
 import {
@@ -170,13 +171,16 @@ function toShopProduct(
 }
 
 /**
- * Everything the shop needs in one round trip: the live catalogue, the
- * categories that actually have something in them, and their subcategories.
- *
- * Wrapped in `cache` so the layout's header and the page underneath it share a
- * single trip per request instead of asking the same question twice.
+ * The tag every storefront read is filed under. The dashboard drops it after a
+ * change, so a new price or a published product reaches shoppers at once
+ * rather than waiting out the window below.
  */
-export const getCatalogue = cache(async function getCatalogue(): Promise<ShopCatalogue> {
+export const CATALOGUE_TAG = "shop-catalogue";
+
+/** How long the shop may keep serving a catalogue it already has in hand. */
+const CATALOGUE_SECONDS = 60;
+
+async function loadCatalogue(): Promise<ShopCatalogue> {
   const supabase = getSupabase();
   if (!supabase) return EMPTY;
 
@@ -260,6 +264,29 @@ export const getCatalogue = cache(async function getCatalogue(): Promise<ShopCat
     categories: shopCategories,
     subcategories: grouped,
   };
+}
+
+/**
+ * Everything the shop needs, in one place: the live catalogue, the categories
+ * that actually have something in them, and their subcategories.
+ *
+ * Two layers of caching, because they answer different questions. `cache` is
+ * per request: the layout's header and the page underneath it ask the same
+ * thing, and should not both pay for it. `unstable_cache` is across requests:
+ * every visitor was otherwise costing five queries — one of them a scan of
+ * every order line ever written, to work out what sells best — and a catalogue
+ * does not change between two people looking at it a second apart.
+ *
+ * A minute is the ceiling, not the resolution. Publishing a product, editing a
+ * price or starting a sale drops the tag through `@/lib/admin-revalidate`, so
+ * the shop is right immediately; the window only covers changes made straight
+ * in the database.
+ */
+export const getCatalogue = cache(async function getCatalogue(): Promise<ShopCatalogue> {
+  return unstable_cache(loadCatalogue, ["shop-catalogue"], {
+    revalidate: CATALOGUE_SECONDS,
+    tags: [CATALOGUE_TAG],
+  })();
 });
 
 /** One product, for a shared link that lands on the full page. */

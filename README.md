@@ -15,11 +15,11 @@ buy at `/`, and everything they do shows up at `/admin`.
 | Page | What it does |
 | --- | --- |
 | **Landing** (`/`) | A hero told as a story: every image from Settings → Storefront becomes a frame with its own progress segment, advancing itself, tappable left and right. Categories sit under it as story rings. Featured products are posts. Then best sellers, new in, and everything else. |
-| **Shop** (`/shop`) | The catalogue, with a sticky rail of category rings, subcategory chips, an on-sale filter, search, and five ways to sort. Every choice lives in the URL, so a narrowed shop is a link you can send someone and the back button undoes a filter. |
+| **Shop** (`/shop`) | The catalogue, with a rail of category rings pinned under the header — it collapses to a chip row once you're into the grid, so navigation you've already read stops taking up a third of the screen. Subcategory chips, an on-sale filter, search, and five ways to sort. Every choice lives in the URL, so a narrowed shop is a link you can send someone and the back button undoes a filter. |
 | **A product** | Opens as a pop-up over whatever you were reading, never a page — the grid stays scrolled where it was, filters still on. Pictures swipe and snap, a double-tap saves, and Add to bag / Buy it now / save / share sit in a bar that never scrolls away. `/product/[slug]` renders the same thing as a real page, for shared links and search engines. |
 | **Saved** (`/saved`) | Everything hearted on this device. No account needed. |
 | **Bag** | A drawer, not a page, so adding something never costs anyone their place. It shows the delivery charge from the same rules checkout uses, and how much more buys free delivery. |
-| **Checkout** (`/checkout`) | Delivery or pickup, contact details, address, note. Prices are re-derived on the server from the catalogue, so what the browser sends is only ever ids and quantities. Pays through Paystack; the order exists before payment starts. |
+| **Checkout** (`/checkout`) | Delivery or pickup, contact details, address, note — filled in from last time, because a returning customer should not retype their address to buy a second dress. Prices are re-derived on the server from the catalogue, so what the browser sends is only ever ids and quantities. Pays through Paystack; the order exists before payment starts. |
 | **Order** (`/order/[reference]`) | Where Paystack sends a shopper back to. It verifies the payment directly rather than waiting on the webhook, so the page is right immediately, and empties the bag only once the money has actually arrived. |
 
 Navigation on a phone is a tab bar along the bottom — home, shop, saved, bag —
@@ -198,7 +198,27 @@ A few decisions worth knowing:
   shopper accounts, so `localStorage` is the bag — read through
   `useSyncExternalStore` rather than copied into state on mount, so it is right
   on the first paint after hydration. A debounced copy goes to the `carts` table
-  so the Checkouts page can see what people left behind.
+  so the Checkouts page can see what people left behind. The name, phone and
+  address from the last checkout are kept the same way, and stay in that browser:
+  there is no account to attach them to, and a server that can't authenticate
+  who is asking has no business handing them back. Card details never touch this
+  app at all — they are typed on Paystack's own page.
+- **The shop is fast because it doesn't ask twice.** The catalogue is cached
+  across requests under one tag, so a busy evening isn't five queries per
+  visitor — one of them a scan of every order line ever written. Every dashboard
+  mutation goes through `src/lib/admin-revalidate.ts`, which drops that tag as
+  well as the dashboard's own paths, so there is no way to add an edit that
+  refreshes the dashboard and leaves the shop stale. The landing page and
+  product pages are rendered once and re-used for up to a minute on top of that.
+- **Product photos are served at the size they're shown.** The uploader stores
+  at 1600px, which is right for a product page and about eight times what a card
+  in a grid needs. `next/image` is pointed at the storage bucket's host — built
+  from `NEXT_PUBLIC_SUPABASE_URL` in `next.config.ts` — so each surface gets the
+  width it renders at, in AVIF or WebP. Anything from another host, or an SVG,
+  falls back to a plain `<img>`, because the optimiser refuses hosts it wasn't
+  told about and a broken picture is worse than an unoptimised one. The hover
+  image on a card is `hidden lg:block` for the same reason: a phone has no
+  hover, and would otherwise download a second photo nobody can see.
 - **Cart tracking is opt-in and closed by default.** `/api/cart` is for a
   separate front end: it writes without an admin session, so it answers `501`
   until `STOREFRONT_API_KEY` is set and `401` to anyone who doesn't send it. Our

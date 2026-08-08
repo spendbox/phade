@@ -7,9 +7,17 @@ import { Loader2, Lock, ShoppingBag, Store, Truck } from "lucide-react";
 import { placeOrder, type CheckoutState } from "@/app/(shop)/checkout/actions";
 import { Media } from "@/components/shop/media";
 import { useShop } from "@/components/shop/shop-provider";
+import { usePersistent } from "@/lib/browser-store";
 import { cn } from "@/lib/cn";
 import { formatNairaShort } from "@/lib/format";
 import { lineKey } from "@/lib/shop";
+import {
+  detailsFrom,
+  detailsStore,
+  hasDetails,
+  NO_DETAILS,
+  safeDetails,
+} from "@/lib/shopper-details";
 import { deliveryFor, type StorefrontContent } from "@/lib/storefront";
 
 const initial: CheckoutState = { ok: null };
@@ -27,20 +35,7 @@ const initial: CheckoutState = { ok: null };
  * the order page clears it once the money has actually arrived.
  */
 export function CheckoutForm({ content }: { content: StorefrontContent }) {
-  const { bag, subtotalKobo, ready, cartToken, count } = useShop();
-  const [state, formAction, pending] = useActionState(placeOrder, initial);
-  const [fulfilment, setFulfilment] = useState<"shipping" | "pickup">(
-    "shipping",
-  );
-
-  const shipping = deliveryFor(content, subtotalKobo, fulfilment);
-  const total = subtotalKobo + shipping;
-
-  // Paystack is a different origin, so this is a real navigation rather than a
-  // router push. Internal redirects go the same way for one code path.
-  useEffect(() => {
-    if (state.ok === true) window.location.assign(state.redirect);
-  }, [state]);
+  const { bag, ready } = useShop();
 
   if (!ready) return <div className="min-h-[50dvh]" aria-hidden />;
 
@@ -66,9 +61,37 @@ export function CheckoutForm({ content }: { content: StorefrontContent }) {
     );
   }
 
+  // Mounted only once the browser's own state is readable, so the fields can
+  // be uncontrolled and still open with what was typed last time.
+  return <CheckoutFields content={content} />;
+}
+
+function CheckoutFields({ content }: { content: StorefrontContent }) {
+  const { bag, subtotalKobo, cartToken, count, say } = useShop();
+  const [state, formAction, pending] = useActionState(placeOrder, initial);
+
+  const stored = safeDetails(usePersistent(detailsStore));
+  const [fulfilment, setFulfilment] = useState<"shipping" | "pickup">(
+    stored.fulfilment,
+  );
+
+  const shipping = deliveryFor(content, subtotalKobo, fulfilment);
+  const total = subtotalKobo + shipping;
+
+  // Paystack is a different origin, so this is a real navigation rather than a
+  // router push. Internal redirects go the same way for one code path.
+  useEffect(() => {
+    if (state.ok === true) window.location.assign(state.redirect);
+  }, [state]);
+
   return (
     <form
       action={formAction}
+      onSubmit={(event) => {
+        // Captured here rather than on success: a payment that fails should
+        // still leave the shopper with their details filled in next time.
+        detailsStore.set(detailsFrom(new FormData(event.currentTarget)));
+      }}
       className="grid gap-8 px-4 pb-10 pt-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-12 lg:px-8"
     >
       <input type="hidden" name="cart_token" value={cartToken} />
@@ -117,11 +140,35 @@ export function CheckoutForm({ content }: { content: StorefrontContent }) {
         </fieldset>
 
         <fieldset className="space-y-4">
-          <legend className="text-sm font-semibold text-ink">
-            Who is it for?
-          </legend>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <legend className="text-sm font-semibold text-ink">
+              Who is it for?
+            </legend>
 
-          <Text name="name" label="Full name" autoComplete="name" required />
+            {hasDetails(stored) && (
+              <p className="text-xs text-ink-muted">
+                Filled in from last time ·{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    detailsStore.set(NO_DETAILS);
+                    say("Details forgotten on this device");
+                  }}
+                  className="underline underline-offset-2 hover:text-ink"
+                >
+                  Forget them
+                </button>
+              </p>
+            )}
+          </div>
+
+          <Text
+            name="name"
+            label="Full name"
+            autoComplete="name"
+            required
+            defaultValue={stored.name}
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <Text
               name="email"
@@ -130,6 +177,7 @@ export function CheckoutForm({ content }: { content: StorefrontContent }) {
               autoComplete="email"
               required
               hint="Your receipt and updates go here."
+              defaultValue={stored.email}
             />
             <Text
               name="phone"
@@ -137,6 +185,7 @@ export function CheckoutForm({ content }: { content: StorefrontContent }) {
               type="tel"
               autoComplete="tel"
               required
+              defaultValue={stored.phone}
             />
           </div>
         </fieldset>
@@ -152,11 +201,13 @@ export function CheckoutForm({ content }: { content: StorefrontContent }) {
               label="Street address"
               autoComplete="address-line1"
               required
+              defaultValue={stored.line1}
             />
             <Text
               name="line2"
               label="Apartment, floor, landmark"
               autoComplete="address-line2"
+              defaultValue={stored.line2}
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <Text
@@ -164,12 +215,14 @@ export function CheckoutForm({ content }: { content: StorefrontContent }) {
                 label="City"
                 autoComplete="address-level2"
                 required
+                defaultValue={stored.city}
               />
               <Text
                 name="state"
                 label="State"
                 autoComplete="address-level1"
                 required
+                defaultValue={stored.state}
               />
             </div>
           </fieldset>
@@ -275,7 +328,8 @@ export function CheckoutForm({ content }: { content: StorefrontContent }) {
 
           <p className="mt-3 text-center text-xs text-ink-muted">
             Card, bank transfer and USSD, handled by Paystack. We never see your
-            card details.
+            card details. Your name and address stay on this device so the next
+            checkout is quicker.
           </p>
         </div>
       </aside>

@@ -151,9 +151,15 @@
    scroll-jacking, and the browser keeps doing the scrolling it is good at.
 --------------------------------------------------------------------------- */
 @layer components {
-  /* A rail: flick sideways, each card settles under your thumb. */
+  /* A rail: flick sideways, each card settles under your thumb.
+     `min-width: 0` is not a nicety. A rail is often a flex child (the sort row
+     on /shop), and a flex child's automatic minimum size is its content — so
+     without this the rail grows as wide as its cards, `overflow-x` never has
+     anything to do, and the whole page scrolls sideways instead. */
   .rail {
     display: flex;
+    min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scroll-behavior: smooth;

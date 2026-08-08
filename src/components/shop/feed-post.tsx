@@ -56,7 +56,7 @@ export function FeedPost({
   }
 
   return (
-    <article className="overflow-hidden rounded-3xl bg-canvas shadow-[0_1px_0_rgb(11_11_12_/_0.06),0_18px_40px_-32px_rgb(11_11_12_/_0.5)]">
+    <article className="isolate overflow-hidden rounded-3xl bg-canvas shadow-[0_1px_0_rgb(11_11_12_/_0.06),0_18px_40px_-32px_rgb(11_11_12_/_0.5)]">
       <header className="flex items-center gap-2.5 px-3.5 py-3">
         <span className="story-ring flex size-9 shrink-0 rounded-full">
           <span className="story-ring-inner flex rounded-full">

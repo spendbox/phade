@@ -13,7 +13,15 @@ import { formatNairaShort } from "@/lib/format";
 import { LOW_STOCK_SHOWS_AT, percentOff } from "@/lib/shop";
 import { getCatalogue, getShopProduct } from "@/lib/shop-queries";
 
-export const dynamic = "force-dynamic";
+/**
+ * Rendered once and re-used for up to a minute. Nothing on this route depends
+ * on who is asking — the bag and the saved list live in the browser — so a
+ * shopper should not wait for it to be built again. Any dashboard change drops
+ * the cache immediately through `revalidate` in `@/lib/admin-revalidate`, so
+ * the minute is a ceiling for edits made straight in the database, not a delay
+ * on the shop's own work.
+ */
+export const revalidate = 60;
 
 /**
  * A product on a page of its own.

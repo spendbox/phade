@@ -8,7 +8,15 @@ import { Toaster } from "@/components/shop/toaster";
 import { getCatalogue } from "@/lib/shop-queries";
 import { getStorefront } from "@/lib/storefront";
 
-export const dynamic = "force-dynamic";
+/**
+ * Rendered once and re-used for up to a minute. Nothing on this route depends
+ * on who is asking — the bag and the saved list live in the browser — so a
+ * shopper should not wait for it to be built again. Any dashboard change drops
+ * the cache immediately through `revalidate` in `@/lib/admin-revalidate`, so
+ * the minute is a ceiling for edits made straight in the database, not a delay
+ * on the shop's own work.
+ */
+export const revalidate = 60;
 
 /**
  * The shell every shop page sits inside: the announcement, the header, the
