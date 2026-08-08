@@ -50,6 +50,13 @@ export default async function LandingPage() {
   const { products, categories } = catalogue;
   const { sections } = content;
 
+  // Units on the shelf, not rows in the catalogue: a shop with four dresses in
+  // three sizes each has twelve things someone could actually take home.
+  const inStock = products.reduce(
+    (total, product) => total + Math.max(product.stock, 0),
+    0,
+  );
+
   const chosen = featured(products, content.featuredProductIds);
   const deck = chosen.length > 0 ? chosen.slice(0, 8) : products.slice(0, 5);
   const best = bestSellers(products, 10);
@@ -187,17 +194,18 @@ export default async function LandingPage() {
           {/* Narrow, like the about block: a closing line is read, and the
               walls of pictures either side of it have had the width. */}
           <section className="mx-auto mt-16 max-w-4xl px-4 sm:mt-20 sm:px-6 lg:px-8">
-            <div className="overflow-hidden rounded-[2rem] bg-canvas-deep px-6 py-12 text-center sm:px-10 sm:py-14">
+            <div className="shop-glow rounded-[2rem] bg-canvas-deep px-6 py-12 text-center sm:px-10 sm:py-14">
               <p className="inline-flex items-center gap-2 rounded-full bg-noir/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-secondary">
                 <ShoppingBag className="size-3.5" aria-hidden />
                 {sections.closing.heading}
               </p>
-              {/* Left alone, this counts the shop: a number that is right on
-                  the day a piece is added is worth more than a sentence
-                  someone has to remember to update. Write one and it stays
-                  written, until it is cleared again. */}
+              {/* Left alone, this counts what is actually on the shelf — every
+                  unit of every piece, not how many rows the catalogue has. A
+                  number that is right on the day something sells is worth more
+                  than a sentence someone has to remember to update. Write one
+                  and it stays written, until it is cleared again. */}
               <h2 className="mx-auto mt-5 max-w-xl text-balance text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-                {sections.closing.note || countLine(products.length)}
+                {sections.closing.note || countLine(inStock)}
               </h2>
               {sections.closing.ctaLabel && sections.closing.ctaHref && (
                 <Link

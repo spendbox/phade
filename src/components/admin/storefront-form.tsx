@@ -368,8 +368,8 @@ export function StorefrontForm({
           fallback={DEFAULT_SECTIONS.closing}
           where="The way into the shop, at the foot of the page. The heading is the small line above; the sentence below it is the large one."
           noteLabel="The big line"
-          noteHint="Left empty it counts the shop for itself, and stays right as pieces are added. Write your own and it stays written."
-          notePlaceholder="48 pieces, waiting to be found"
+          noteHint="Left empty it counts everything in stock for itself, and stays right as pieces sell. Write your own and it stays written."
+          notePlaceholder="142 pieces, waiting to be found"
         />
       </Panel>
 
