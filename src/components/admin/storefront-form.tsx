@@ -280,6 +280,21 @@ export function StorefrontForm({
         </div>
       </Panel>
 
+      <Panel title="The shop page">
+        <Field
+          label="Line under &ldquo;Everything&rdquo;"
+          htmlFor="shop_note"
+          hint="Shown beside the piece count at the head of /shop, where nothing is filtered. A category brings its own description; this is the one view that had only a number. Leave it blank for just the count."
+        >
+          <Input
+            id="shop_note"
+            name="shop_note"
+            defaultValue={content.shopNote}
+            placeholder="Every piece we have, in one place"
+          />
+        </Field>
+      </Panel>
+
       <Panel title="Announcement bar">
         <div className="space-y-4">
           <label className="flex items-center gap-2.5 text-sm">

@@ -755,6 +755,32 @@
   }
 }
 
+/* The next piece arriving.
+
+   A card whose contents are simply replaced reads as a glitch: the picture
+   changes but nothing moved, so a shopper isn't sure their swipe did what they
+   meant. Coming in from the side it was pulled from, slightly small and
+   slightly faded, says "that one went, here is the next" in a third of a
+   second — the same sentence a feed tells all day. */
+.step-in-right {
+  animation: phade-step-right 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.step-in-left {
+  animation: phade-step-left 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes phade-step-right {
+  from {
+    opacity: 0.3;
+    transform: translateX(7%) scale(0.97);
+  }
+}
+@keyframes phade-step-left {
+  from {
+    opacity: 0.3;
+    transform: translateX(-7%) scale(0.97);
+  }
+}
+
 /* Nobody asked for a moving page. Anyone who has said so gets a still one. */
 @media (prefers-reduced-motion: reduce) {
   .shimmer::after,
@@ -779,6 +805,8 @@
   .rise,
   .sheet-up,
   .pop-heart,
+  .step-in-right,
+  .step-in-left,
   .swipe-cue-glyph,
   .shop-glow::before,
   .featured-stage::before,

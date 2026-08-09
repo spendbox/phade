@@ -63,13 +63,18 @@ export function SiteMenu({
         <Menu className="size-5" aria-hidden />
       </button>
 
-      {/* The same lines, laid out, once there is width to lay them out in.
-          `min-w-0` and the truncation let a shop with eight rooms shrink
-          rather than push the bag off the end of the bar. */}
+      {/* The same lines, laid out, once there is width to lay them out in —
+          and centred on the bar rather than pushed up against the wordmark.
+          Absolutely, because centring it in the flow would mean the wordmark
+          on one side and the icons on the other had to be exactly the same
+          width, which they never are. `pointer-events-none` on the track so
+          the empty half of it doesn't sit over anything, with the links
+          taking their own presses back. */}
       <nav
         aria-label="Menu"
-        className="order-3 ml-2 hidden min-w-0 items-center gap-1 lg:flex"
+        className="pointer-events-none absolute inset-x-0 hidden justify-center lg:flex"
       >
+        <div className="pointer-events-auto flex min-w-0 items-center gap-1">
         {links.map((link, index) =>
           link.href === CONTACT_HREF ? (
             <button
@@ -93,6 +98,7 @@ export function SiteMenu({
             </Link>
           ),
         )}
+        </div>
       </nav>
 
       <Sheet

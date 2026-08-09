@@ -106,6 +106,14 @@ export type StorefrontContent = {
   marquee: string[];
   /** What sits behind the hamburger, in the order it is read. */
   menu: MenuLink[];
+  /**
+   * The line under "Everything" at the head of the shop.
+   *
+   * Every other view of the catalogue introduces itself — a category has its
+   * description, a search has the words that were typed — and the one that
+   * shows the whole shop had only a count. Blank leaves it as it was.
+   */
+  shopNote: string;
   /** Where a message from the shop front actually goes. */
   support: SupportDetails;
   /** The paragraph beside the logo at the foot of every page. */
@@ -189,6 +197,7 @@ export const DEFAULT_STOREFRONT: StorefrontContent = {
   about: DEFAULT_ABOUT,
   marquee: ["New in", "Delivered nationwide", "Chosen one piece at a time"],
   menu: DEFAULT_MENU,
+  shopNote: "",
   support: DEFAULT_SUPPORT,
   footerBlurb:
     "Bags, shoes and ready-to-wear, chosen one piece at a time and delivered across Nigeria.",
@@ -383,6 +392,7 @@ export function parseStorefront(raw: unknown): StorefrontContent {
     about: parseAbout(value.about),
     marquee: strList(value.marquee),
     menu: parseMenu(value.menu),
+    shopNote: str(value.shopNote, "").trim(),
     support: parseSupport(value.support),
     footerBlurb: str(value.footerBlurb, DEFAULT_STOREFRONT.footerBlurb),
     socials: parseSocials(value.socials),
@@ -414,7 +424,7 @@ export const getStorefront = cache(async function getStorefront(): Promise<Store
   // The key carries a version: this cache holds the *parsed* object, so a
   // release that adds a field would otherwise keep serving yesterday's shape
   // — a page reading `content.menu.length` off an object that has no menu.
-  return unstable_cache(loadStorefront, ["storefront-content", "v3"], {
+  return unstable_cache(loadStorefront, ["storefront-content", "v4"], {
     revalidate: 60,
     tags: [CATALOGUE_TAG],
   })();

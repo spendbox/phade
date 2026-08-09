@@ -196,6 +196,7 @@ export async function saveStorefront(
       // front reads them with, so a line with no words or a WhatsApp number
       // with no digits is dropped here rather than half-rendered there.
       menu: parseStorefront({ menu: menuLinks(formData) }).menu,
+      shopNote: text(formData, "shop_note"),
       support: parseStorefront({
         support: {
           email: text(formData, "support_email"),

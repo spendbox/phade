@@ -44,8 +44,7 @@ import { LOW_STOCK_SHOWS_AT, percentOff, type ShopProduct } from "@/lib/shop";
  * shopper and the next thing they wanted to look at.
  */
 export function ProductModal() {
-  const { viewing, closeProduct, stepProduct, viewingAt, viewingOf } =
-    useShop();
+  const { viewing, closeProduct, stepProduct, viewingOf } = useShop();
   const [added, setAdded] = useState<AddedChoice | null>(null);
 
   // Opening a different product — or closing this one — starts full size
@@ -58,11 +57,20 @@ export function ProductModal() {
     setAdded(null);
   }
 
-  const hasPrev = viewingAt > 0;
-  const hasNext = viewingAt > -1 && viewingAt < viewingOf - 1;
+  /**
+   * Which way the last step went, so the card that arrives comes in from the
+   * side it was pulled from rather than simply appearing.
+   */
+  const [from, setFrom] = useState<1 | -1>(1);
 
   /** Sideways moves along the row this was opened from, if there is one. */
-  const step = added || viewingOf < 2 ? undefined : stepProduct;
+  const step =
+    added || viewingOf < 2
+      ? undefined
+      : (by: 1 | -1) => {
+          setFrom(by);
+          stepProduct(by);
+        };
 
   return (
     <Sheet
@@ -88,14 +96,16 @@ export function ProductModal() {
           />
         ) : (
           <Detail
+            // Keyed by the product, so the whole card is rebuilt rather than
+            // having its contents swapped underneath a shopper: the gallery
+            // starts on the first picture again, and the entrance animation
+            // has something to play on.
             key={viewing.id}
             product={viewing}
             onAdded={setAdded}
             onClose={closeProduct}
             onStep={step}
-            hasPrev={hasPrev}
-            hasNext={hasNext}
-            position={viewingOf > 1 ? `${viewingAt + 1} of ${viewingOf}` : null}
+            enter={step ? (from === 1 ? "right" : "left") : null}
           />
         ))}
 
@@ -111,24 +121,27 @@ function Detail({
   onAdded,
   onClose,
   onStep,
-  hasPrev,
-  hasNext,
-  position,
+  enter,
 }: {
   product: ShopProduct;
   onAdded: (choice: AddedChoice) => void;
   onClose: () => void;
   onStep?: (by: 1 | -1) => void;
-  hasPrev: boolean;
-  hasNext: boolean;
-  position: string | null;
+  /** Which side this card arrived from, or null when it simply opened. */
+  enter: "left" | "right" | null;
 }) {
   const controls = useBuyControls(product, onAdded);
   const soldOut = product.stock <= 0;
   const off = percentOff(product);
 
   return (
-    <div className="flex h-full min-h-0 flex-col sm:grid sm:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] sm:overflow-hidden">
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-col sm:grid sm:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] sm:overflow-hidden",
+        enter === "right" && "step-in-right",
+        enter === "left" && "step-in-left",
+      )}
+    >
       <ProductGallery
         product={product}
         className="h-[46dvh] shrink-0 sm:h-[min(80dvh,42rem)]"
@@ -138,24 +151,12 @@ function Detail({
 
       {/* The row this was opened from, walkable without closing the pop-up.
           A thumb swipes; a cursor gets these, which sit outside the card on a
-          wide screen and over the picture on a narrow one. */}
+          wide screen and over the picture on a narrow one. Neither is ever
+          disabled — the row goes round, so there is always a next one. */}
       {onStep && (
         <>
-          <StepButton
-            side="left"
-            disabled={!hasPrev}
-            onClick={() => onStep(-1)}
-          />
-          <StepButton
-            side="right"
-            disabled={!hasNext}
-            onClick={() => onStep(1)}
-          />
-          {position && (
-            <span className="pointer-events-none absolute left-3 top-3 z-30 rounded-full bg-noir/55 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white backdrop-blur sm:hidden">
-              {position}
-            </span>
-          )}
+          <StepButton side="left" onClick={() => onStep(-1)} />
+          <StepButton side="right" onClick={() => onStep(1)} />
         </>
       )}
 
@@ -340,21 +341,18 @@ function Receipt({
 /** One step along the row, for a pointer. */
 function StepButton({
   side,
-  disabled,
   onClick,
 }: {
   side: "left" | "right";
-  disabled: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
       aria-label={side === "left" ? "Previous piece" : "Next piece"}
       className={cn(
-        "absolute top-1/2 z-30 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-canvas/90 text-noir shadow-md ring-1 ring-noir/10 backdrop-blur transition hover:bg-canvas disabled:opacity-0 sm:flex",
+        "absolute top-1/2 z-30 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-canvas/90 text-noir shadow-md ring-1 ring-noir/10 backdrop-blur transition hover:bg-canvas active:scale-90 sm:flex",
         side === "left" ? "left-3" : "right-3",
       )}
     >
