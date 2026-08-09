@@ -47,8 +47,13 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
     shipping.pickupLocations,
   );
 
+  // Only a zone that takes a whole state claims it. A zone built out of parts
+  // of Lagos leaves Lagos free for the next one — which is the whole point of
+  // having more than one Lagos zone.
   const claimed = new Set(
-    zones.flatMap((zone) => zone.states.map((name) => name.toLowerCase())),
+    zones
+      .filter((zone) => zone.areas.length === 0)
+      .flatMap((zone) => zone.states.map((name) => name.toLowerCase())),
   );
   const claimedAreas = new Set(
     zones.flatMap((zone) => zone.areas.map((name) => name.toLowerCase())),
@@ -237,9 +242,24 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                   </div>
                 </fieldset>
 
-                {/* Lagos is twenty million people and an hour's drive across.
-                    A zone that claims it can be narrowed to the parts it
-                    actually covers, and then it prices only those. */}
+                {/* Lagos is twenty million people and an hour's drive
+                    across, so it can be split as finely as a shop likes: name
+                    the parts a zone covers and it prices only those, which
+                    leaves the rest of Lagos for the next zone. */}
+                {zone.areas.length === 0 &&
+                  !zone.states.includes(AREA_STATE) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        update(zone.id, { areas: [LAGOS_AREAS[0]] })
+                      }
+                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+                    >
+                      <Plus className="size-3.5" />
+                      Price parts of Lagos separately
+                    </button>
+                  )}
+
                 {(zone.states.includes(AREA_STATE) ||
                   zone.areas.length > 0) && (
                   <fieldset className="mt-3">
@@ -288,8 +308,9 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                     </div>
 
                     <p className="mt-2 text-xs text-ink-muted">
-                      Pick none and this zone covers all of Lagos. Pick some and
-                      it covers only those, at this price.
+                      {zone.areas.length === 0
+                        ? "None picked, so this zone covers all of Lagos. Pick some and it covers only those — and Lagos stays available for another zone at another price."
+                        : "This zone covers only these parts, at this price. Anywhere in Lagos nobody has named falls to a whole-Lagos zone, or to the default."}
                     </p>
                   </fieldset>
                 )}

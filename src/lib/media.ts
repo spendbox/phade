@@ -35,7 +35,7 @@ export function posterFor(media: string[]): string | null {
  * black box and a picture for a product with no photograph to fall back on.
  */
 export function firstFrame(url: string): string {
-  return url.includes("#") ? url : `${url}#t=0.1`;
+  return url.includes("#t=") ? url : `${url}#t=0.1`;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,28 +71,91 @@ export type Focus = keyof typeof FOCUS_POSITIONS;
 
 export const FOCUS_KEYS = Object.keys(FOCUS_POSITIONS) as Focus[];
 
-const FOCUS_MARK = "#pos=";
-
 function isFocus(value: string): value is Focus {
   return value in FOCUS_POSITIONS;
 }
 
+/**
+ * Everything the shop has decided about one piece of media, carried in the
+ * URL's fragment.
+ *
+ * `…/dress.webp#pos=top` frames a photograph. `…/clip.mp4#t=1.4,8.2` trims a
+ * video to the seconds worth keeping — that is the standard media fragment,
+ * which browsers honour without any help from us, so "trimming" costs no
+ * re-encoding and no upload. `…&poster=<url>` is the still to hold on before
+ * it plays.
+ *
+ * All of it lives in the fragment because a fragment is never sent to a
+ * server: the file resolves exactly as it did before, every URL already stored
+ * keeps working, and none of these choices needed a column.
+ */
+export type MediaHints = {
+  src: string;
+  focus: Focus;
+  /** Seconds, when the shop has trimmed the clip. */
+  trim: { start: number; end: number } | null;
+  poster: string | null;
+};
+
+function seconds(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+export function readHints(url: string): MediaHints {
+  const at = url.indexOf("#");
+  if (at === -1) return { src: url, focus: "center", trim: null, poster: null };
+
+  const src = url.slice(0, at);
+  const params = new URLSearchParams(url.slice(at + 1));
+
+  const wantedFocus = params.get("pos") ?? "";
+  const [start, end] = (params.get("t") ?? "").split(",");
+  const from = seconds(start);
+  const to = seconds(end);
+  const poster = params.get("poster");
+
+  return {
+    src,
+    focus: isFocus(wantedFocus) ? wantedFocus : "center",
+    trim: from !== null && to !== null && to > from ? { start: from, end: to } : null,
+    poster: poster || null,
+  };
+}
+
+/** Rebuilds a URL from its file and whatever the shop has chosen about it. */
+export function withHints(
+  url: string,
+  next: Partial<Omit<MediaHints, "src">>,
+): string {
+  const current = readHints(url);
+  const merged = { ...current, ...next };
+
+  const params = new URLSearchParams();
+  if (merged.focus !== "center") params.set("pos", merged.focus);
+  if (merged.trim) {
+    params.set("t", `${round(merged.trim.start)},${round(merged.trim.end)}`);
+  }
+  if (merged.poster) params.set("poster", merged.poster);
+
+  const fragment = params.toString();
+  return fragment ? `${merged.src}#${fragment}` : merged.src;
+}
+
+function round(value: number): number {
+  return Math.max(Math.round(value * 10) / 10, 0);
+}
+
 /** Splits a stored URL into the file and how it should be framed. */
 export function readFocus(url: string): { src: string; focus: Focus } {
-  const at = url.indexOf(FOCUS_MARK);
-  if (at === -1) return { src: url, focus: "center" };
-
-  const wanted = url.slice(at + FOCUS_MARK.length);
-  return {
-    src: url.slice(0, at),
-    focus: isFocus(wanted) ? wanted : "center",
-  };
+  const { src, focus } = readHints(url);
+  return { src, focus };
 }
 
 /** Stores a framing choice on a URL. Centre is the default, so it stores none. */
 export function withFocus(url: string, focus: Focus): string {
-  const { src } = readFocus(url);
-  return focus === "center" ? src : `${src}${FOCUS_MARK}${focus}`;
+  return withHints(url, { focus });
 }
 
 /** The CSS for a framing choice. */

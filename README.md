@@ -42,7 +42,7 @@ because that is where a thumb is. On a wider screen the header takes over.
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | **General** — the default low-stock alert level. **Team** — who else can sign in, what they can do, and what the limited role is called. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and size run. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero, the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the footer blurb and social links. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state (or by parts of Lagos, for a shop that prices Lekki differently from Ikorodu) with their own prices, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
+| **Settings** | **General** — the default low-stock alert level. **Team** — who else can sign in, what they can do, and what the limited role is called. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and its size runs: a shop that sells dresses and shoes names both, and a product picks which run it belongs to rather than being offered a 12 and a 38 on the same row. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero, the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the footer blurb and social links. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state, or as many separate Lagos zones as a shop wants — name the parts each one covers and it prices only those, leaving the rest of Lagos for the next zone, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -200,11 +200,23 @@ A few decisions worth knowing:
   collections, products, the shop, saved, tracking — rather than typed. A
   mistyped path is a button that goes nowhere, found by a customer rather than
   by the person who wrote it. Pasting a full address still works.
+- **Clips are trimmed without being re-encoded.** The in and out points ride
+  in the URL as a media fragment (`#t=1.4,8.2`) — the standard way to name a
+  range of a video, which browsers play by themselves — so cutting the wobbly
+  first second off a clip is instant, works from a phone on mobile data, and
+  can be undone later with nothing lost. The file in storage is never touched.
+  The placeholder is a real still: scrub to the frame worth showing, and it is
+  drawn to a canvas, encoded as WebP and uploaded like any other picture.
 - **A clip is never a black box.** A product whose cover is a video borrows the
   next photograph in the same product as its poster, and where there isn't one
   the browser is asked for the frame a tenth of a second in — a few kilobytes,
   and a picture instead of a black rectangle. The dashboard's thumbnails do the
   same.
+- **The hero is the same picture everywhere.** A photograph shot for a shop is
+  usually portrait, and a wide screen cropping it to fill takes the model's
+  head off. So the hero shows the whole thing, over a blown-up blurred copy of
+  itself that fills whatever shape the screen is — a phone and a laptop see the
+  same composition rather than two different crops.
 - **The shop chooses where a picture is framed.** Every surface crops — a
   square tile, a 3:4 card, a hero — and a centred crop takes the head off a
   studio shot as happily as the hem. So each uploaded picture carries a

@@ -157,7 +157,7 @@ export function ProductForm({
           </Panel>
 
           <Panel title="Sizes">
-            <SizePicker initial={product?.sizes ?? []} options={defaults.sizes} />
+            <SizePicker initial={product?.sizes ?? []} runs={defaults.runs} />
           </Panel>
 
           <Panel title="Pricing">

@@ -403,6 +403,87 @@
   will-change: transform;
 }
 
+@keyframes phade-aurora-a {
+  0% {
+    transform: translate3d(-12%, -8%, 0) rotate(0deg) scale(1.1);
+  }
+  50% {
+    transform: translate3d(10%, 6%, 0) rotate(120deg) scale(1.35);
+  }
+  100% {
+    transform: translate3d(-12%, -8%, 0) rotate(240deg) scale(1.1);
+  }
+}
+
+@keyframes phade-aurora-b {
+  0% {
+    transform: translate3d(8%, 10%, 0) scale(1.2);
+  }
+  50% {
+    transform: translate3d(-10%, -6%, 0) scale(1.45);
+  }
+  100% {
+    transform: translate3d(8%, 10%, 0) scale(1.2);
+  }
+}
+
+/* The dark panel the featured deck sits on.
+
+   Flat black behind a deck of cards is a hole in the page. Two slow bands of
+   colour moving behind it — brand rose on one side, a cool counterweight on
+   the other — make it a stage instead, and cost a few hundred bytes of CSS
+   rather than a megabyte of looping GIF that would band and blur on a phone.
+   Nothing here paints over the cards: both layers live under the content in
+   the panel's own stacking context. */
+.featured-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: #0c0c0d;
+}
+.featured-stage::before,
+.featured-stage::after {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  z-index: -1;
+  pointer-events: none;
+}
+.featured-stage::before {
+  background:
+    radial-gradient(
+      42% 42% at 28% 30%,
+      color-mix(in oklab, var(--color-brand) 78%, transparent),
+      transparent 68%
+    ),
+    radial-gradient(
+      36% 36% at 74% 22%,
+      color-mix(in oklab, #6d3bd6 55%, transparent),
+      transparent 70%
+    );
+  filter: blur(58px);
+  opacity: 0.55;
+  animation: phade-aurora-a 30s ease-in-out infinite;
+  will-change: transform;
+}
+.featured-stage::after {
+  background:
+    radial-gradient(
+      40% 40% at 78% 74%,
+      color-mix(in oklab, #1f6f6b 62%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      30% 30% at 18% 82%,
+      color-mix(in oklab, var(--color-brand) 60%, transparent),
+      transparent 72%
+    );
+  filter: blur(64px);
+  opacity: 0.45;
+  animation: phade-aurora-b 38s ease-in-out infinite;
+  will-change: transform;
+}
+
 /* Nobody asked for a moving page. Anyone who has said so gets a still one. */
 @media (prefers-reduced-motion: reduce) {
   .marquee-track,
@@ -410,7 +491,9 @@
   .rise,
   .sheet-up,
   .pop-heart,
-  .shop-glow::before {
+  .shop-glow::before,
+  .featured-stage::before,
+  .featured-stage::after {
     animation: none;
   }
   .rail {

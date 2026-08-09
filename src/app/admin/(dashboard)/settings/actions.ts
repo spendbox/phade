@@ -6,7 +6,7 @@ import { actionError, requireOwner } from "@/lib/guard";
 import {
   CATALOGUE_KEY,
   parseColorList,
-  parseSizeList,
+  parseRuns,
   type CatalogueDefaults,
 } from "@/lib/catalogue-settings";
 import { nairaToKobo } from "@/lib/format";
@@ -213,10 +213,10 @@ export async function saveCatalogue(
     const supabase = requireSupabase();
 
     let rawColors: unknown = [];
-    let rawSizes: unknown = [];
+    let rawRuns: unknown = [];
     try {
       rawColors = JSON.parse(String(formData.get("colors") ?? "[]"));
-      rawSizes = JSON.parse(String(formData.get("sizes") ?? "[]"));
+      rawRuns = JSON.parse(String(formData.get("runs") ?? "[]"));
     } catch {
       throw new Error("Couldn't read those values. Try again.");
     }
@@ -226,10 +226,14 @@ export async function saveCatalogue(
       throw new Error("Keep at least one colour in the palette.");
     }
 
-    const content: CatalogueDefaults = {
-      colors,
-      sizes: parseSizeList(rawSizes),
-    };
+    const runs = parseRuns(rawRuns);
+    // A run with no name or no sizes is dropped by the parser rather than
+    // stored half-made; saying so beats a silent disappearance.
+    if (Array.isArray(rawRuns) && rawRuns.length > 0 && runs.length === 0) {
+      throw new Error("Give every size run a name and at least one size.");
+    }
+
+    const content: CatalogueDefaults = { colors, runs };
 
     const { error } = await supabase.from("app_settings").upsert(
       {

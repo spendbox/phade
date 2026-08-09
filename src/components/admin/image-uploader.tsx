@@ -1,9 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Crop, ImagePlus, Loader2, Star, Trash2 } from "lucide-react";
+import {
+  Check,
+  Crop,
+  ImagePlus,
+  Loader2,
+  Scissors,
+  Star,
+  Trash2,
+} from "lucide-react";
 
 import { MediaThumb } from "@/components/admin/media-thumb";
+import { VideoEditor } from "@/components/admin/video-editor";
 import { cn } from "@/lib/cn";
 import {
   FOCUS_KEYS,
@@ -52,6 +61,8 @@ export function ImageUploader({
   const [dragging, setDragging] = useState(false);
   /** The picture whose framing grid is open, if any. */
   const [framing, setFraming] = useState<string | null>(null);
+  /** The clip open in the trim-and-placeholder editor, if any. */
+  const [editing, setEditing] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const room = limit ? Math.max(limit - media.length, 0) : Infinity;
@@ -126,7 +137,17 @@ export function ImageUploader({
                   that can hover still gets them out of the way of the
                   picture. */}
               <div className="absolute inset-x-1.5 bottom-1.5 flex justify-end gap-1 transition-opacity focus-within:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
-                {!isVideoUrl(url) && (
+                {isVideoUrl(url) ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(url)}
+                    title="Trim and placeholder"
+                    aria-label="Trim this clip and choose its placeholder"
+                    className="mr-auto flex size-7 items-center justify-center rounded-md bg-surface/95 text-ink-secondary shadow-sm hover:text-ink"
+                  >
+                    <Scissors className="size-3.5" />
+                  </button>
+                ) : (
                   <button
                     type="button"
                     onClick={() =>
@@ -237,6 +258,19 @@ export function ImageUploader({
         <p role="alert" className="text-sm text-critical">
           {error}
         </p>
+      )}
+
+      {editing && (
+        <VideoEditor
+          url={editing}
+          open
+          onClose={() => setEditing(null)}
+          onSave={(next) =>
+            setMedia((current) =>
+              current.map((item) => (item === editing ? next : item)),
+            )
+          }
+        />
       )}
     </div>
   );

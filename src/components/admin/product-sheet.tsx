@@ -779,7 +779,7 @@ function EditorModal({
             <SizePicker
               key={`sizes-${row.id}`}
               initial={row.sizes ?? []}
-              options={defaults.sizes}
+              runs={defaults.runs}
               onChange={(sizes) => {
                 valueRef.current = JSON.stringify(sizes);
               }}

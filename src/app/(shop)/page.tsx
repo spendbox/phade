@@ -121,8 +121,9 @@ export default async function LandingPage() {
           {deck.length > 0 && (
             <section className="mt-12 px-4 sm:mt-16 sm:px-6 lg:px-8">
               {/* Dark, once, in the middle of an ivory page: the deck is the
-                  one thing here meant to be played with rather than read. */}
-              <div className="overflow-hidden rounded-[2rem] bg-noir px-5 py-10 text-white sm:px-10 sm:py-14">
+                  one thing here meant to be played with rather than read, and
+                  the light moving behind it says so. */}
+              <div className="featured-stage rounded-[2rem] px-5 py-10 text-white sm:px-10 sm:py-14">
                 <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-14">
                   <div>
                     <h2 className="text-balance text-3xl font-semibold leading-[1.05] tracking-tight sm:text-4xl lg:text-5xl">

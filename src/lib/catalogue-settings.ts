@@ -9,9 +9,24 @@ import { PRODUCT_SIZES, type ProductColor } from "@/lib/types";
  * lands on the same burgundy every time instead of a fresh guess per upload.
  */
 
+/**
+ * One named run of sizes.
+ *
+ * A shop that sells dresses and shoes has two size runs and no way to say so
+ * with one list: a 38 is a shoe and a 12 is a dress, and offering both on
+ * every product is how a size gets ticked by accident. So the runs are named,
+ * and a product picks the one it belongs to.
+ */
+export type SizeRun = {
+  id: string;
+  name: string;
+  sizes: number[];
+};
+
 export type CatalogueDefaults = {
   colors: ProductColor[];
-  sizes: number[];
+  /** Every run this shop uses, in the order they are offered. */
+  runs: SizeRun[];
 };
 
 export const CATALOGUE_KEY = "catalogue_defaults";
@@ -39,7 +54,14 @@ export const DEFAULT_CATALOGUE: CatalogueDefaults = {
     { name: "Silver", hex: "#c0c0c0" },
     { name: "Gold", hex: "#c9a227" },
   ],
-  sizes: [...PRODUCT_SIZES],
+  runs: [
+    { id: "clothing", name: "Clothing", sizes: [...PRODUCT_SIZES] },
+    {
+      id: "shoes",
+      name: "Shoes",
+      sizes: [35, 36, 37, 38, 39, 40, 41, 42, 43, 44],
+    },
+  ],
 };
 
 export function parseColorList(raw: unknown): ProductColor[] {
@@ -60,14 +82,15 @@ export function parseColorList(raw: unknown): ProductColor[] {
   });
 }
 
-/** Sizes are whole numbers between 2 and 30 — a size run, not arbitrary data. */
+/** Sizes are whole numbers between 2 and 60 — a size run, not arbitrary data. */
 export function parseSizeList(raw: unknown): number[] {
   if (!Array.isArray(raw)) return [];
 
   const chosen = new Set<number>();
   for (const item of raw) {
     const size = Number(item);
-    if (Number.isInteger(size) && size >= 2 && size <= 30) chosen.add(size);
+    // Wide enough for a UK dress size and a European shoe alike.
+    if (Number.isInteger(size) && size >= 2 && size <= 60) chosen.add(size);
   }
   return [...chosen].sort((a, b) => a - b);
 }
@@ -77,12 +100,53 @@ export function parseCatalogue(raw: unknown): CatalogueDefaults {
   const value = raw as Record<string, unknown>;
 
   const colors = parseColorList(value.colors);
-  const sizes = parseSizeList(value.sizes);
+  const runs = parseRuns(value.runs, value.sizes);
 
   return {
     colors: colors.length > 0 ? colors : DEFAULT_CATALOGUE.colors,
-    sizes: sizes.length > 0 ? sizes : DEFAULT_CATALOGUE.sizes,
+    runs: runs.length > 0 ? runs : DEFAULT_CATALOGUE.runs,
   };
+}
+
+/**
+ * The named runs, with one eye on the single flat list this used to be: a shop
+ * that saved its sizes before runs existed keeps them, as a run called
+ * Clothing, rather than waking up to the defaults.
+ */
+export function parseRuns(raw: unknown, legacy?: unknown): SizeRun[] {
+  if (Array.isArray(raw)) {
+    const runs = raw.flatMap((item): SizeRun[] => {
+      if (typeof item !== "object" || item === null) return [];
+      const value = item as Record<string, unknown>;
+      const name = typeof value.name === "string" ? value.name.trim() : "";
+      const sizes = parseSizeList(value.sizes);
+      if (!name || sizes.length === 0) return [];
+
+      return [
+        {
+          id:
+            typeof value.id === "string" && value.id
+              ? value.id
+              : name.toLowerCase().replace(/\s+/g, "-"),
+          name,
+          sizes,
+        },
+      ];
+    });
+    if (runs.length > 0) return runs;
+  }
+
+  const kept = parseSizeList(legacy);
+  return kept.length > 0
+    ? [{ id: "clothing", name: "Clothing", sizes: kept }]
+    : [];
+}
+
+/** Every size the shop uses, whichever run it came from. */
+export function allSizes(defaults: CatalogueDefaults): number[] {
+  const seen = new Set<number>();
+  for (const run of defaults.runs) for (const size of run.sizes) seen.add(size);
+  return [...seen].sort((a, b) => a - b);
 }
 
 export async function getCatalogueDefaults(): Promise<CatalogueDefaults> {

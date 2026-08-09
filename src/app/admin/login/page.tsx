@@ -52,11 +52,6 @@ export default async function LoginPage({
             </p>
           </div>
         )}
-
-        <p className="mt-6 text-center text-xs text-ink-muted">
-          Credentials are set through environment variables — there is no
-          sign-up.
-        </p>
       </div>
     </main>
   );

@@ -11,6 +11,7 @@ import {
   Plus,
   Sparkles,
   Tag,
+  Scissors,
   Trash2,
   Upload,
   X,
@@ -25,6 +26,7 @@ import { SizePicker } from "@/components/admin/size-picker";
 import { SelectField } from "@/components/ui/select-field";
 import type { CatalogueDefaults } from "@/lib/catalogue-settings";
 import { MediaThumb } from "@/components/admin/media-thumb";
+import { VideoEditor } from "@/components/admin/video-editor";
 import { Button, buttonClass } from "@/components/ui/button";
 import {
   Field,
@@ -37,7 +39,7 @@ import {
 import { describeProduct, mergeTags, suggestTags } from "@/lib/ai-client";
 import { CategoryIcon } from "@/lib/category-icons";
 import { cn } from "@/lib/cn";
-import { isPickableMedia, PICKABLE_MEDIA_TYPES } from "@/lib/media";
+import { isPickableMedia, isVideoUrl, PICKABLE_MEDIA_TYPES } from "@/lib/media";
 import { uploadMedia } from "@/lib/upload-client";
 import type { Category, ProductColor, ProductStatus } from "@/lib/types";
 
@@ -188,6 +190,11 @@ export function ProductUploader({
       current.map((draft) => (draft.id === id ? { ...draft, ...patch } : draft)),
     );
   }
+
+  /** The clip open in the trim editor, and the draft it belongs to. */
+  const [editing, setEditing] = useState<{ draftId: string; url: string } | null>(
+    null,
+  );
 
   async function handleFiles(files: FileList | File[]) {
     const list = [...files].filter(isPickableMedia);
@@ -368,6 +375,21 @@ export function ProductUploader({
         </p>
       </div>
 
+      {editing && (
+        <VideoEditor
+          url={editing.url}
+          open
+          onClose={() => setEditing(null)}
+          onSave={(next) =>
+            update(editing.draftId, {
+              media: (
+                drafts.find((draft) => draft.id === editing.draftId)?.media ?? []
+              ).map((item) => (item === editing.url ? next : item)),
+            })
+          }
+        />
+      )}
+
       {drafts.length === 0 ? (
         <Dropzone
           onFiles={handleFiles}
@@ -387,6 +409,21 @@ export function ProductUploader({
                       className="aspect-square w-full rounded-lg ring-1 ring-inset ring-line"
                       controls
                     />
+
+                    {/* One product at a time, as each is added: trim the clip
+                        and pick the frame it rests on before publishing. */}
+                    {isVideoUrl(draft.media[0]) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditing({ draftId: draft.id, url: draft.media[0] })
+                        }
+                        className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-plane text-xs font-medium text-ink transition hover:bg-line-strong"
+                      >
+                        <Scissors className="size-3.5" />
+                        Trim &amp; placeholder
+                      </button>
+                    )}
 
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {draft.media.slice(1).map((url) => (
@@ -829,7 +866,7 @@ function MoreDetails({
         <SizePicker
           name={`sizes-${draft.id}`}
           initial={draft.sizes}
-          options={defaults.sizes}
+          runs={defaults.runs}
           onChange={(sizes) => onChange({ sizes })}
         />
       </Field>

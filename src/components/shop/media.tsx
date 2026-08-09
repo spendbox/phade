@@ -6,7 +6,7 @@ import {
   firstFrame,
   isVideoUrl,
   objectPosition,
-  readFocus,
+  readHints,
 } from "@/lib/media";
 
 /**
@@ -60,6 +60,7 @@ export function Media({
   priority = false,
   autoPlay = false,
   poster,
+  fit = "cover",
 }: {
   url: string | null | undefined;
   alt: string;
@@ -73,6 +74,13 @@ export function Media({
    * rarely the frame anyone would have chosen, so the shop can choose one.
    */
   poster?: string | null;
+  /**
+   * `cover` fills the box and crops; `contain` shows the whole picture and
+   * leaves room around it. The hero uses `contain` so that one photograph
+   * looks the same on a phone as on a laptop, instead of being cropped two
+   * different ways by two different shapes of screen.
+   */
+  fit?: "cover" | "contain";
 }) {
   if (!url) {
     return (
@@ -87,19 +95,32 @@ export function Media({
     );
   }
 
-  const { src, focus } = readFocus(url);
-  const framing = { objectPosition: objectPosition(focus) };
+  const hints = readHints(url);
+  const { src, focus } = hints;
+  // The shop's own poster wins over anything a caller guessed at.
+  const still = hints.poster ?? poster ?? null;
+  const framing = {
+    objectPosition: objectPosition(focus),
+    objectFit: fit,
+  } as const;
 
   if (isVideoUrl(src)) {
     return (
       <video
-        // With no still to hold on, ask the browser to seek a tenth of a
-        // second in and paint that — otherwise a clip is a black box until it
-        // has downloaded enough to decode a frame.
-        src={poster ? src : firstFrame(src)}
+        // Trimmed clips carry their range as a media fragment, which the
+        // browser honours by itself. Untrimmed ones with no still to hold on
+        // are asked for the frame a tenth of a second in, so a clip is a
+        // picture rather than a black box while it loads.
+        src={
+          hints.trim
+            ? `${src}#t=${hints.trim.start},${hints.trim.end}`
+            : still
+              ? src
+              : firstFrame(src)
+        }
         style={framing}
-        poster={poster ?? undefined}
-        className={cn("bg-canvas-deep object-cover", className)}
+        poster={still ?? undefined}
+        className={cn("bg-canvas-deep", className)}
         muted
         loop
         playsInline
@@ -122,7 +143,6 @@ export function Media({
           sizes={sizes}
           priority={priority}
           style={framing}
-          className="object-cover"
         />
       </span>
     );
@@ -138,7 +158,7 @@ export function Media({
       loading={priority ? "eager" : "lazy"}
       fetchPriority={priority ? "high" : "auto"}
       decoding="async"
-      className={cn("object-cover", className)}
+      className={cn(className)}
     />
   );
 }

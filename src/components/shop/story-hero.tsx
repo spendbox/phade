@@ -92,13 +92,26 @@ export function StoryHero({
               position === index ? "opacity-100" : "opacity-0",
             )}
           >
+            {/* The same photograph twice. Underneath, blown up and blurred, it
+                fills whatever shape the screen is. On top it is shown whole,
+                so a phone and a laptop see the same picture rather than two
+                different crops of it — which is what a photograph shot for a
+                shop deserves, and why nobody's head gets cut off on desktop. */}
             <Media
               url={url}
               alt=""
               priority={position === 0}
+              sizes="100vw"
+              className="size-full scale-110 blur-2xl saturate-125"
+            />
+            <Media
+              url={url}
+              alt=""
+              fit="contain"
+              priority={position === 0}
               autoPlay={position === index}
               sizes="100vw"
-              className="size-full"
+              className="absolute inset-0 size-full"
             />
           </div>
         ))

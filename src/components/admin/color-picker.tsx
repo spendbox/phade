@@ -65,8 +65,9 @@ export function ColorPicker({
     }
     commit([
       ...colors,
+      // A colourway is added because the shop has one, so it starts at one.
       counted
-        ? { name: clean, hex: color.hex, stock: color.stock ?? 0 }
+        ? { name: clean, hex: color.hex, stock: color.stock ?? 1 }
         : { name: clean, hex: color.hex },
     ]);
   }
@@ -103,7 +104,7 @@ export function ColorPicker({
                   min={0}
                   step={1}
                   inputMode="numeric"
-                  value={color.stock ?? 0}
+                  value={color.stock ?? 1}
                   onChange={(event) =>
                     commit(
                       colors.map((item) =>
