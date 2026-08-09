@@ -25,6 +25,8 @@ export type ShopperDetails = {
   line2: string;
   city: string;
   state: string;
+  /** Which part of Lagos, when that is where it goes. */
+  area: string;
   fulfilment: "shipping" | "pickup";
 };
 
@@ -37,6 +39,7 @@ export const NO_DETAILS: ShopperDetails = {
   line2: "",
   city: "",
   state: "",
+  area: "",
   fulfilment: "shipping",
 };
 
@@ -77,6 +80,7 @@ export function detailsFrom(form: FormData): ShopperDetails {
     line2: text(form.get("line2")).trim(),
     city: text(form.get("city")).trim(),
     state: text(form.get("state")).trim(),
+    area: text(form.get("area")).trim(),
     fulfilment: form.get("fulfilment") === "pickup" ? "pickup" : "shipping",
   };
 }
@@ -96,6 +100,7 @@ export function safeDetails(raw: ShopperDetails): ShopperDetails {
     line2: text(raw.line2),
     city: text(raw.city),
     state: text(raw.state),
+    area: text(raw.area),
     fulfilment: raw.fulfilment === "pickup" ? "pickup" : "shipping",
   };
 }

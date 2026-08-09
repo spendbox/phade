@@ -2,7 +2,12 @@ import Image from "next/image";
 import { ImageIcon } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { isVideoUrl, objectPosition, readFocus } from "@/lib/media";
+import {
+  firstFrame,
+  isVideoUrl,
+  objectPosition,
+  readFocus,
+} from "@/lib/media";
 
 /**
  * One frame of product media.
@@ -88,10 +93,13 @@ export function Media({
   if (isVideoUrl(src)) {
     return (
       <video
-        src={src}
+        // With no still to hold on, ask the browser to seek a tenth of a
+        // second in and paint that — otherwise a clip is a black box until it
+        // has downloaded enough to decode a frame.
+        src={poster ? src : firstFrame(src)}
         style={framing}
         poster={poster ?? undefined}
-        className={cn("object-cover", className)}
+        className={cn("bg-canvas-deep object-cover", className)}
         muted
         loop
         playsInline

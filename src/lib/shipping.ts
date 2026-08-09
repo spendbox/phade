@@ -25,12 +25,29 @@ export type ShippingZone = {
   name: string;
   /** State names this zone covers, matched case-insensitively. */
   states: string[];
+  /**
+   * Areas of Lagos this zone covers, when the shop prices Lagos more finely
+   * than "Lagos". Getting a parcel to Ikoyi is not what it costs to get one to
+   * Ikorodu, and both are Lagos. A zone with areas only claims those areas; a
+   * zone with none claims whole states, as it always did.
+   */
+  areas: string[];
   feeKobo: number;
   /**
    * Spend this much and this zone ships free. Null falls back to the shop-wide
    * threshold, which is what most shops want.
    */
   freeOverKobo: number | null;
+};
+
+/** Somewhere a shopper can collect an order in person. */
+export type PickupLocation = {
+  id: string;
+  /** What the shop calls it — "The studio", "Lekki shop". */
+  name: string;
+  address: string;
+  /** Opening hours, a landmark, which gate to use. */
+  note: string;
 };
 
 export type ShippingSettings = {
@@ -42,6 +59,12 @@ export type ShippingSettings = {
   pickupEnabled: boolean;
   /** Where and when, shown wherever pickup is offered. */
   pickupNote: string;
+  /**
+   * The shop's own counters. A shopper choosing collection picks one, and it
+   * travels on the order so the confirmation says where to go rather than
+   * "we'll message you".
+   */
+  pickupLocations: PickupLocation[];
 };
 
 export const SHIPPING_KEY = "shipping_settings";
@@ -52,6 +75,7 @@ export const DEFAULT_SHIPPING: ShippingSettings = {
   zones: [],
   pickupEnabled: true,
   pickupNote: "Collect from us — we'll message you when it's ready.",
+  pickupLocations: [],
 };
 
 /**
@@ -99,10 +123,95 @@ export const NIGERIAN_STATES = [
   "Zamfara",
 ] as const;
 
+/**
+ * Lagos, in the pieces a courier actually thinks in.
+ *
+ * The state is one entry in the list above and about twenty million people in
+ * practice, spread from Badagry to Epe. A shop that charges one Lagos price is
+ * either overcharging Yaba or losing money on Ikorodu, so the checkout asks
+ * which part of Lagos, and a zone can be built out of these.
+ */
+export const LAGOS_AREAS = [
+  "Agege",
+  "Ajah",
+  "Alimosho",
+  "Amuwo-Odofin",
+  "Apapa",
+  "Badagry",
+  "Egbeda",
+  "Epe",
+  "Festac",
+  "Gbagada",
+  "Ibeju-Lekki",
+  "Idimu",
+  "Ifako-Ijaiye",
+  "Ijesha",
+  "Ikeja",
+  "Ikorodu",
+  "Ikoyi",
+  "Ilupeju",
+  "Isolo",
+  "Ketu",
+  "Lagos Island",
+  "Lekki",
+  "Magodo",
+  "Maryland",
+  "Mushin",
+  "Ogba",
+  "Ogudu",
+  "Ojo",
+  "Ojota",
+  "Okota",
+  "Oshodi",
+  "Sangotedo",
+  "Shomolu",
+  "Surulere",
+  "Victoria Island",
+  "Yaba",
+] as const;
+
+/** The one state that is asked about in more detail. */
+export const AREA_STATE = "Lagos";
+
+function textList(raw: unknown): string[] {
+  return Array.isArray(raw)
+    ? raw.filter(
+        (item): item is string => typeof item === "string" && item.trim() !== "",
+      )
+    : [];
+}
+
 function kobo(value: unknown, fallback: number): number {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount < 0) return fallback;
   return Math.trunc(amount);
+}
+
+function parsePickup(raw: unknown): PickupLocation[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.flatMap((item): PickupLocation[] => {
+    if (typeof item !== "object" || item === null) return [];
+    const value = item as Record<string, unknown>;
+
+    const name = typeof value.name === "string" ? value.name.trim() : "";
+    const address =
+      typeof value.address === "string" ? value.address.trim() : "";
+    // A counter with no address is not somewhere anyone can go.
+    if (!name || !address) return [];
+
+    return [
+      {
+        id:
+          typeof value.id === "string" && value.id
+            ? value.id
+            : name.toLowerCase(),
+        name,
+        address,
+        note: typeof value.note === "string" ? value.note.trim() : "",
+      },
+    ];
+  });
 }
 
 function parseZone(raw: unknown): ShippingZone[] {
@@ -112,12 +221,10 @@ function parseZone(raw: unknown): ShippingZone[] {
   const name = typeof value.name === "string" ? value.name.trim() : "";
   if (!name) return [];
 
-  const states = Array.isArray(value.states)
-    ? value.states.filter(
-        (state): state is string => typeof state === "string" && state.trim() !== "",
-      )
-    : [];
-  if (states.length === 0) return [];
+  const states = textList(value.states);
+  const areas = textList(value.areas);
+  // A zone that claims nothing would silently price everything.
+  if (states.length === 0 && areas.length === 0) return [];
 
   const freeOver =
     value.freeOverKobo === null || value.freeOverKobo === undefined
@@ -129,6 +236,7 @@ function parseZone(raw: unknown): ShippingZone[] {
       id: typeof value.id === "string" && value.id ? value.id : name.toLowerCase(),
       name,
       states,
+      areas,
       feeKobo: kobo(value.feeKobo, 0),
       freeOverKobo: freeOver,
     },
@@ -149,22 +257,41 @@ export function parseShipping(raw: unknown): ShippingSettings {
       typeof value.pickupNote === "string"
         ? value.pickupNote
         : DEFAULT_SHIPPING.pickupNote,
+    pickupLocations: parsePickup(value.pickupLocations),
   };
 }
 
-/** The zone covering a state, or null when none names it. */
+/**
+ * The zone that claims this destination, or null when none does.
+ *
+ * An area beats a state: a shop that has priced Lekki separately means it,
+ * and the Lagos-wide zone it also sits inside is the fallback, not the answer.
+ */
 export function zoneFor(
   shipping: ShippingSettings,
   state: string | null | undefined,
+  area?: string | null,
 ): ShippingZone | null {
-  if (!state) return null;
-  const wanted = state.trim().toLowerCase();
-  if (!wanted) return null;
+  const claims = (list: string[], wanted: string) =>
+    list.some((name) => name.trim().toLowerCase() === wanted);
+
+  const wantedArea = area?.trim().toLowerCase();
+  if (wantedArea) {
+    const byArea = shipping.zones.find((zone) =>
+      claims(zone.areas, wantedArea),
+    );
+    if (byArea) return byArea;
+  }
+
+  const wantedState = state?.trim().toLowerCase();
+  if (!wantedState) return null;
 
   return (
-    shipping.zones.find((zone) =>
-      zone.states.some((name) => name.trim().toLowerCase() === wanted),
-    ) ?? null
+    shipping.zones.find(
+      (zone) => zone.areas.length === 0 && claims(zone.states, wantedState),
+    ) ??
+    shipping.zones.find((zone) => claims(zone.states, wantedState)) ??
+    null
   );
 }
 
@@ -187,13 +314,18 @@ export type DeliveryQuote = {
 export function quoteDelivery(
   shipping: ShippingSettings,
   subtotalKobo: number,
-  options: { fulfilment: "shipping" | "pickup"; state?: string | null },
+  options: {
+    fulfilment: "shipping" | "pickup";
+    state?: string | null;
+    /** Which part of Lagos, when that is where it is going. */
+    area?: string | null;
+  },
 ): DeliveryQuote {
   if (options.fulfilment === "pickup") {
     return { feeKobo: 0, label: "Pickup", free: true, toFreeKobo: null };
   }
 
-  const zone = zoneFor(shipping, options.state);
+  const zone = zoneFor(shipping, options.state, options.area);
   const fee = zone ? zone.feeKobo : shipping.defaultFeeKobo;
   const threshold = zone?.freeOverKobo ?? shipping.freeOverKobo;
 

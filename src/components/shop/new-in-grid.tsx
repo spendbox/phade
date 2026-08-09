@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 
 import { Media } from "@/components/shop/media";
 import { useShop } from "@/components/shop/shop-provider";
+import { posterFor } from "@/lib/media";
 import { formatNairaShort } from "@/lib/format";
 import { percentOff, type ShopProduct } from "@/lib/shop";
 
@@ -56,6 +57,7 @@ function Tile({
     <article className="group relative aspect-[3/4] overflow-hidden rounded-3xl bg-canvas-deep">
       <Media
         url={product.media[0]}
+        poster={posterFor(product.media)}
         alt={product.name}
         priority={priority}
         sizes="(min-width: 640px) 33vw, 50vw"

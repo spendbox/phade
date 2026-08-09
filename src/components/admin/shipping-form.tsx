@@ -13,7 +13,10 @@ import { Panel } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
 import { formatNairaShort, koboToNairaInput, nairaToKobo } from "@/lib/format";
 import {
+  AREA_STATE,
+  LAGOS_AREAS,
   NIGERIAN_STATES,
+  type PickupLocation,
   type ShippingSettings,
   type ShippingZone,
 } from "@/lib/shipping";
@@ -40,9 +43,15 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
 
   const [zones, setZones] = useState<ShippingZone[]>(shipping.zones);
   const [pickup, setPickup] = useState(shipping.pickupEnabled);
+  const [places, setPlaces] = useState<PickupLocation[]>(
+    shipping.pickupLocations,
+  );
 
   const claimed = new Set(
     zones.flatMap((zone) => zone.states.map((name) => name.toLowerCase())),
+  );
+  const claimedAreas = new Set(
+    zones.flatMap((zone) => zone.areas.map((name) => name.toLowerCase())),
   );
 
   function update(id: string, patch: Partial<ShippingZone>) {
@@ -97,6 +106,7 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                   id: `zone_${Date.now()}`,
                   name: "",
                   states: [],
+                  areas: [],
                   feeKobo: shipping.defaultFeeKobo,
                   freeOverKobo: null,
                 },
@@ -226,6 +236,63 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                     })}
                   </div>
                 </fieldset>
+
+                {/* Lagos is twenty million people and an hour's drive across.
+                    A zone that claims it can be narrowed to the parts it
+                    actually covers, and then it prices only those. */}
+                {(zone.states.includes(AREA_STATE) ||
+                  zone.areas.length > 0) && (
+                  <fieldset className="mt-3">
+                    <legend className="flex items-center gap-1.5 text-[13px] font-medium text-ink-secondary">
+                      <MapPin className="size-3.5 text-ink-muted" />
+                      Parts of Lagos
+                      <span className="text-ink-muted">
+                        ({zone.areas.length === 0
+                          ? "all of it"
+                          : zone.areas.length})
+                      </span>
+                    </legend>
+
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {LAGOS_AREAS.map((area) => {
+                        const chosen = zone.areas.includes(area);
+                        const taken =
+                          !chosen && claimedAreas.has(area.toLowerCase());
+
+                        return (
+                          <button
+                            key={area}
+                            type="button"
+                            disabled={taken}
+                            onClick={() =>
+                              update(zone.id, {
+                                areas: chosen
+                                  ? zone.areas.filter((entry) => entry !== area)
+                                  : [...zone.areas, area],
+                              })
+                            }
+                            aria-pressed={chosen}
+                            className={cn(
+                              "rounded-full px-2.5 py-1 text-xs transition",
+                              chosen
+                                ? "bg-noir font-medium text-white"
+                                : taken
+                                  ? "cursor-not-allowed bg-surface text-ink-muted opacity-50"
+                                  : "bg-surface text-ink-secondary hover:bg-line-strong hover:text-ink",
+                            )}
+                          >
+                            {area}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <p className="mt-2 text-xs text-ink-muted">
+                      Pick none and this zone covers all of Lagos. Pick some and
+                      it covers only those, at this price.
+                    </p>
+                  </fieldset>
+                )}
               </li>
             ))}
           </ul>
@@ -251,15 +318,122 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
           <Field
             label="What to tell them"
             htmlFor="pickup_note"
-            hint="Where to come, and when. Shown at checkout and on the order."
+            hint="Shown at checkout and on the order, under whichever counter they chose."
           >
             <Input
               id="pickup_note"
               name="pickup_note"
               defaultValue={shipping.pickupNote}
               disabled={!pickup}
-              placeholder="Collect from the studio, Mon–Sat, 10am–6pm."
+              placeholder="Collect Mon–Sat, 10am–6pm."
             />
+          </Field>
+
+          <input
+            type="hidden"
+            name="pickup_locations"
+            value={JSON.stringify(places)}
+          />
+
+          <Field
+            label="Where they collect from"
+            hint={
+              places.length === 0
+                ? "No address yet — the checkout just says collection is free."
+                : `${places.length} to choose from at checkout.`
+            }
+            action={
+              <button
+                type="button"
+                onClick={() =>
+                  setPlaces((current) => [
+                    ...current,
+                    {
+                      id: `place_${Date.now()}`,
+                      name: "",
+                      address: "",
+                      note: "",
+                    },
+                  ])
+                }
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+              >
+                <Plus className="size-3.5" />
+                Add an address
+              </button>
+            }
+          >
+            {places.length === 0 ? (
+              <p className="rounded-lg bg-plane px-3 py-5 text-center text-sm text-ink-muted">
+                Add the shop, the studio, wherever a customer can walk in.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {places.map((place) => (
+                  <li key={place.id} className="rounded-xl bg-plane p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="grid flex-1 gap-3">
+                        <Input
+                          value={place.name}
+                          onChange={(event) =>
+                            setPlaces((current) =>
+                              current.map((entry) =>
+                                entry.id === place.id
+                                  ? { ...entry, name: event.target.value }
+                                  : entry,
+                              ),
+                            )
+                          }
+                          placeholder="The studio"
+                          aria-label="Name"
+                        />
+                        <Input
+                          value={place.address}
+                          onChange={(event) =>
+                            setPlaces((current) =>
+                              current.map((entry) =>
+                                entry.id === place.id
+                                  ? { ...entry, address: event.target.value }
+                                  : entry,
+                              ),
+                            )
+                          }
+                          placeholder="12 Awolowo Road, Ikoyi, Lagos"
+                          aria-label="Address"
+                        />
+                        <Input
+                          value={place.note}
+                          onChange={(event) =>
+                            setPlaces((current) =>
+                              current.map((entry) =>
+                                entry.id === place.id
+                                  ? { ...entry, note: event.target.value }
+                                  : entry,
+                              ),
+                            )
+                          }
+                          placeholder="Mon–Sat, 10am–6pm · ring the bell at the black gate"
+                          aria-label="Opening hours or directions"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPlaces((current) =>
+                            current.filter((entry) => entry.id !== place.id),
+                          )
+                        }
+                        aria-label={`Remove ${place.name || "address"}`}
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-critical-soft hover:text-critical"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Field>
         </div>
       </Panel>

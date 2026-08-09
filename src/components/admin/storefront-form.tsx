@@ -9,6 +9,7 @@ import {
 } from "@/app/admin/(dashboard)/settings/actions";
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { MediaThumb } from "@/components/admin/media-thumb";
+import { PathPicker, type PagePath } from "@/components/admin/path-picker";
 import { Button } from "@/components/ui/button";
 import {
   SOCIAL_KEYS,
@@ -44,9 +45,12 @@ export type FeaturedOption = {
 export function StorefrontForm({
   content,
   products,
+  pages,
 }: {
   content: StorefrontContent;
   products: FeaturedOption[];
+  /** Everywhere a button could point, by name. See `getLinkablePages`. */
+  pages: PagePath[];
 }) {
   const [state, formAction, pending] = useActionState(
     saveStorefront,
@@ -62,6 +66,8 @@ export function StorefrontForm({
     ),
   );
   const [aboutOn, setAboutOn] = useState(content.about.enabled);
+  const [heroHref, setHeroHref] = useState(content.heroCtaHref);
+  const [aboutHref, setAboutHref] = useState(content.about.ctaHref);
   const [socials, setSocials] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       content.socials.map((link) => [link.platform, link.url]),
@@ -158,16 +164,13 @@ export function StorefrontForm({
               />
             </Field>
 
-            <Field
-              label="Button link"
-              htmlFor="hero_cta_href"
-              hint="A path like /shop, or a full https:// address."
-            >
-              <Input
+            <Field label="Button goes to" htmlFor="hero_cta_href">
+              <PathPicker
                 id="hero_cta_href"
                 name="hero_cta_href"
-                defaultValue={content.heroCtaHref}
-                placeholder="/shop"
+                pages={pages}
+                value={heroHref}
+                onChange={setHeroHref}
               />
             </Field>
           </div>
@@ -203,7 +206,8 @@ export function StorefrontForm({
           name="collections"
           copy={content.sections.collections}
           fallback={DEFAULT_SECTIONS.collections}
-          where="The ring of categories under the hero."
+          pages={pages}
+          where="The rail of collections under the hero."
           cta={false}
         />
       </Panel>
@@ -214,6 +218,7 @@ export function StorefrontForm({
             name="featured"
             copy={content.sections.featured}
             fallback={DEFAULT_SECTIONS.featured}
+            pages={pages}
             where="The deck of cards a shopper swipes through."
           />
 
@@ -250,6 +255,7 @@ export function StorefrontForm({
           name="newIn"
           copy={content.sections.newIn}
           fallback={DEFAULT_SECTIONS.newIn}
+          pages={pages}
           where="The wall of what arrived most recently."
         />
       </Panel>
@@ -316,12 +322,13 @@ export function StorefrontForm({
               />
             </Field>
 
-            <Field label="Button link" htmlFor="about_cta_href">
-              <Input
+            <Field label="Button goes to" htmlFor="about_cta_href">
+              <PathPicker
                 id="about_cta_href"
                 name="about_cta_href"
-                defaultValue={content.about.ctaHref}
-                placeholder="/shop"
+                pages={pages}
+                value={aboutHref}
+                onChange={setAboutHref}
               />
             </Field>
           </div>
@@ -357,6 +364,7 @@ export function StorefrontForm({
           name="bestSellers"
           copy={content.sections.bestSellers}
           fallback={DEFAULT_SECTIONS.bestSellers}
+          pages={pages}
           where="The rail of what everyone else is buying."
         />
       </Panel>
@@ -366,6 +374,7 @@ export function StorefrontForm({
           name="closing"
           copy={content.sections.closing}
           fallback={DEFAULT_SECTIONS.closing}
+          pages={pages}
           where="The way into the shop, at the foot of the page. The heading is the small line above; the sentence below it is the large one."
           noteLabel="The big line"
           noteHint="Left empty it counts everything in stock for itself, and stays right as pieces sell. Write your own and it stays written."
@@ -461,6 +470,7 @@ function SectionFields({
   copy,
   fallback,
   where,
+  pages,
   cta = true,
   noteLabel = "Subtext",
   noteHint = "The line under the heading. Leave it empty for no line at all.",
@@ -471,6 +481,7 @@ function SectionFields({
   fallback: SectionCopy;
   /** Where on the page this section shows up, in a few words. */
   where: string;
+  pages: PagePath[];
   cta?: boolean;
   noteLabel?: string;
   noteHint?: string;
@@ -481,6 +492,7 @@ function SectionFields({
   // shop that writes over an automatic line should be able to change its mind
   // without guessing what the line used to say.
   const [note, setNote] = useState(copy.note);
+  const [href, setHref] = useState(copy.ctaHref);
 
   return (
     <div className="space-y-4">
@@ -536,12 +548,13 @@ function SectionFields({
             />
           </Field>
 
-          <Field label="Button link" htmlFor={`${name}_cta_href`}>
-            <Input
+          <Field label="Button goes to" htmlFor={`${name}_cta_href`}>
+            <PathPicker
               id={`${name}_cta_href`}
               name={`${name}_cta_href`}
-              defaultValue={copy.ctaHref}
-              placeholder={fallback.ctaHref}
+              pages={pages}
+              value={href}
+              onChange={setHref}
             />
           </Field>
         </div>

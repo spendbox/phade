@@ -110,6 +110,9 @@ export function SiteFooter({
               <li>
                 <FooterLink href="/saved">Saved</FooterLink>
               </li>
+              <li>
+                <FooterLink href="/track">Track an order</FooterLink>
+              </li>
             </ul>
           </nav>
         </div>

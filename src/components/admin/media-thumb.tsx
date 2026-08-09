@@ -1,7 +1,12 @@
 import { ImageIcon } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { isVideoUrl, objectPosition, readFocus } from "@/lib/media";
+import {
+  firstFrame,
+  isVideoUrl,
+  objectPosition,
+  readFocus,
+} from "@/lib/media";
 
 /**
  * Renders a piece of product media. Videos get a real <video> element so the
@@ -39,12 +44,13 @@ export function MediaThumb({
   if (isVideoUrl(src)) {
     return (
       <video
-        src={src}
+        // A frame to look at rather than a black rectangle: see `firstFrame`.
+        src={firstFrame(src)}
+        preload="metadata"
         style={framing}
-        className={cn("bg-ink object-cover", className)}
+        className={cn("bg-plane object-cover", className)}
         muted
         playsInline
-        preload="metadata"
         controls={controls}
       />
     );

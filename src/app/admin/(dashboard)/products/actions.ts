@@ -93,7 +93,15 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
         const colorName = typeof entry.name === "string" ? entry.name.trim() : "";
         const hex = typeof entry.hex === "string" ? entry.hex : "";
         if (!colorName || !/^#[0-9a-fA-F]{3,8}$/.test(hex)) return [];
-        return [{ name: colorName, hex }];
+
+        // A count per colourway, when the form was told to ask for one.
+        const count = Number(entry.stock);
+        const stock =
+          entry.stock === undefined || !Number.isFinite(count)
+            ? undefined
+            : Math.max(Math.trunc(count), 0);
+
+        return [{ name: colorName, hex, ...(stock === undefined ? {} : { stock }) }];
       });
     }
   } catch {
@@ -101,6 +109,15 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
   }
 
   const sizes = parseSizes(formData.get("sizes"));
+
+  // Colours that each carry a number are the count: the shop typed three
+  // emerald and none in black, and the total follows from that rather than
+  // from a second field someone has to remember to keep in step.
+  const counted =
+    colors.length > 0 && colors.every((color) => color.stock !== undefined);
+  const stock = counted
+    ? colors.reduce((total, color) => total + (color.stock ?? 0), 0)
+    : Math.max(integer(formData, "stock"), 0);
 
   return {
     name,
@@ -112,7 +129,7 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
     cost_price_kobo: cost,
     sku: optional(formData, "sku"),
     subcategory: optional(formData, "subcategory"),
-    stock: Math.max(integer(formData, "stock"), 0),
+    stock,
     low_stock_threshold: Math.max(
       integer(formData, "low_stock_threshold", defaultLowStock),
       0,

@@ -892,6 +892,63 @@ export async function getSheetRows(): Promise<QueryResult<SheetRow[]>> {
 }
 
 /** Same list, with a thumbnail — for pickers where the picture is the label. */
+/**
+ * Every page a button on the front page could sensibly point at, by name.
+ *
+ * A shop owner should not have to know that a category lives at
+ * `/shop?category=abayas` — and a mistyped path is a button that goes nowhere,
+ * found by a customer rather than by the person who wrote it.
+ */
+export async function getLinkablePages(): Promise<
+  QueryResult<{ label: string; value: string; group: string }[]>
+> {
+  const supabase = getSupabase();
+
+  const fixed = [
+    { label: "Front page", value: "/", group: "Pages" },
+    { label: "Everything in the shop", value: "/shop", group: "Pages" },
+    { label: "New in", value: "/shop?sort=new", group: "Pages" },
+    { label: "Best selling", value: "/shop?sort=best", group: "Pages" },
+    { label: "On sale", value: "/shop?sale=1", group: "Pages" },
+    { label: "Saved", value: "/saved", group: "Pages" },
+    { label: "Track an order", value: "/track", group: "Pages" },
+  ];
+
+  if (!supabase) return empty(fixed, NOT_CONFIGURED);
+
+  const [categories, products] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("name, slug")
+      .order("sort_order", { ascending: true })
+      .limit(100),
+    supabase
+      .from("products")
+      .select("name, slug")
+      .eq("status", "active")
+      .order("name", { ascending: true })
+      .limit(300),
+  ]);
+
+  return empty([
+    ...fixed,
+    ...((categories.data ?? []) as { name: string; slug: string }[]).map(
+      (row) => ({
+        label: row.name,
+        value: `/shop?category=${row.slug}`,
+        group: "Collections",
+      }),
+    ),
+    ...((products.data ?? []) as { name: string; slug: string }[]).map(
+      (row) => ({
+        label: row.name,
+        value: `/product/${row.slug}`,
+        group: "Products",
+      }),
+    ),
+  ]);
+}
+
 export async function getProductPickerOptions(): Promise<
   QueryResult<{ id: string; name: string; image: string | null }[]>
 > {

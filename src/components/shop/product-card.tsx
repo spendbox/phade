@@ -5,6 +5,7 @@ import { Heart, Plus } from "lucide-react";
 import { Media } from "@/components/shop/media";
 import { Rail } from "@/components/shop/rail";
 import { useShop } from "@/components/shop/shop-provider";
+import { posterFor } from "@/lib/media";
 import { cn } from "@/lib/cn";
 import { formatNairaShort } from "@/lib/format";
 import { isNewIn, percentOff, type ShopProduct } from "@/lib/shop";
@@ -51,6 +52,7 @@ export function ProductCard({
       <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-canvas-deep">
         <Media
           url={product.media[0]}
+          poster={posterFor(product.media)}
           alt={product.name}
           priority={priority}
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 45vw"

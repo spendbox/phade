@@ -13,6 +13,31 @@ export function isVideoUrl(url: string | null | undefined): boolean {
   return VIDEO_EXTENSIONS.some((extension) => path.endsWith(extension));
 }
 
+/**
+ * The still to show for a product whose cover is a clip.
+ *
+ * A `<video>` with nothing to hold on paints black until it has downloaded
+ * enough to decode a frame — so a shop that leads with video gets a grid of
+ * black rectangles, which reads as broken rather than as film. The next
+ * photograph in the same product is the honest stand-in: it is the same piece,
+ * shot by the same person, on the same day.
+ */
+export function posterFor(media: string[]): string | null {
+  return media.find((url) => !isVideoUrl(url)) ?? null;
+}
+
+/**
+ * Asks the browser for one frame.
+ *
+ * A media fragment of `#t=0.1` tells it to seek a tenth of a second in, which
+ * every browser will do off `preload="metadata"` — a few kilobytes rather than
+ * the whole clip — and paint what it finds. It is the difference between a
+ * black box and a picture for a product with no photograph to fall back on.
+ */
+export function firstFrame(url: string): string {
+  return url.includes("#") ? url : `${url}#t=0.1`;
+}
+
 // ---------------------------------------------------------------------------
 // Where a picture is framed
 // ---------------------------------------------------------------------------

@@ -270,8 +270,10 @@ export async function saveShipping(
     const supabase = requireSupabase();
 
     let rawZones: unknown = [];
+    let rawPlaces: unknown = [];
     try {
       rawZones = JSON.parse(String(formData.get("zones") ?? "[]"));
+      rawPlaces = JSON.parse(String(formData.get("pickup_locations") ?? "[]"));
     } catch {
       throw new Error("Couldn't read those zones. Try again.");
     }
@@ -279,10 +281,26 @@ export async function saveShipping(
     if (Array.isArray(rawZones)) {
       for (const zone of rawZones as Record<string, unknown>[]) {
         const named = typeof zone?.name === "string" && zone.name.trim();
-        const covers = Array.isArray(zone?.states) && zone.states.length > 0;
+        // Either whole states, or named parts of Lagos — but something.
+        const covers =
+          (Array.isArray(zone?.states) && zone.states.length > 0) ||
+          (Array.isArray(zone?.areas) && zone.areas.length > 0);
         if (!named || !covers) {
           throw new Error(
-            "Every zone needs a name and at least one state. Remove the empty one, or fill it in.",
+            "Every zone needs a name and somewhere it covers. Remove the empty one, or fill it in.",
+          );
+        }
+      }
+    }
+
+    if (Array.isArray(rawPlaces)) {
+      for (const place of rawPlaces as Record<string, unknown>[]) {
+        const named = typeof place?.name === "string" && place.name.trim();
+        const located =
+          typeof place?.address === "string" && place.address.trim();
+        if (!named || !located) {
+          throw new Error(
+            "A pickup address needs a name and an address. Remove the empty one, or fill it in.",
           );
         }
       }
@@ -294,6 +312,7 @@ export async function saveShipping(
       zones: rawZones,
       pickupEnabled: formData.get("pickup_enabled") === "on",
       pickupNote: String(formData.get("pickup_note") ?? "").trim(),
+      pickupLocations: rawPlaces,
     });
 
     const { error } = await supabase.from("app_settings").upsert(

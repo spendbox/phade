@@ -16,6 +16,7 @@ import { SizePicker } from "@/components/admin/size-picker";
 import { SelectField } from "@/components/ui/select-field";
 import type { CatalogueDefaults } from "@/lib/catalogue-settings";
 import { ImageUploader } from "@/components/admin/image-uploader";
+import { SlugField } from "@/components/admin/slug-field";
 import { TagsField } from "@/components/admin/tags-field";
 import { Button, buttonClass } from "@/components/ui/button";
 import {
@@ -27,9 +28,18 @@ import {
 } from "@/components/ui/field";
 import { Panel } from "@/components/ui/stat-tile";
 import { koboToNairaInput, slugify } from "@/lib/format";
-import type { Category, ProductWithCategory } from "@/lib/types";
+import type {
+  Category,
+  ProductColor,
+  ProductWithCategory,
+} from "@/lib/types";
 
 const initialState: ProductFormState = { ok: null };
+
+/** Whether the colourways are carrying the count for this product. */
+function counts(colors: ProductColor[]): boolean {
+  return colors.length > 0 && colors.every((color) => color.stock !== undefined);
+}
 
 export function ProductForm({
   product,
@@ -56,6 +66,14 @@ export function ProductForm({
 
   const [name, setName] = useState(product?.name ?? "");
   const [slug, setSlug] = useState(product?.slug ?? "");
+  const [colors, setColors] = useState<ProductColor[]>(product?.colors ?? []);
+
+  // Colours carry the count once every one of them has a number on it.
+  const countedColours = counts(colors);
+  const colourTotal = colors.reduce(
+    (total, color) => total + Math.max(color.stock ?? 0, 0),
+    0,
+  );
   const [slugTouched, setSlugTouched] = useState(Boolean(product?.slug));
 
   // A new product goes back to the list once it's saved; edits stay put so the
@@ -128,7 +146,14 @@ export function ProductForm({
             <ColorPicker
               initial={product?.colors ?? []}
               suggestions={defaults.colors}
+              counted
+              onChange={setColors}
             />
+            <p className="mt-2 text-xs text-ink-muted">
+              How many of each you have. They add up to the stock on hand
+              below, so a colourway that runs out stops being something a
+              shopper can choose.
+            </p>
           </Panel>
 
           <Panel title="Sizes">
@@ -175,14 +200,35 @@ export function ProductForm({
 
           <Panel title="Inventory">
             <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Stock on hand" htmlFor="stock">
-                <NumberInput
-                  id="stock"
-                  name="stock"
-                  min={0}
-                  step={1}
-                  defaultValue={product?.stock ?? 0}
-                />
+              <Field
+                label="Stock on hand"
+                htmlFor="stock"
+                hint={
+                  countedColours
+                    ? "Added up from the colours above."
+                    : undefined
+                }
+              >
+                {countedColours ? (
+                  <>
+                    <input type="hidden" name="stock" value={colourTotal} />
+                    <p className="flex h-9 items-center rounded-lg bg-plane px-3 text-sm tabular-nums text-ink">
+                      {colourTotal}
+                      <span className="ml-2 text-xs text-ink-muted">
+                        across {colors.length} colour
+                        {colors.length === 1 ? "" : "s"}
+                      </span>
+                    </p>
+                  </>
+                ) : (
+                  <NumberInput
+                    id="stock"
+                    name="stock"
+                    min={0}
+                    step={1}
+                    defaultValue={product?.stock ?? 0}
+                  />
+                )}
               </Field>
               <Field
                 label="Low stock at"
@@ -279,18 +325,15 @@ export function ProductForm({
                 enabled={aiEnabled}
               />
 
-              <Field label="URL slug" htmlFor="slug" hint="/shop/your-slug">
-                <Input
-                  id="slug"
-                  name="slug"
-                  value={slug}
-                  onChange={(event) => {
-                    setSlugTouched(true);
-                    setSlug(event.target.value);
-                  }}
-                  placeholder="adaeze-wrap-dress"
-                />
-              </Field>
+              <SlugField
+                value={slug}
+                onChange={(next) => {
+                  setSlugTouched(true);
+                  setSlug(next);
+                }}
+                prefix="/product/"
+                editing={Boolean(product)}
+              />
             </div>
           </Panel>
         </div>

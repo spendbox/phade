@@ -1,6 +1,6 @@
 import { StorefrontForm } from "@/components/admin/storefront-form";
 import { SetupNotice } from "@/components/admin/setup-notice";
-import { getProductPickerOptions } from "@/lib/queries";
+import { getLinkablePages, getProductPickerOptions } from "@/lib/queries";
 import { getStorefront } from "@/lib/storefront";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
@@ -14,10 +14,13 @@ export default async function StorefrontSettingsPage() {
     );
   }
 
-  const [content, { data: products }] = await Promise.all([
+  const [content, { data: products }, { data: pages }] = await Promise.all([
     getStorefront(),
     getProductPickerOptions(),
+    getLinkablePages(),
   ]);
 
-  return <StorefrontForm content={content} products={products} />;
+  return (
+    <StorefrontForm content={content} products={products} pages={pages} />
+  );
 }

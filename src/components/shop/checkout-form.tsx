@@ -6,6 +6,7 @@ import {
   Check,
   Loader2,
   Lock,
+  MapPin,
   Plus,
   ShoppingBag,
   Store,
@@ -39,7 +40,9 @@ import {
   safeDetails,
 } from "@/lib/shopper-details";
 import {
+  AREA_STATE,
   cheapestFee,
+  LAGOS_AREAS,
   NIGERIAN_STATES,
   quoteDelivery,
   type ShippingSettings,
@@ -139,17 +142,29 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
   // The delivery charge depends on where it's going, so the state field is the
   // one input on this form that changes the total as you use it.
   const [state_, setState] = useState(stored.state);
+  // Lagos is asked about twice: the state, then the part of it. Getting a
+  // parcel to Ikoyi is not what it costs to get one to Ikorodu.
+  const [area, setArea] = useState(stored.area);
   const [note, setNote] = useState("");
+  const [pickupAt, setPickupAt] = useState(
+    () => shipping.pickupLocations[0]?.id ?? "",
+  );
 
   const delivering = fulfilment === "shipping";
+  const inLagos = delivering && state_ === AREA_STATE;
+  const counters = shipping.pickupLocations;
+  const collectingFrom = counters.find((place) => place.id === pickupAt);
 
   const whoDone =
     Boolean(name.trim()) &&
     EMAIL.test(email.trim()) &&
     digitCount(phones[0]?.number ?? "") >= 7;
   const whereDone =
-    !delivering || Boolean(line1.trim() && city.trim() && state_);
-  const ready = whoDone && whereDone;
+    !delivering ||
+    Boolean(line1.trim() && city.trim() && state_ && (!inLagos || area));
+  // Collection with nowhere chosen is an order nobody can hand over.
+  const howDone = delivering || counters.length === 0 || Boolean(collectingFrom);
+  const ready = howDone && whoDone && whereDone;
 
   const steps: StepKey[] = delivering
     ? ["how", "who", "where", "note"]
@@ -185,6 +200,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
   const quote = quoteDelivery(shipping, subtotalKobo, {
     fulfilment,
     state: state_,
+    area,
   });
   const total = subtotalKobo - (coupon.applied?.amountKobo ?? 0) + quote.feeKobo;
 
@@ -234,7 +250,11 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
           <input type="hidden" name="line2" value={line2.trim()} />
           <input type="hidden" name="city" value={city.trim()} />
           <input type="hidden" name="state" value={state_} />
+          {inLagos && <input type="hidden" name="area" value={area} />}
         </>
+      )}
+      {!delivering && collectingFrom && (
+        <input type="hidden" name="pickup_location" value={collectingFrom.id} />
       )}
       {coupon.applied && (
         <input type="hidden" name="coupon" value={coupon.applied.code} />
@@ -259,15 +279,18 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
           title="How would you like it?"
           summary={
             delivering
-              ? state_
-                ? `Delivered to ${state_}`
+              ? area || state_
+                ? `Delivered to ${[area, state_].filter(Boolean).join(", ")}`
                 : "Delivered"
-              : "Collected from us"
+              : collectingFrom
+                ? `Collect from ${collectingFrom.name}`
+                : "Collected from us"
           }
           open={open === "how"}
-          done
+          done={howDone}
           onOpen={() => setOpen("how")}
           onNext={() => setOpen(whoDone && !delivering ? "note" : "who")}
+          nextDisabled={!howDone}
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Choice
@@ -295,10 +318,70 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
                 onChange={() => setFulfilment("pickup")}
                 icon={<Store className="size-4" aria-hidden />}
                 title="Picked up"
-                note="Free"
+                note={
+                  counters.length > 1
+                    ? `Free · ${counters.length} places`
+                    : "Free"
+                }
               />
             )}
           </div>
+
+          {/* Where to come, chosen rather than described: the address travels
+              on the order, so the confirmation says where to go. */}
+          {!delivering && counters.length > 0 && (
+            <fieldset className="mt-4">
+              <legend className="text-[13px] font-medium text-ink-secondary">
+                Collect from
+              </legend>
+              <ul className="mt-2 space-y-2">
+                {counters.map((place) => {
+                  const chosen = place.id === pickupAt;
+                  return (
+                    <li key={place.id}>
+                      <label
+                        className={cn(
+                          "flex cursor-pointer gap-3 rounded-2xl p-3.5 transition",
+                          chosen
+                            ? "bg-canvas ring-2 ring-noir"
+                            : "bg-canvas-deep/60 ring-1 ring-inset ring-line hover:ring-line-strong",
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="pickup_choice"
+                          value={place.id}
+                          checked={chosen}
+                          onChange={() => setPickupAt(place.id)}
+                          className="sr-only"
+                        />
+                        <MapPin
+                          className={cn(
+                            "mt-0.5 size-4 shrink-0",
+                            chosen ? "text-brand" : "text-ink-muted",
+                          )}
+                          aria-hidden
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium text-ink">
+                            {place.name}
+                          </span>
+                          <span className="block text-xs text-ink-secondary">
+                            {place.address}
+                          </span>
+                          {place.note && (
+                            <span className="mt-0.5 block text-xs text-ink-muted">
+                              {place.note}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </fieldset>
+          )}
         </Step>
 
         <Step
@@ -409,6 +492,30 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
                   </p>
                 </div>
               </div>
+
+              {inLagos && (
+                <div>
+                  <label
+                    htmlFor="area"
+                    className="block text-[13px] font-medium text-ink-secondary"
+                  >
+                    Part of Lagos<span className="ml-0.5 text-critical">*</span>
+                  </label>
+                  <div className="mt-1.5">
+                    <SearchSelect
+                      id="area"
+                      options={[...LAGOS_AREAS]}
+                      value={area}
+                      onChange={setArea}
+                      placeholder="Ikeja, Lekki, Yaba…"
+                      emptyLabel="No area by that name"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    Lagos is an hour across. This is what the rider is given.
+                  </p>
+                </div>
+              )}
             </div>
           </Step>
         )}
@@ -496,8 +603,8 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
               <dt className="min-w-0 text-ink-secondary">
                 {!delivering
                   ? "Pickup"
-                  : state_
-                    ? `Delivery · ${state_}`
+                  : area || state_
+                    ? `Delivery · ${area || state_}`
                     : "Delivery"}
               </dt>
               <dd className="shrink-0 font-medium text-ink tabular-nums">
@@ -515,6 +622,16 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
               </dd>
             </div>
           </dl>
+
+          {!delivering && collectingFrom && (
+            <p className="mt-4 rounded-xl bg-canvas px-3 py-2.5 text-[13px] text-ink-secondary">
+              <span className="font-medium text-ink">
+                {collectingFrom.name}
+              </span>
+              <br />
+              {collectingFrom.address}
+            </p>
+          )}
 
           {!delivering && shipping.pickupNote && (
             <p className="mt-4 rounded-xl bg-canvas px-3 py-2.5 text-[13px] text-ink-secondary">
