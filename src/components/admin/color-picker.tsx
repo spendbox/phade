@@ -48,9 +48,16 @@ export function ColorPicker({
   counted?: boolean;
   onChange?: (colors: ProductColor[]) => void;
 }) {
-  const [colors, setColors] = useState<ProductColor[]>(initial);
+  // Counted from the moment it opens: a colourway carried over from a product
+  // that never kept per-colour numbers has no count, and an unanswered box is
+  // read as nought the first time this is saved.
+  const [colors, setColors] = useState<ProductColor[]>(() =>
+    counted ? initial.map((color) => ({ ...color, stock: color.stock ?? 0 })) : initial,
+  );
   const [draftName, setDraftName] = useState("");
   const [draftHex, setDraftHex] = useState("#a63655");
+  /** What is in each count box while it is being typed in, keyed by colour. */
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   function commit(next: ProductColor[]) {
     setColors(next);
@@ -65,11 +72,30 @@ export function ColorPicker({
     }
     commit([
       ...colors,
-      // A colourway is added because the shop has one, so it starts at one.
       counted
-        ? { name: clean, hex: color.hex, stock: color.stock ?? 1 }
+        ? { name: clean, hex: color.hex, stock: color.stock ?? 0 }
         : { name: clean, hex: color.hex },
     ]);
+  }
+
+  /**
+   * Typing over the count.
+   *
+   * A number field showing 0 with the caret behind it turns "13" into "013" —
+   * which parses to thirteen but reads as a mistake while it is being typed.
+   * So the field is a string while it is being edited: focusing selects what
+   * is there so the first keystroke replaces it, a leading zero is dropped as
+   * soon as a digit follows it, and clearing the box leaves it empty rather
+   * than snapping back to a 0 that has to be deleted again.
+   */
+  function setCount(name: string, raw: string) {
+    const cleaned = raw.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "");
+    setDrafts({ ...drafts, [name]: cleaned });
+    commit(
+      colors.map((item) =>
+        item.name === name ? { ...item, stock: Number(cleaned || 0) } : item,
+      ),
+    );
   }
 
   return (
@@ -100,26 +126,17 @@ export function ColorPicker({
                 </label>
                 <input
                   id={`stock-${color.name}`}
-                  type="number"
-                  min={0}
-                  step={1}
+                  type="text"
                   inputMode="numeric"
-                  value={color.stock ?? 1}
-                  onChange={(event) =>
-                    commit(
-                      colors.map((item) =>
-                        item.name === color.name
-                          ? {
-                              ...item,
-                              stock: Math.max(
-                                Math.trunc(Number(event.target.value) || 0),
-                                0,
-                              ),
-                            }
-                          : item,
-                      ),
-                    )
-                  }
+                  pattern="[0-9]*"
+                  value={drafts[color.name] ?? String(color.stock ?? 0)}
+                  onFocus={(event) => event.target.select()}
+                  onChange={(event) => setCount(color.name, event.target.value)}
+                  onBlur={() => {
+                    const next = { ...drafts };
+                    delete next[color.name];
+                    setDrafts(next);
+                  }}
                   className="h-8 w-20 rounded-md bg-surface px-2 text-right text-[13px] tabular-nums text-ink shadow-[0_0_0_1px_rgb(11_11_12_/_0.10)] focus:shadow-[0_0_0_2px_var(--color-brand)] focus:outline-none"
                 />
 

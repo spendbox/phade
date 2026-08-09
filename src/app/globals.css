@@ -187,6 +187,16 @@
       scroll-padding-inline: 2rem;
     }
   }
+  /* A rail of full-bleed frames — the pictures in a product pop-up.
+     It has no gutter, so the padding that keeps a card clear of a rail's edge
+     would park every photograph a gutter's width short of the frame, leaving a
+     sliver of the previous one showing and no snap point anyone can land on.
+     And with frames, unlike cards, there is only ever one right resting place,
+     so the snap is mandatory: a swipe lands on a picture or comes back. */
+  .rail-frames {
+    scroll-padding-inline: 0;
+    scroll-snap-type: x mandatory;
+  }
   .rail::-webkit-scrollbar {
     display: none;
   }

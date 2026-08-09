@@ -443,6 +443,7 @@ export type InventoryRow = Pick<
   | "price_kobo"
   | "cost_price_kobo"
   | "images"
+  | "colors"
 > & { category: Pick<Category, "id" | "name"> | null };
 
 export async function getInventory(filters?: {
@@ -455,7 +456,7 @@ export async function getInventory(filters?: {
   let query = supabase
     .from("products")
     .select(
-      "id, name, sku, stock, low_stock_threshold, status, price_kobo, cost_price_kobo, images, category:categories(id, name)",
+      "id, name, sku, stock, low_stock_threshold, status, price_kobo, cost_price_kobo, images, colors, category:categories(id, name)",
     )
     .neq("status", "archived")
     .order("stock", { ascending: true });

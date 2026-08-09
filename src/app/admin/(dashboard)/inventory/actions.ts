@@ -3,6 +3,7 @@
 import { revalidate } from "@/lib/admin-revalidate";
 
 import { actionError, requireOwner } from "@/lib/guard";
+import { parseColors } from "@/lib/product-colors";
 import { requireSupabase } from "@/lib/supabase";
 import type { ActionResult, InventoryReason } from "@/lib/types";
 import { INVENTORY_REASONS } from "@/lib/types";
@@ -25,7 +26,27 @@ export async function adjustStock(
     if (!productId) throw new Error("Missing product.");
 
     const mode = String(formData.get("mode") ?? "adjust");
-    const amount = Number.parseInt(String(formData.get("amount") ?? ""), 10);
+
+    /**
+     * Counting by colourway.
+     *
+     * A product that comes in four colours has four numbers, and the one on
+     * the product row is their sum — kept by hand it drifts from them, and a
+     * shopper is offered a black one nobody has. So editing the colours here
+     * writes both: the counts, and the total they add up to.
+     */
+    const colors =
+      mode === "colors" ? parseColors(String(formData.get("colors") ?? "")) : null;
+    if (colors && colors.length === 0) {
+      throw new Error("Add at least one colourway, or use one of the other tabs.");
+    }
+
+    // Summed defensively rather than through `countedStock`, which answers
+    // null for a list where any colour is uncounted — here that is a colour
+    // the shop has none of, not a reason to write the stock down to zero.
+    const amount = colors
+      ? colors.reduce((sum, color) => sum + (color.stock ?? 0), 0)
+      : Number.parseInt(String(formData.get("amount") ?? ""), 10);
     if (!Number.isFinite(amount)) throw new Error("Enter a number.");
 
     const reasonInput = String(formData.get("reason") ?? "manual");
@@ -45,22 +66,28 @@ export async function adjustStock(
     if (readError) throw new Error(readError.message);
 
     const current = product?.stock ?? 0;
-    const nextStock = mode === "set" ? amount : current + amount;
+    const nextStock = mode === "adjust" ? current + amount : amount;
     if (nextStock < 0) throw new Error("That would take stock below zero.");
 
     const delta = nextStock - current;
-    if (delta === 0) return { ok: true, message: "Stock already at that level." };
+    // Colour counts can be rearranged without the total moving — three black
+    // becoming three white is a real change to save, and no movement to log.
+    if (delta === 0 && !colors) {
+      return { ok: true, message: "Stock already at that level." };
+    }
 
     const { error: updateError } = await supabase
       .from("products")
-      .update({ stock: nextStock })
+      .update(colors ? { stock: nextStock, colors } : { stock: nextStock })
       .eq("id", productId);
     if (updateError) throw new Error(updateError.message);
 
-    const { error: movementError } = await supabase
-      .from("inventory_movements")
-      .insert({ product_id: productId, delta, reason, note });
-    if (movementError) throw new Error(movementError.message);
+    if (delta !== 0) {
+      const { error: movementError } = await supabase
+        .from("inventory_movements")
+        .insert({ product_id: productId, delta, reason, note });
+      if (movementError) throw new Error(movementError.message);
+    }
 
     revalidate("/admin/inventory");
     revalidate("/admin/products");
@@ -73,34 +100,4 @@ export async function adjustStock(
   } catch (error) {
     return actionError(error);
   }
-}
-
-/** One-click +1 / −1 from the inventory table. */
-export async function nudgeStock(formData: FormData): Promise<void> {
-  await requireOwner();
-  const supabase = requireSupabase();
-
-  const productId = String(formData.get("product_id") ?? "");
-  const delta = Number.parseInt(String(formData.get("delta") ?? "0"), 10);
-  if (!productId || !Number.isFinite(delta) || delta === 0) return;
-
-  const { data: product, error } = await supabase
-    .from("products")
-    .select("stock")
-    .eq("id", productId)
-    .single();
-  if (error) throw new Error(error.message);
-
-  const next = Math.max((product?.stock ?? 0) + delta, 0);
-  if (next === product?.stock) return;
-
-  await supabase.from("products").update({ stock: next }).eq("id", productId);
-  await supabase.from("inventory_movements").insert({
-    product_id: productId,
-    delta: next - (product?.stock ?? 0),
-    reason: delta > 0 ? "restock" : "correction",
-    note: "Quick adjustment",
-  });
-
-  revalidate("/admin/inventory");
 }

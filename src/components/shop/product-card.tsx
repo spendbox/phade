@@ -59,18 +59,10 @@ export function ProductCard({
           className="size-full transition-transform duration-500 group-hover:scale-[1.04]"
         />
 
-        {product.media[1] && (
-          // The second photo on hover — the closest a mouse gets to turning a
-          // garment around. `hidden lg:block` is not styling: a phone has no
-          // hover, and without it every card in the grid downloads a second
-          // picture nobody can ever see.
-          <Media
-            url={product.media[1]}
-            alt=""
-            sizes="25vw"
-            className="absolute inset-0 hidden size-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 lg:block"
-          />
-        )}
+        {/* No second picture on hover. A tile that swaps its photograph as the
+            cursor crosses it makes a grid twitch on the way to somewhere else,
+            and the shot the shop chose to lead with is the one that should be
+            there when someone looks. The other pictures are a tap away. */}
 
         <button
           type="button"

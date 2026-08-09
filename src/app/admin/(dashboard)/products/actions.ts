@@ -10,6 +10,7 @@ import { categoryNameFor, generateSku } from "@/lib/sku";
 import { requireSupabase } from "@/lib/supabase";
 import { DELETE_CONFIRMATION } from "@/lib/types";
 import { parseSizeList } from "@/lib/catalogue-settings";
+import { countedStock, parseColors } from "@/lib/product-colors";
 import type {
   ActionResult,
   ProductColor,
@@ -83,41 +84,14 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
     .map((tag) => tag.trim())
     .filter(Boolean);
 
-  let colors: ProductColor[] = [];
-  try {
-    const parsed: unknown = JSON.parse(text(formData, "colors") || "[]");
-    if (Array.isArray(parsed)) {
-      colors = parsed.flatMap((item): ProductColor[] => {
-        if (typeof item !== "object" || item === null) return [];
-        const entry = item as Record<string, unknown>;
-        const colorName = typeof entry.name === "string" ? entry.name.trim() : "";
-        const hex = typeof entry.hex === "string" ? entry.hex : "";
-        if (!colorName || !/^#[0-9a-fA-F]{3,8}$/.test(hex)) return [];
-
-        // A count per colourway, when the form was told to ask for one.
-        const count = Number(entry.stock);
-        const stock =
-          entry.stock === undefined || !Number.isFinite(count)
-            ? undefined
-            : Math.max(Math.trunc(count), 0);
-
-        return [{ name: colorName, hex, ...(stock === undefined ? {} : { stock }) }];
-      });
-    }
-  } catch {
-    colors = [];
-  }
-
+  const colors = parseColors(text(formData, "colors"));
   const sizes = parseSizes(formData.get("sizes"));
 
   // Colours that each carry a number are the count: the shop typed three
   // emerald and none in black, and the total follows from that rather than
   // from a second field someone has to remember to keep in step.
-  const counted =
-    colors.length > 0 && colors.every((color) => color.stock !== undefined);
-  const stock = counted
-    ? colors.reduce((total, color) => total + (color.stock ?? 0), 0)
-    : Math.max(integer(formData, "stock"), 0);
+  const stock =
+    countedStock(colors) ?? Math.max(integer(formData, "stock"), 0);
 
   return {
     name,
