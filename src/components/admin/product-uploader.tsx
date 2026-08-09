@@ -24,7 +24,7 @@ import {
 import { ColorPicker } from "@/components/admin/color-picker";
 import { SizePicker } from "@/components/admin/size-picker";
 import { SelectField } from "@/components/ui/select-field";
-import type { CatalogueDefaults } from "@/lib/catalogue-settings";
+import type { CatalogueDefaults } from "@/lib/catalogue";
 import { MediaThumb } from "@/components/admin/media-thumb";
 import { VideoEditor } from "@/components/admin/video-editor";
 import { Button, buttonClass } from "@/components/ui/button";

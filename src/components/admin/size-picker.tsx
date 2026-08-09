@@ -3,12 +3,10 @@
 import { useState } from "react";
 
 import { cn } from "@/lib/cn";
-import type { SizeRun } from "@/lib/catalogue-settings";
-import { PRODUCT_SIZES } from "@/lib/types";
+import { DEFAULT_CATALOGUE, type SizeRun } from "@/lib/catalogue";
 
-const FALLBACK_RUNS: SizeRun[] = [
-  { id: "clothing", name: "Clothing", sizes: [...PRODUCT_SIZES] },
-];
+/** What a shop that has never opened Settings is offered. */
+const FALLBACK_RUNS: readonly SizeRun[] = DEFAULT_CATALOGUE.runs;
 
 /**
  * Which sizes a product comes in. Optional — plenty of the catalogue (bags,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
 
 import { Media } from "@/components/shop/media";
 import { useShop } from "@/components/shop/shop-provider";
@@ -13,8 +13,10 @@ import type { ShopProduct } from "@/lib/shop";
  *
  * One frame at a time, snapped, swiped with a thumb — the browser does the
  * scrolling, so it has the momentum and the rubber-banding a hand-written
- * carousel never quite gets right. Arrows appear for a cursor, which cannot
- * swipe.
+ * carousel never quite gets right. It has no arrows of its own: the pop-up
+ * already carries a pair for moving along the row of products, and a second
+ * pair a few pixels away, meaning something else entirely, is how a shopper
+ * ends up on a dress they never asked to see.
  *
  * Whatever says "there are more pictures" has to say it over the pictures
  * themselves, and fashion photography is mostly white studio wall. Plain white
@@ -58,13 +60,6 @@ export function ProductGallery({
     return () => element.removeEventListener("scroll", onScroll);
   }, []);
 
-  function go(step: number) {
-    const element = rail.current;
-    if (!element) return;
-    const target = Math.min(Math.max(index + step, 0), media.length - 1);
-    element.scrollTo({ left: element.clientWidth * target, behavior: "smooth" });
-  }
-
   function onPointerUp() {
     const now = Date.now();
     if (now - lastTap.current < 320) {
@@ -85,7 +80,7 @@ export function ProductGallery({
               url={url || null}
               alt={`${product.name}, image ${position + 1}`}
               priority={position === 0}
-              autoPlay={position === 0}
+              autoPlay={position === index}
               sizes="(min-width: 640px) 55vw, 100vw"
               className="size-full"
             />
@@ -133,49 +128,8 @@ export function ProductGallery({
           <span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-noir/55 px-2 py-1 text-[11px] font-semibold tabular-nums text-white backdrop-blur-sm">
             {Math.min(index + 1, media.length)}/{media.length}
           </span>
-
-          <Arrow side="left" onClick={() => go(-1)} disabled={index === 0} />
-          <Arrow
-            side="right"
-            onClick={() => go(1)}
-            disabled={index === media.length - 1}
-          />
         </>
       )}
     </div>
-  );
-}
-
-function Arrow({
-  side,
-  onClick,
-  disabled,
-}: {
-  side: "left" | "right";
-  onClick: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      // Two quick clicks on an arrow are two clicks on an arrow, not a
-      // double-tap on the photo behind it.
-      onPointerUp={(event) => event.stopPropagation()}
-      disabled={disabled}
-      aria-label={side === "left" ? "Previous image" : "Next image"}
-      className={cn(
-        // Ringed and shadowed rather than merely tinted: a translucent white
-        // button on a white photograph is not a button anyone can see.
-        "absolute top-1/2 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full bg-canvas/90 text-noir shadow-md ring-1 ring-noir/10 backdrop-blur transition hover:bg-canvas disabled:opacity-0 sm:flex",
-        side === "left" ? "left-2" : "right-2",
-      )}
-    >
-      {side === "left" ? (
-        <ChevronLeft className="size-5" aria-hidden />
-      ) : (
-        <ChevronRight className="size-5" aria-hidden />
-      )}
-    </button>
   );
 }

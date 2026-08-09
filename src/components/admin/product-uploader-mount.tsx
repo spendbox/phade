@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-import type { CatalogueDefaults } from "@/lib/catalogue-settings";
+import type { CatalogueDefaults } from "@/lib/catalogue";
 import type { Category } from "@/lib/types";
 
 /**

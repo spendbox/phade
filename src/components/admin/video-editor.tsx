@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Loader2, Play, Scissors } from "lucide-react";
+import { Camera, Loader2, Pause, Play, Scissors } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -42,6 +42,7 @@ export function VideoEditor({
   const [end, setEnd] = useState(hints.trim?.end ?? 0);
   const [at, setAt] = useState(hints.trim?.start ?? 0);
   const [poster, setPoster] = useState(hints.poster);
+  const [playing, setPlaying] = useState(false);
   const [grabbing, setGrabbing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,11 +67,28 @@ export function VideoEditor({
     setAt(clamped);
   }
 
-  function playRange() {
+  /**
+   * Plays the trimmed range, and stops it again.
+   *
+   * Choosing a placeholder means watching the clip until the right frame goes
+   * past, and then wanting it to stop there. A button that could only start
+   * playback left the only way to do that as waiting for the end.
+   */
+  function togglePlay() {
     const element = video.current;
     if (!element) return;
-    element.currentTime = start;
-    void element.play();
+
+    if (!element.paused) {
+      element.pause();
+      return;
+    }
+
+    // Restarting from the top once it has run out; otherwise picking up
+    // wherever it was scrubbed to.
+    if (element.currentTime < start || element.currentTime >= end - 0.05) {
+      element.currentTime = start;
+    }
+    void element.play().catch(() => setPlaying(false));
   }
 
   /** Draws whatever is on screen right now and uploads it as the poster. */
@@ -130,13 +148,19 @@ export function VideoEditor({
             muted
             preload="metadata"
             onLoadedMetadata={onLoaded}
+            // Tracked from the element, not from the click, so the button
+            // still reads right when the clip pauses at the end of the trim.
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
             onTimeUpdate={(event) => {
               const element = event.currentTarget;
               setAt(element.currentTime);
               // Preview the trim rather than the whole file.
               if (end > 0 && element.currentTime >= end) element.pause();
             }}
-            className="mx-auto max-h-[45vh] w-full object-contain"
+            onClick={togglePlay}
+            className="mx-auto max-h-[45vh] w-full cursor-pointer object-contain"
           />
         </div>
 
@@ -190,11 +214,16 @@ export function VideoEditor({
 
             <button
               type="button"
-              onClick={playRange}
+              onClick={togglePlay}
+              aria-pressed={playing}
               className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-plane px-3 text-sm font-medium text-ink transition hover:bg-line-strong"
             >
-              <Play className="size-3.5" />
-              Preview
+              {playing ? (
+                <Pause className="size-3.5" />
+              ) : (
+                <Play className="size-3.5" />
+              )}
+              {playing ? "Pause" : "Preview"}
             </button>
 
             <button

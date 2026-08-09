@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Loader2, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 import {
   saveCatalogue,
@@ -11,7 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Panel } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
-import type { CatalogueDefaults, SizeRun } from "@/lib/catalogue-settings";
+import {
+  DEFAULT_CATALOGUE,
+  MAX_SIZE,
+  MIN_SIZE,
+  type CatalogueDefaults,
+  type SizeRun,
+} from "@/lib/catalogue";
 import type { ProductColor } from "@/lib/types";
 
 const initialState: CatalogueFormState = { ok: null };
@@ -36,6 +42,8 @@ export function CatalogueForm({ defaults }: { defaults: CatalogueDefaults }) {
   const [draftHex, setDraftHex] = useState("#a63655");
   /** One in-progress size per run, keyed by run. */
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  /** Whether the reset button is waiting to be pressed a second time. */
+  const [confirming, setConfirming] = useState(false);
 
   function updateRun(id: string, patch: Partial<SizeRun>) {
     setRuns((current) =>
@@ -55,7 +63,7 @@ export function CatalogueForm({ defaults }: { defaults: CatalogueDefaults }) {
 
   function addSize(runId: string) {
     const size = Number.parseInt(drafts[runId] ?? "", 10);
-    if (!Number.isInteger(size) || size < 2 || size > 60) return;
+    if (!Number.isInteger(size) || size < MIN_SIZE || size > MAX_SIZE) return;
 
     const run = runs.find((item) => item.id === runId);
     if (!run || run.sizes.includes(size)) return;
@@ -162,27 +170,50 @@ export function CatalogueForm({ defaults }: { defaults: CatalogueDefaults }) {
       <Panel
         title="Size runs"
         action={
-          <button
-            type="button"
-            onClick={() =>
-              setRuns([
-                ...runs,
-                { id: `run_${Date.now()}`, name: "", sizes: [] },
-              ])
-            }
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
-          >
-            <Plus className="size-3.5" />
-            Add a run
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Asks once. Restoring the shipped runs throws away whatever is
+                in the panel, which is not something to do on a mis-tap. */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirming) {
+                  setConfirming(true);
+                  return;
+                }
+                setRuns(DEFAULT_CATALOGUE.runs.map((run) => ({ ...run })));
+                setConfirming(false);
+              }}
+              onBlur={() => setConfirming(false)}
+              className={cn(
+                "inline-flex items-center gap-1.5 text-xs font-medium",
+                confirming
+                  ? "text-critical"
+                  : "text-ink-secondary hover:text-ink",
+              )}
+            >
+              <RotateCcw className="size-3.5" />
+              {confirming ? "Replace what's here?" : "Reset to defaults"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setRuns([
+                  ...runs,
+                  { id: `run_${Date.now()}`, name: "", sizes: [] },
+                ])
+              }
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+            >
+              <Plus className="size-3.5" />
+              Add a run
+            </button>
+          </div>
         }
       >
         <div className="space-y-4">
           <p className="text-sm text-ink-secondary">
-            A shop that sells dresses and shoes has two size runs: a 38 is a
-            shoe and a 12 is a dress, and offering both on every product is how
-            the wrong one gets ticked. Name each run and a product picks which
-            it belongs to. Sizes stay optional — bags simply have none.
+            Add multiple size runs for various types of products.
           </p>
 
           {runs.length === 0 && (
@@ -250,8 +281,8 @@ export function CatalogueForm({ defaults }: { defaults: CatalogueDefaults }) {
                   <input
                     type="number"
                     inputMode="numeric"
-                    min={2}
-                    max={60}
+                    min={MIN_SIZE}
+                    max={MAX_SIZE}
                     step={1}
                     value={drafts[run.id] ?? ""}
                     onChange={(event) =>
@@ -262,7 +293,8 @@ export function CatalogueForm({ defaults }: { defaults: CatalogueDefaults }) {
                       event.preventDefault();
                       addSize(run.id);
                     }}
-                    placeholder="Size"
+                    placeholder={`${MIN_SIZE}–${MAX_SIZE}`}
+                    aria-label={`Add a size to ${run.name || "this run"}`}
                     className={cn(
                       "h-10 w-28 rounded-lg bg-surface px-3 text-sm tabular-nums text-ink",
                       "shadow-[0_0_0_1px_rgb(11_11_12_/_0.10)] placeholder:text-ink-muted",

@@ -20,6 +20,7 @@ import { Media } from "@/components/shop/media";
 import { ProductGallery } from "@/components/shop/product-gallery";
 import { Sheet } from "@/components/shop/sheet";
 import { useShop } from "@/components/shop/shop-provider";
+import { SwipeCue } from "@/components/shop/swipe-cue";
 import { cn } from "@/lib/cn";
 import { formatNairaShort } from "@/lib/format";
 import { LOW_STOCK_SHOWS_AT, percentOff, type ShopProduct } from "@/lib/shop";
@@ -97,6 +98,10 @@ export function ProductModal() {
             position={viewingOf > 1 ? `${viewingAt + 1} of ${viewingOf}` : null}
           />
         ))}
+
+      {/* Above the card's own contents, once, and only where there is a thumb
+          to do the swiping. */}
+      {viewing && !added && step && <SwipeCue />}
     </Sheet>
   );
 }

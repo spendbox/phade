@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ImageIcon } from "lucide-react";
 
+import { VideoFrame } from "@/components/shop/video-frame";
 import { cn } from "@/lib/cn";
 import {
   firstFrame,
@@ -68,6 +69,10 @@ export function Media({
   className?: string;
   sizes?: string;
   priority?: boolean;
+  /**
+   * Whether a clip should be playing — true for the frame someone is actually
+   * looking at. It is driven, not merely requested: see `VideoFrame`.
+   */
   autoPlay?: boolean;
   /**
    * The still to hold on before a clip plays. The first frame of a video is
@@ -106,7 +111,7 @@ export function Media({
 
   if (isVideoUrl(src)) {
     return (
-      <video
+      <VideoFrame
         // Trimmed clips carry their range as a media fragment, which the
         // browser honours by itself. Untrimmed ones with no still to hold on
         // are asked for the frame a tenth of a second in, so a clip is a
@@ -118,15 +123,11 @@ export function Media({
               ? src
               : firstFrame(src)
         }
-        style={framing}
         poster={still ?? undefined}
+        playing={autoPlay}
+        style={framing}
         className={cn("bg-canvas-deep", className)}
-        muted
-        loop
-        playsInline
-        autoPlay={autoPlay}
-        preload={autoPlay ? "auto" : "metadata"}
-        aria-label={alt}
+        label={alt}
       />
     );
   }

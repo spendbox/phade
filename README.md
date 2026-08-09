@@ -42,7 +42,7 @@ because that is where a thumb is. On a wider screen the header takes over.
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | **General** — the default low-stock alert level. **Team** — who else can sign in, what they can do, and what the limited role is called. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and its size runs: a shop that sells dresses and shoes names both, and a product picks which run it belongs to rather than being offered a 12 and a 38 on the same row. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero, the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the footer blurb and social links. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state, or as many separate Lagos zones as a shop wants — name the parts each one covers and it prices only those, leaving the rest of Lagos for the next zone, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
+| **Settings** | **General** — the default low-stock alert level. **Team** — who else can sign in, what they can do, and what the limited role is called. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and its size runs: name a run per type of product, put any whole number from 1 to 100 in it, and a product picks which run it belongs to rather than being offered a 12 and a 38 on the same row. Clothing and shoe runs ship as standard, and one button puts them back. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero, the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the footer blurb and social links. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state, or as many separate Lagos zones as a shop wants — name the parts each one covers and it prices only those, leaving the rest of Lagos for the next zone, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -159,7 +159,8 @@ src/
     supabase.ts  paystack.ts     Service clients
     format.ts                    Naira, dates, slugs
     storefront.ts                Shop-front copy — one settings row, no migration
-    catalogue-settings.ts        The shop's colour palette and size run
+    catalogue.ts                 The shop's colour palette and size runs
+    catalogue-settings.ts        …as this shop has saved them
     spreadsheet.ts               CSV and .xlsx reader, no dependencies
     xlsx-writer.ts               .xlsx writer for the import template
   proxy.ts                       Gates /admin behind a valid session
@@ -212,6 +213,14 @@ A few decisions worth knowing:
   the browser is asked for the frame a tenth of a second in — a few kilobytes,
   and a picture instead of a black rectangle. The dashboard's thumbnails do the
   same.
+- **Playback is driven, not requested.** `autoplay` is answered once, when the
+  element is created, and browsers routinely decline it for a video that
+  appears inside a pop-up or becomes the frame in view after a swipe — which
+  left clips sitting on their posters. So whichever frame is being looked at is
+  told to play and every other one is told to stop, and the ask is repeated
+  each time that changes. Always muted, which is both good manners and the one
+  case every browser allows without a tap. The file streams at whatever it was
+  uploaded at; nothing is re-encoded or downscaled.
 - **The hero is the same picture everywhere.** A photograph shot for a shop is
   usually portrait, and a wide screen cropping it to fill takes the model's
   head off. So the hero shows the whole thing, over a blown-up blurred copy of

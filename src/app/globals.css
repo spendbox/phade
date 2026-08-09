@@ -484,6 +484,53 @@
   will-change: transform;
 }
 
+/* "There is another piece that way."
+
+   Sideways in a product pop-up moves along the row it was opened from, which
+   is a lovely thing nobody discovers by staring at a photograph. So it is
+   demonstrated rather than explained: a chevron drifts the way a thumb should
+   go, twice, and then the whole cue takes itself off the picture. It is
+   pointer-events-none throughout and never covers the product. */
+.swipe-cue {
+  animation: phade-cue 4.6s ease forwards;
+}
+.swipe-cue-glyph {
+  animation: phade-cue-glyph 1.5s ease-in-out infinite;
+}
+@keyframes phade-cue {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  10%,
+  76% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes phade-cue-glyph {
+  0%,
+  10% {
+    opacity: 0;
+    transform: translateX(5px);
+  }
+  30% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+    transform: translateX(-5px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
 /* Nobody asked for a moving page. Anyone who has said so gets a still one. */
 @media (prefers-reduced-motion: reduce) {
   .marquee-track,
@@ -491,6 +538,7 @@
   .rise,
   .sheet-up,
   .pop-heart,
+  .swipe-cue-glyph,
   .shop-glow::before,
   .featured-stage::before,
   .featured-stage::after {
