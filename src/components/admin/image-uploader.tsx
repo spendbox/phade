@@ -1,17 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Check,
-  Crop,
-  ImagePlus,
-  Loader2,
-  Scissors,
-  Star,
-  Trash2,
-} from "lucide-react";
+import { Check, Crop, ImagePlus, Scissors, Star, Trash2 } from "lucide-react";
 
 import { MediaThumb } from "@/components/admin/media-thumb";
+import { UploadProgress } from "@/components/admin/upload-progress";
 import { VideoEditor } from "@/components/admin/video-editor";
 import { cn } from "@/lib/cn";
 import {
@@ -56,7 +49,16 @@ export function ImageUploader({
   useEffect(() => {
     report.current?.(media);
   }, [media]);
-  const [uploading, setUploading] = useState(0);
+  /**
+   * What is going up, and how far it has got.
+   *
+   * Keyed by a per-file id rather than by name, because dropping the same
+   * photograph twice is a thing people do and two entries under one key would
+   * be one bar moving twice.
+   */
+  const [going, setGoing] = useState<{ id: number; name: string; at: number }[]>(
+    [],
+  );
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   /** The picture whose framing grid is open, if any. */
@@ -74,12 +76,26 @@ export function ImageUploader({
       if (list.length === 0) return;
 
       setError(null);
-      setUploading((count) => count + list.length);
+      const started = Date.now();
+
+      setGoing((current) => [
+        ...current,
+        ...list.map((file, index) => ({
+          id: started + index,
+          name: file.name,
+          at: 0,
+        })),
+      ]);
 
       await Promise.all(
-        list.map(async (file) => {
+        list.map(async (file, index) => {
+          const id = started + index;
           try {
-            const url = await uploadMedia(file);
+            const url = await uploadMedia(file, (at) =>
+              setGoing((current) =>
+                current.map((item) => (item.id === id ? { ...item, at } : item)),
+              ),
+            );
             setMedia((current) => [...current, url]);
           } catch (cause) {
             setError(
@@ -88,7 +104,7 @@ export function ImageUploader({
                 : "That file didn't upload.",
             );
           } finally {
-            setUploading((count) => count - 1);
+            setGoing((current) => current.filter((item) => item.id !== id));
           }
         }),
       );
@@ -216,18 +232,12 @@ export function ImageUploader({
             : "border-line-strong bg-plane/60",
         )}
       >
-        {uploading > 0 ? (
-          <Loader2 className="size-5 animate-spin text-ink-muted" />
-        ) : (
-          <ImagePlus className="size-5 text-ink-muted" />
-        )}
+        <ImagePlus className="size-5 text-ink-muted" />
 
         <p className="mt-2 text-sm text-ink-secondary">
-          {uploading > 0
-            ? `Uploading ${uploading} file${uploading === 1 ? "" : "s"}…`
-            : limit === 1
-              ? "Drop a photo or a video here"
-              : "Drop photos or videos here"}
+          {limit === 1
+            ? "Drop a photo or a video here"
+            : "Drop photos or videos here"}
         </p>
 
         <button
@@ -253,6 +263,8 @@ export function ImageUploader({
         />
       </div>
       )}
+
+      <UploadProgress going={going} />
 
       {error && (
         <p role="alert" className="text-sm text-critical">

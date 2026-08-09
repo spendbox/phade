@@ -17,6 +17,7 @@ import {
   type ShippingSettings,
 } from "@/lib/shipping";
 import {
+  CONTACT_HREF,
   parseStorefront,
   STOREFRONT_KEY,
   type StorefrontContent,
@@ -101,6 +102,17 @@ function socialLinks(formData: FormData): { platform: string; url: string }[] {
   }
 }
 
+function menuLinks(formData: FormData): { label: string; href: string }[] {
+  try {
+    const parsed: unknown = JSON.parse(String(formData.get("menu") ?? "[]"));
+    return Array.isArray(parsed)
+      ? (parsed as { label: string; href: string }[])
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function saveStorefront(
   _previous: StorefrontFormState,
   formData: FormData,
@@ -120,6 +132,11 @@ export async function saveStorefront(
       ctaHref,
       text(formData, "about_cta_href"),
       ...SECTION_KEYS.map((key) => text(formData, `${key}_cta_href`)),
+      // `#contact` opens the message pop-up rather than going anywhere, so it
+      // is the one menu destination that isn't an address.
+      ...menuLinks(formData)
+        .map((link) => link.href)
+        .filter((href) => href !== CONTACT_HREF),
     ]) {
       if (link && !/^(\/|https?:\/\/)/.test(link)) {
         throw new Error(
@@ -175,6 +192,18 @@ export async function saveStorefront(
         .map((word) => word.trim())
         .filter(Boolean)
         .slice(0, 20),
+      // The menu and the support details go through the same parser the shop
+      // front reads them with, so a line with no words or a WhatsApp number
+      // with no digits is dropped here rather than half-rendered there.
+      menu: parseStorefront({ menu: menuLinks(formData) }).menu,
+      support: parseStorefront({
+        support: {
+          email: text(formData, "support_email"),
+          whatsappEnabled: formData.get("whatsapp_enabled") === "on",
+          whatsappNumber: text(formData, "whatsapp_number"),
+          note: text(formData, "support_note"),
+        },
+      }).support,
       footerBlurb: String(formData.get("footer_blurb") ?? "").trim(),
       socials: parseStorefront({ socials: socialLinks(formData) }).socials,
     };
@@ -275,9 +304,11 @@ export async function saveShipping(
 
     let rawZones: unknown = [];
     let rawPlaces: unknown = [];
+    let rawEta: unknown = null;
     try {
       rawZones = JSON.parse(String(formData.get("zones") ?? "[]"));
       rawPlaces = JSON.parse(String(formData.get("pickup_locations") ?? "[]"));
+      rawEta = JSON.parse(String(formData.get("eta") ?? "null"));
     } catch {
       throw new Error("Couldn't read those zones. Try again.");
     }
@@ -314,6 +345,7 @@ export async function saveShipping(
       defaultFeeKobo: nairaToKobo(String(formData.get("default_fee") ?? "")),
       freeOverKobo: nairaToKobo(String(formData.get("free_over") ?? "")),
       zones: rawZones,
+      eta: rawEta,
       pickupEnabled: formData.get("pickup_enabled") === "on",
       pickupNote: String(formData.get("pickup_note") ?? "").trim(),
       pickupLocations: rawPlaces,

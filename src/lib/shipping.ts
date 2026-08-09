@@ -34,11 +34,26 @@ export type ShippingZone = {
   areas: string[];
   feeKobo: number;
   /**
+   * How long this zone takes, when it is not what the rest of the shop
+   * promises. Null uses the shop-wide range — most zones will.
+   */
+  eta: DeliveryEta | null;
+  /**
    * Spend this much and this zone ships free. Null falls back to the shop-wide
    * threshold, which is what most shops want.
    */
   freeOverKobo: number | null;
 };
+
+/**
+ * How long delivery takes, in hours.
+ *
+ * Hours rather than days because a Lagos shop delivering the same afternoon
+ * would have to write "0 days" otherwise, and "within 24 hours" is the promise
+ * a Nigerian shopper is actually used to reading. A range where both ends
+ * match reads as a single figure — see `formatEta`.
+ */
+export type DeliveryEta = { minHours: number; maxHours: number };
 
 /** Somewhere a shopper can collect an order in person. */
 export type PickupLocation = {
@@ -56,6 +71,8 @@ export type ShippingSettings = {
   /** Shop-wide free-delivery threshold. 0 turns it off. */
   freeOverKobo: number;
   zones: ShippingZone[];
+  /** What the shop promises anywhere it hasn't said otherwise. */
+  eta: DeliveryEta;
   pickupEnabled: boolean;
   /** Where and when, shown wherever pickup is offered. */
   pickupNote: string;
@@ -73,6 +90,7 @@ export const DEFAULT_SHIPPING: ShippingSettings = {
   defaultFeeKobo: 500_000,
   freeOverKobo: 10_000_000,
   zones: [],
+  eta: { minHours: 24, maxHours: 24 },
   pickupEnabled: true,
   pickupNote: "Collect from us — we'll message you when it's ready.",
   pickupLocations: [],
@@ -214,6 +232,53 @@ function parsePickup(raw: unknown): PickupLocation[] {
   });
 }
 
+/**
+ * A delivery window, or the fallback when one hasn't been set.
+ *
+ * Bounded at a fortnight: the field exists to say "tomorrow" or "two to three
+ * days", and a number with an extra digit typed into it is a promise no shop
+ * meant to make.
+ */
+function parseEta<T extends DeliveryEta | null>(
+  raw: unknown,
+  fallback: T,
+): DeliveryEta | T {
+  if (typeof raw !== "object" || raw === null) return fallback;
+  const value = raw as Record<string, unknown>;
+
+  const hours = (input: unknown): number | null => {
+    const number = Number(input);
+    if (!Number.isFinite(number)) return null;
+    return Math.min(Math.max(Math.round(number), 1), 336);
+  };
+
+  const min = hours(value.minHours);
+  const max = hours(value.maxHours);
+  if (min === null && max === null) return fallback;
+
+  const from = min ?? max ?? 24;
+  const to = max ?? min ?? 24;
+  return { minHours: Math.min(from, to), maxHours: Math.max(from, to) };
+}
+
+/**
+ * A delivery window in the words a shopper reads it in.
+ *
+ * Under two days is counted in hours, because "within 24 hours" is the promise
+ * everyone here knows; past that it is days, because "within 72 hours" makes a
+ * reader do arithmetic to find out whether that is this week.
+ */
+export function formatEta(eta: DeliveryEta): string {
+  const say = (hours: number) =>
+    hours < 48
+      ? `${hours} hour${hours === 1 ? "" : "s"}`
+      : `${Math.round(hours / 24)} days`;
+
+  if (eta.minHours === eta.maxHours) return `Within ${say(eta.maxHours)}`;
+  if (eta.maxHours < 48) return `${eta.minHours}–${eta.maxHours} hours`;
+  return `${Math.round(eta.minHours / 24)}–${Math.round(eta.maxHours / 24)} days`;
+}
+
 function parseZone(raw: unknown): ShippingZone[] {
   if (typeof raw !== "object" || raw === null) return [];
   const value = raw as Record<string, unknown>;
@@ -238,6 +303,7 @@ function parseZone(raw: unknown): ShippingZone[] {
       states,
       areas,
       feeKobo: kobo(value.feeKobo, 0),
+      eta: parseEta(value.eta, null),
       freeOverKobo: freeOver,
     },
   ];
@@ -252,6 +318,7 @@ export function parseShipping(raw: unknown): ShippingSettings {
     defaultFeeKobo: kobo(value.defaultFeeKobo, DEFAULT_SHIPPING.defaultFeeKobo),
     freeOverKobo: kobo(value.freeOverKobo, DEFAULT_SHIPPING.freeOverKobo),
     zones: Array.isArray(value.zones) ? value.zones.flatMap(parseZone) : [],
+    eta: parseEta(value.eta, DEFAULT_SHIPPING.eta) ?? DEFAULT_SHIPPING.eta,
     pickupEnabled: value.pickupEnabled !== false,
     pickupNote:
       typeof value.pickupNote === "string"
@@ -370,7 +437,9 @@ async function loadShipping(): Promise<ShippingSettings> {
 
 /** Cached like the catalogue, and dropped by the same tag when it changes. */
 export const getShipping = cache(async function getShipping(): Promise<ShippingSettings> {
-  return unstable_cache(loadShipping, ["shipping-settings"], {
+  // Versioned for the same reason the storefront cache is: this holds the
+  // parsed object, and it gained a delivery window.
+  return unstable_cache(loadShipping, ["shipping-settings", "v2"], {
     revalidate: 60,
     tags: [CATALOGUE_TAG],
   })();

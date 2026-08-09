@@ -43,6 +43,13 @@ export default async function DevelopersSettingsPage() {
         "Powers the write/improve buttons on product and category descriptions, and tag suggestions. OPENAI_MODEL is optional and defaults to gpt-4o-mini.",
     },
     {
+      name: "Messages from the shop front",
+      ready: Boolean(process.env.RESEND_API_KEY),
+      variables: ["RESEND_API_KEY", "CONTACT_FROM"],
+      detail:
+        "Sends the “Here to help” form to the address set in Settings → Storefront. Until it is set, the form hands the message to the shopper's own mail app instead — nothing is lost, it just takes them one more tap. CONTACT_FROM is optional and must be an address on a domain verified with Resend.",
+    },
+    {
       name: "Cart tracking",
       ready: Boolean(process.env.STOREFRONT_API_KEY),
       variables: ["STOREFRONT_API_KEY"],

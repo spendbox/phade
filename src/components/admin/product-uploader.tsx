@@ -26,6 +26,7 @@ import { SizePicker } from "@/components/admin/size-picker";
 import { SelectField } from "@/components/ui/select-field";
 import type { CatalogueDefaults } from "@/lib/catalogue";
 import { MediaThumb } from "@/components/admin/media-thumb";
+import { UploadProgress } from "@/components/admin/upload-progress";
 import { VideoEditor } from "@/components/admin/video-editor";
 import { Button, buttonClass } from "@/components/ui/button";
 import {
@@ -146,6 +147,10 @@ export function ProductUploader({
   const [showRestored, setShowRestored] = useState(Boolean(restored));
 
   const [uploading, setUploading] = useState(0);
+  /** What is going up right now, and how far. See `UploadProgress`. */
+  const [going, setGoing] = useState<{ id: number; name: string; at: number }[]>(
+    [],
+  );
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -207,8 +212,14 @@ export function ProductUploader({
     setUploading((count) => count + list.length);
 
     for (const file of list) {
+      const id = Date.now() + Math.random();
+      setGoing((current) => [...current, { id, name: file.name, at: 0 }]);
       try {
-        const url = await uploadMedia(file);
+        const url = await uploadMedia(file, (at) =>
+          setGoing((current) =>
+            current.map((item) => (item.id === id ? { ...item, at } : item)),
+          ),
+        );
         if (target) {
           // Extra media for one product rather than a new product.
           setDrafts((current) =>
@@ -227,6 +238,7 @@ export function ProductUploader({
         );
       } finally {
         setUploading((count) => count - 1);
+        setGoing((current) => current.filter((item) => item.id !== id));
       }
     }
   }
@@ -374,6 +386,8 @@ export function ProductUploader({
               : "Changes save automatically"}
         </p>
       </div>
+
+      <UploadProgress going={going} />
 
       {editing && (
         <VideoEditor

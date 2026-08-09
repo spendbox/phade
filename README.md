@@ -25,7 +25,19 @@ buy at `/`, and everything they do shows up at `/admin`.
 | **Track** (`/track`) | The same page, found again with the reference from the confirmation. No account, no login: the reference is unguessable and it is the only thing anyone needs to see where their parcel is. |
 
 Navigation on a phone is a tab bar along the bottom — home, shop, saved, bag —
-because that is where a thumb is. On a wider screen the header takes over.
+because that is where a thumb is. On a wider screen the header takes over. A
+menu sits behind the ☰ in the top-left corner of both, written in the
+dashboard: Home, Categories, New in, Saved, Track an order and Contact us to
+begin with, and whatever the shop wants after that.
+
+Every page ends with three promises, and each is a button rather than a
+paragraph, because each is really a question. **Delivered nationwide** opens
+the price of every zone with how long it takes, the free-delivery threshold and
+whether collection is offered — all from Settings → Shipping, so it cannot
+promise something checkout won't honour. **Paid securely** shows the channels
+Paystack handles and says plainly that the card number never reaches this shop.
+**Here to help** is a message form that goes to the address in the dashboard,
+with a WhatsApp button beside it where the shop offers one.
 
 ---
 
@@ -42,7 +54,7 @@ because that is where a thumb is. On a wider screen the header takes over.
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | **General** — the default low-stock alert level. **Team** — who else can sign in, what they can do, and what the limited role is called. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and its size runs: name a run per type of product, put any whole number from 1 to 100 in it, and a product picks which run it belongs to rather than being offered a 12 and a 38 on the same row. Clothing and shoe runs ship as standard, and one button puts them back. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero, the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the footer blurb and social links. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state, or as many separate Lagos zones as a shop wants — name the parts each one covers and it prices only those, leaving the rest of Lagos for the next zone, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
+| **Settings** | **General** — the default low-stock alert level. **Team** — who else can sign in, what they can do, and what the limited role is called. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and its size runs: name a run per type of product, put any whole number from 1 to 100 in it, and a product picks which run it belongs to rather than being offered a 12 and a 38 on the same row. Clothing and shoe runs ship as standard, and one button puts them back. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero, the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the menu behind the ☰, the footer blurb, social links, and where a message from "Here to help" goes — an address, and a WhatsApp number if the shop wants one offered. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — the default delivery charge, how long delivery takes (in hours, so "within 24 hours" is sayable), a free-delivery threshold, delivery zones by state — or as many separate Lagos zones as a shop wants, naming the parts each one covers so it prices only those and leaves the rest of Lagos for the next zone — each zone able to promise its own delivery window, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -307,6 +319,29 @@ A few decisions worth knowing:
   shows the one photograph the shop chose to lead with and keeps showing it:
   a tile that swaps its picture under a passing cursor makes a grid twitch on
   the way to somewhere else, and downloads a second photo to do it.
+- **Nothing waits on a blank screen.** Every route ships a skeleton of itself,
+  streamed the moment someone asks for it, so a slow connection shows the shape
+  of the page rather than white — which is indistinguishable from a page that
+  failed. Photographs load lazily and shimmer while they do, and the shimmer
+  sits *under* the picture rather than in place of it, so nothing swaps and
+  nothing jumps. An image already in cache is caught by a `complete` check in
+  the ref, since its load event fired before React was attached.
+- **Uploads report the real figure.** `fetch` cannot say how far a PUT has got —
+  it resolves at the end and says nothing before — so a shop owner pushing a
+  40MB clip on a phone tether watched a spinner that never distinguished slow
+  from stuck. That one call is on XMLHttpRequest, which reports upload
+  progress, and the bar is the browser's own number rather than a guess on a
+  timer.
+- **A button that did something says so.** Add to bag becomes a tick for a
+  second and then goes back to being a button, and the same goes for share and
+  the quick-add on a card. On a phone whatever changed is usually off screen,
+  and silence at the moment of pressing is what makes someone press again.
+- **Messages need a mail provider, and work without one.** "Here to help" sends
+  through Resend when `RESEND_API_KEY` is set. When it isn't — which is the
+  state a shop is in the day it opens — the answer says so and hands the whole
+  message to the shopper's own mail app, already written and addressed. A form
+  that silently drops what somebody took the trouble to type is worse than one
+  that takes an extra tap.
 - **Cart tracking is opt-in and closed by default.** `/api/cart` is for a
   separate front end: it writes without an admin session, so it answers `501`
   until `STOREFRONT_API_KEY` is set and `401` to anyone who doesn't send it. Our

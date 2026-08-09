@@ -61,6 +61,36 @@ export type StorefrontSections = {
   closing: SectionCopy;
 };
 
+/**
+ * One line in the menu behind the hamburger.
+ *
+ * Editable because a shop knows its own rooms: one that sells only abayas
+ * wants "Abayas" where another wants "Categories", and neither should need a
+ * deploy to say so. `#contact` is the one href that isn't a page — it opens
+ * the message pop-up, since "Contact us" is a thing every shop puts in a menu
+ * and there is no page behind it here.
+ */
+export type MenuLink = { label: string; href: string };
+
+/** The href that opens the message pop-up rather than going anywhere. */
+export const CONTACT_HREF = "#contact";
+
+/**
+ * How a shopper reaches a person.
+ *
+ * The email is where the message goes. WhatsApp is optional because plenty of
+ * shops run on it entirely and plenty of others would rather not hand out a
+ * number; the one that does can name which line it opens.
+ */
+export type SupportDetails = {
+  email: string;
+  whatsappEnabled: boolean;
+  /** Digits only, in full international form — 234… not 0…, no plus. */
+  whatsappNumber: string;
+  /** What the pop-up says above the two ways to get in touch. */
+  note: string;
+};
+
 export type StorefrontContent = {
   announcement: string;
   announcementEnabled: boolean;
@@ -74,6 +104,10 @@ export type StorefrontContent = {
   about: AboutBlock;
   /** The words that run across the strip under the hero. */
   marquee: string[];
+  /** What sits behind the hamburger, in the order it is read. */
+  menu: MenuLink[];
+  /** Where a message from the shop front actually goes. */
+  support: SupportDetails;
   /** The paragraph beside the logo at the foot of every page. */
   footerBlurb: string;
   socials: SocialLink[];
@@ -127,6 +161,22 @@ export const DEFAULT_ABOUT: AboutBlock = {
   posterUrl: "",
 };
 
+export const DEFAULT_MENU: MenuLink[] = [
+  { label: "Home", href: "/" },
+  { label: "Categories", href: "/shop" },
+  { label: "New in", href: "/shop?sort=new" },
+  { label: "Saved", href: "/saved" },
+  { label: "Track an order", href: "/track" },
+  { label: "Contact us", href: CONTACT_HREF },
+];
+
+export const DEFAULT_SUPPORT: SupportDetails = {
+  email: "phadewoman@gmail.com",
+  whatsappEnabled: false,
+  whatsappNumber: "",
+  note: "Ask us about sizing, an order, or anything else. We answer every message.",
+};
+
 export const DEFAULT_STOREFRONT: StorefrontContent = {
   announcement: "Free delivery on orders over ₦100,000",
   announcementEnabled: false,
@@ -139,6 +189,8 @@ export const DEFAULT_STOREFRONT: StorefrontContent = {
   sections: DEFAULT_SECTIONS,
   about: DEFAULT_ABOUT,
   marquee: ["New in", "Delivered nationwide", "Chosen one piece at a time"],
+  menu: DEFAULT_MENU,
+  support: DEFAULT_SUPPORT,
   footerBlurb:
     "Bags, shoes and ready-to-wear, chosen one piece at a time and delivered across Nigeria.",
   socials: [],
@@ -272,6 +324,44 @@ function parseAbout(raw: unknown): AboutBlock {
   };
 }
 
+/**
+ * The menu, or ours where a shop has never touched it.
+ *
+ * An empty saved list is a real choice — a shop that deleted every line meant
+ * to, and gets no menu button at all rather than the defaults growing back.
+ */
+function parseMenu(raw: unknown): MenuLink[] {
+  if (!Array.isArray(raw)) return DEFAULT_MENU;
+
+  return raw.flatMap((item): MenuLink[] => {
+    if (typeof item !== "object" || item === null) return [];
+    const value = item as Record<string, unknown>;
+
+    const label = str(value.label, "").trim();
+    const href = str(value.href, "").trim();
+    // A line with no words, or nowhere to go, is not a menu item.
+    if (!label || !href) return [];
+    return [{ label, href }];
+  });
+}
+
+function parseSupport(raw: unknown): SupportDetails {
+  const value = group(raw);
+  const email = str(value.email, "").trim();
+  // Digits only: a number saved as "+234 801 234 5678" and one saved as
+  // "2348012345678" have to open the same chat.
+  const number = str(value.whatsappNumber, "").replace(/\D/g, "");
+
+  return {
+    email: email || DEFAULT_SUPPORT.email,
+    whatsappEnabled: value.whatsappEnabled === true && number.length >= 8,
+    whatsappNumber: number,
+    note: Object.keys(value).length > 0
+      ? str(value.note, "").trim()
+      : DEFAULT_SUPPORT.note,
+  };
+}
+
 /** Anything missing or the wrong shape falls back, so a half-filled row still renders. */
 export function parseStorefront(raw: unknown): StorefrontContent {
   if (typeof raw !== "object" || raw === null) return DEFAULT_STOREFRONT;
@@ -293,6 +383,8 @@ export function parseStorefront(raw: unknown): StorefrontContent {
     ),
     about: parseAbout(value.about),
     marquee: strList(value.marquee),
+    menu: parseMenu(value.menu),
+    support: parseSupport(value.support),
     footerBlurb: str(value.footerBlurb, DEFAULT_STOREFRONT.footerBlurb),
     socials: parseSocials(value.socials),
   };
@@ -320,7 +412,10 @@ async function loadStorefront(): Promise<StorefrontContent> {
  * per visitor for a row that only changes when someone submits a form.
  */
 export const getStorefront = cache(async function getStorefront(): Promise<StorefrontContent> {
-  return unstable_cache(loadStorefront, ["storefront-content"], {
+  // The key carries a version: this cache holds the *parsed* object, so a
+  // release that adds a field would otherwise keep serving yesterday's shape
+  // — a page reading `content.menu.length` off an object that has no menu.
+  return unstable_cache(loadStorefront, ["storefront-content", "v2"], {
     revalidate: 60,
     tags: [CATALOGUE_TAG],
   })();

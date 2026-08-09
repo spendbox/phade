@@ -1,6 +1,6 @@
-import Image from "next/image";
 import { ImageIcon } from "lucide-react";
 
+import { ImageFrame } from "@/components/shop/image-frame";
 import { VideoFrame } from "@/components/shop/video-frame";
 import { cn } from "@/lib/cn";
 import {
@@ -21,9 +21,11 @@ import {
  * Photos from the shop's own bucket go through `next/image`, which is the
  * single biggest thing standing between a grid of forty products and a phone
  * on Nigerian mobile data. The uploader stores at 1600px; a card renders at
- * about 180. Without this, every card downloads the full thing — twice, with
- * the hover image — and the shop feels slow for reasons no amount of clever
- * rendering can fix.
+ * about 180. Without this, every card downloads the full thing, and the shop
+ * feels slow for reasons no amount of clever rendering can fix.
+ *
+ * Everything below the fold loads lazily, and shimmers while it does — see
+ * `ImageFrame`.
  *
  * Anything else — an SVG, a brand asset, a URL from somewhere we haven't
  * listed in `next.config.ts` — falls back to a plain `<img>`. The optimiser
@@ -132,34 +134,17 @@ export function Media({
     );
   }
 
-  // `fill` needs a positioned box, so the component brings its own rather than
+  // `fill` needs a positioned box, so the frame brings its own rather than
   // asking every caller to remember one.
-  if (isOptimisable(src)) {
-    return (
-      <span className={cn("relative block overflow-hidden", className)}>
-        <Image
-          src={src}
-          alt={alt}
-          fill
-          sizes={sizes}
-          priority={priority}
-          style={framing}
-        />
-      </span>
-    );
-  }
-
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <ImageFrame
       src={src}
       alt={alt}
       sizes={sizes}
+      priority={priority}
+      optimised={isOptimisable(src)}
       style={framing}
-      loading={priority ? "eager" : "lazy"}
-      fetchPriority={priority ? "high" : "auto"}
-      decoding="async"
-      className={cn(className)}
+      className={className}
     />
   );
 }

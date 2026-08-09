@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Heart, Share2, ShoppingBag } from "lucide-react";
 
+import { Confirmed, useConfirmed } from "@/components/shop/confirm";
 import { useShop } from "@/components/shop/shop-provider";
 import { cn } from "@/lib/cn";
 import {
@@ -297,6 +298,8 @@ export function BuyActions({
   className?: string;
 }) {
   const { soldOut, saved } = controls;
+  const [added, confirm] = useConfirmed();
+  const [shared, confirmShare] = useConfirmed();
 
   return (
     <div className={className}>
@@ -316,21 +319,45 @@ export function BuyActions({
 
         <button
           type="button"
-          onClick={controls.share}
+          onClick={() => {
+            controls.share();
+            confirmShare();
+          }}
           aria-label="Share"
           className="flex size-12 shrink-0 items-center justify-center rounded-full bg-canvas-deep text-ink transition hover:bg-line-strong active:scale-90"
         >
-          <Share2 className="size-5" aria-hidden />
+          {shared ? (
+            <Confirmed className="size-5 text-brand" />
+          ) : (
+            <Share2 className="size-5" aria-hidden />
+          )}
         </button>
 
+        {/* The button answers for itself. Whatever it dropped into the bag is
+            off the top of the screen on a phone, and silence at the moment of
+            pressing is what makes someone press again. */}
         <button
           type="button"
-          onClick={controls.add}
+          onClick={() => {
+            if (controls.add()) confirm();
+          }}
           disabled={soldOut}
-          className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-noir text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-40"
+          className={cn(
+            "flex h-12 flex-1 items-center justify-center gap-2 rounded-full text-sm font-semibold text-white transition-colors duration-300 disabled:cursor-not-allowed disabled:opacity-40",
+            added ? "bg-brand" : "bg-noir hover:bg-brand",
+          )}
         >
-          <ShoppingBag className="size-4" aria-hidden />
-          {soldOut ? "Sold out" : "Add to bag"}
+          {added ? (
+            <>
+              <Confirmed />
+              In your bag
+            </>
+          ) : (
+            <>
+              <ShoppingBag className="size-4" aria-hidden />
+              {soldOut ? "Sold out" : "Add to bag"}
+            </>
+          )}
         </button>
       </div>
 

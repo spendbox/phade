@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Loader2, MapPin, Plus, Trash2 } from "lucide-react";
+import { Clock, Loader2, MapPin, Plus, Trash2 } from "lucide-react";
 
 import {
   saveShipping,
@@ -14,8 +14,10 @@ import { cn } from "@/lib/cn";
 import { formatNairaShort, koboToNairaInput, nairaToKobo } from "@/lib/format";
 import {
   AREA_STATE,
+  formatEta,
   LAGOS_AREAS,
   NIGERIAN_STATES,
+  type DeliveryEta,
   type PickupLocation,
   type ShippingSettings,
   type ShippingZone,
@@ -42,6 +44,7 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
   );
 
   const [zones, setZones] = useState<ShippingZone[]>(shipping.zones);
+  const [eta, setEta] = useState<DeliveryEta>(shipping.eta);
   const [pickup, setPickup] = useState(shipping.pickupEnabled);
   const [places, setPlaces] = useState<PickupLocation[]>(
     shipping.pickupLocations,
@@ -96,6 +99,14 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
               />
             </Field>
           </div>
+
+          <Field
+            label="How long it takes"
+            hint={`Shown to shoppers as "${formatEta(eta)}". Leave both the same for a single figure. A zone can promise something different.`}
+          >
+            <EtaFields value={eta} onChange={setEta} />
+          </Field>
+          <input type="hidden" name="eta" value={JSON.stringify(eta)} />
         </div>
       </Panel>
 
@@ -113,6 +124,7 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                   states: [],
                   areas: [],
                   feeKobo: shipping.defaultFeeKobo,
+                  eta: null,
                   freeOverKobo: null,
                 },
               ])
@@ -195,6 +207,40 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                   >
                     <Trash2 className="size-4" />
                   </button>
+                </div>
+
+                {/* Somewhere further away takes longer, and a shop that has
+                    bothered to price it separately usually knows by how much. */}
+                <div className="mt-3">
+                  {zone.eta ? (
+                    <Field
+                      label="How long this zone takes"
+                      hint={`Shoppers going here are told "${formatEta(zone.eta)}".`}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <EtaFields
+                          value={zone.eta}
+                          onChange={(next) => update(zone.id, { eta: next })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => update(zone.id, { eta: null })}
+                          className="text-xs font-medium text-ink-secondary underline underline-offset-4 hover:text-ink"
+                        >
+                          Use the shop-wide window
+                        </button>
+                      </div>
+                    </Field>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => update(zone.id, { eta: { ...eta } })}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+                    >
+                      <Clock className="size-3.5" />
+                      This zone takes longer
+                    </button>
+                  )}
                 </div>
 
                 <fieldset className="mt-3">
@@ -481,5 +527,56 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * A delivery window, as two numbers.
+ *
+ * Hours rather than days: a Lagos shop delivering the same afternoon would
+ * otherwise have to write "0 days", and "within 24 hours" is the promise a
+ * shopper here is used to reading. Setting both ends the same says one figure
+ * rather than a range, which is what most shops mean.
+ */
+function EtaFields({
+  value,
+  onChange,
+}: {
+  value: DeliveryEta;
+  onChange: (next: DeliveryEta) => void;
+}) {
+  const hours = (raw: string) => Math.min(Math.max(Number(raw) || 1, 1), 336);
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="number"
+        min={1}
+        max={336}
+        step={1}
+        inputMode="numeric"
+        value={value.minHours}
+        aria-label="Fastest, in hours"
+        onChange={(event) =>
+          onChange({ ...value, minHours: hours(event.target.value) })
+        }
+        className="h-10 w-20 rounded-lg bg-surface px-3 text-sm tabular-nums text-ink shadow-[0_0_0_1px_rgb(11_11_12_/_0.10)] focus:shadow-[0_0_0_2px_var(--color-brand)] focus:outline-none"
+      />
+      <span className="text-sm text-ink-muted">to</span>
+      <input
+        type="number"
+        min={1}
+        max={336}
+        step={1}
+        inputMode="numeric"
+        value={value.maxHours}
+        aria-label="Slowest, in hours"
+        onChange={(event) =>
+          onChange({ ...value, maxHours: hours(event.target.value) })
+        }
+        className="h-10 w-20 rounded-lg bg-surface px-3 text-sm tabular-nums text-ink shadow-[0_0_0_1px_rgb(11_11_12_/_0.10)] focus:shadow-[0_0_0_2px_var(--color-brand)] focus:outline-none"
+      />
+      <span className="text-sm text-ink-muted">hours</span>
+    </div>
   );
 }

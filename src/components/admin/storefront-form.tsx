@@ -1,7 +1,15 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Loader2, Search } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  MessageCircle,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 
 import {
   saveStorefront,
@@ -21,7 +29,9 @@ import { Field, Input, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
 import {
+  CONTACT_HREF,
   DEFAULT_SECTIONS,
+  type MenuLink,
   type SectionCopy,
   type StorefrontContent,
 } from "@/lib/storefront";
@@ -73,6 +83,16 @@ export function StorefrontForm({
       content.socials.map((link) => [link.platform, link.url]),
     ),
   );
+  const [menu, setMenu] = useState<MenuLink[]>(content.menu);
+  const [whatsappOn, setWhatsappOn] = useState(content.support.whatsappEnabled);
+
+  function moveLink(index: number, by: -1 | 1) {
+    const to = index + by;
+    if (to < 0 || to >= menu.length) return;
+    const next = [...menu];
+    [next[index], next[to]] = [next[to], next[index]];
+    setMenu(next);
+  }
 
   return (
     <form action={formAction} className="space-y-5">
@@ -92,6 +112,144 @@ export function StorefrontForm({
           ),
         )}
       />
+
+      <input type="hidden" name="menu" value={JSON.stringify(menu)} />
+
+      <Panel
+        title="Menu"
+        action={
+          <button
+            type="button"
+            onClick={() => setMenu([...menu, { label: "", href: "/shop" }])}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+          >
+            <Plus className="size-3.5" />
+            Add a line
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-ink-secondary">
+            What sits behind the ☰ on every shop page, in this order. Clear the
+            list entirely and the button goes away.
+          </p>
+
+          {menu.length === 0 ? (
+            <p className="rounded-lg bg-plane px-3 py-5 text-center text-sm text-ink-muted">
+              No menu. Add a line — Home, Categories, Contact us.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {menu.map((link, index) => (
+                <li
+                  key={index}
+                  className="grid gap-2 rounded-xl bg-plane p-2.5 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_auto] sm:items-center"
+                >
+                  <Input
+                    value={link.label}
+                    aria-label={`Menu line ${index + 1} — what it says`}
+                    onChange={(event) =>
+                      setMenu(
+                        menu.map((item, at) =>
+                          at === index
+                            ? { ...item, label: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                    placeholder="What it says"
+                  />
+
+                  {link.href === CONTACT_HREF ? (
+                    <p className="flex h-10 items-center gap-2 rounded-lg bg-surface px-3 text-[13px] text-ink-secondary ring-1 ring-inset ring-line">
+                      <MessageCircle className="size-3.5 shrink-0 text-brand" />
+                      Opens the message pop-up
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMenu(
+                            menu.map((item, at) =>
+                              at === index ? { ...item, href: "/shop" } : item,
+                            ),
+                          )
+                        }
+                        className="ml-auto shrink-0 text-xs font-medium underline underline-offset-4 hover:text-ink"
+                      >
+                        Point at a page
+                      </button>
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <PathPicker
+                          name={`menu_href_${index}`}
+                          value={link.href}
+                          onChange={(next) =>
+                            setMenu(
+                              menu.map((item, at) =>
+                                at === index ? { ...item, href: next } : item,
+                              ),
+                            )
+                          }
+                          pages={pages}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        title="Open the message pop-up instead"
+                        aria-label="Open the message pop-up instead"
+                        onClick={() =>
+                          setMenu(
+                            menu.map((item, at) =>
+                              at === index
+                                ? { ...item, href: CONTACT_HREF }
+                                : item,
+                            ),
+                          )
+                        }
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface hover:text-brand"
+                      >
+                        <MessageCircle className="size-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => moveLink(index, -1)}
+                      disabled={index === 0}
+                      aria-label="Move up"
+                      className="flex size-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface hover:text-ink disabled:opacity-30"
+                    >
+                      <ChevronUp className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLink(index, 1)}
+                      disabled={index === menu.length - 1}
+                      aria-label="Move down"
+                      className="flex size-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface hover:text-ink disabled:opacity-30"
+                    >
+                      <ChevronDown className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMenu(menu.filter((_, at) => at !== index))
+                      }
+                      aria-label="Remove this line"
+                      className="flex size-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-critical-soft hover:text-critical"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Panel>
 
       <Panel title="Announcement bar">
         <div className="space-y-4">
@@ -435,6 +593,73 @@ export function StorefrontForm({
               ))}
             </ul>
           </Field>
+        </div>
+      </Panel>
+
+      <Panel title="Here to help">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-secondary">
+            What happens when someone presses &ldquo;Here to help&rdquo; at the
+            foot of the page, or Contact us in the menu.
+          </p>
+
+          <Field
+            label="Where messages go"
+            htmlFor="support_email"
+            hint="Every message sent from the shop front arrives here."
+          >
+            <Input
+              id="support_email"
+              name="support_email"
+              type="email"
+              defaultValue={content.support.email}
+              placeholder="phadewoman@gmail.com"
+            />
+          </Field>
+
+          <Field label="What the pop-up says" htmlFor="support_note">
+            <Textarea
+              id="support_note"
+              name="support_note"
+              rows={2}
+              defaultValue={content.support.note}
+              placeholder="Ask us about sizing, an order, or anything else."
+            />
+          </Field>
+
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              name="whatsapp_enabled"
+              checked={whatsappOn}
+              onChange={(event) => setWhatsappOn(event.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-brand"
+            />
+            <span>
+              <span className="block text-sm font-medium text-ink">
+                Offer WhatsApp too
+              </span>
+              <span className="block text-xs text-ink-muted">
+                A second button that opens a chat with the number below.
+              </span>
+            </span>
+          </label>
+
+          {whatsappOn && (
+            <Field
+              label="WhatsApp number"
+              htmlFor="whatsapp_number"
+              hint="In full international form — 2348012345678, not 0801…"
+            >
+              <Input
+                id="whatsapp_number"
+                name="whatsapp_number"
+                inputMode="tel"
+                defaultValue={content.support.whatsappNumber}
+                placeholder="2348012345678"
+              />
+            </Field>
+          )}
         </div>
       </Panel>
 

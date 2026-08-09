@@ -2,6 +2,7 @@
 
 import { Heart, Plus } from "lucide-react";
 
+import { Confirmed, useConfirmed } from "@/components/shop/confirm";
 import { Media } from "@/components/shop/media";
 import { Rail } from "@/components/shop/rail";
 import { useShop } from "@/components/shop/shop-provider";
@@ -36,6 +37,7 @@ export function ProductCard({
   className?: string;
 }) {
   const { openProduct, isSaved, toggleSaved, addToBag } = useShop();
+  const [added, confirm] = useConfirmed();
 
   const off = percentOff(product);
   const soldOut = product.stock <= 0;
@@ -109,17 +111,25 @@ export function ProductCard({
         {!soldOut && (
           <button
             type="button"
-            onClick={() =>
-              needsChoice ? openProduct(product, siblings) : addToBag({ product })
-            }
+            onClick={() => {
+              if (needsChoice) {
+                openProduct(product, siblings);
+                return;
+              }
+              addToBag({ product });
+              confirm();
+            }}
             aria-label={
               needsChoice
                 ? `Choose options for ${product.name}`
                 : `Add ${product.name} to bag`
             }
-            className="absolute bottom-2 right-2 z-30 flex size-9 items-center justify-center rounded-full bg-noir text-white shadow-lg transition hover:bg-brand active:scale-90"
+            className={cn(
+              "absolute bottom-2 right-2 z-30 flex size-9 items-center justify-center rounded-full text-white shadow-lg transition active:scale-90",
+              added ? "bg-brand" : "bg-noir hover:bg-brand",
+            )}
           >
-            <Plus className="size-4" aria-hidden />
+            {added ? <Confirmed /> : <Plus className="size-4" aria-hidden />}
           </button>
         )}
       </div>
