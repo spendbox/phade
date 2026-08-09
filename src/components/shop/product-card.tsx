@@ -2,7 +2,7 @@
 
 import { Heart, Plus } from "lucide-react";
 
-import { Confirmed, useConfirmed } from "@/components/shop/confirm";
+import { Morph, useConfirmed } from "@/components/shop/confirm";
 import { Media } from "@/components/shop/media";
 import { Rail } from "@/components/shop/rail";
 import { useShop } from "@/components/shop/shop-provider";
@@ -129,7 +129,9 @@ export function ProductCard({
               added ? "bg-brand" : "bg-noir hover:bg-brand",
             )}
           >
-            {added ? <Confirmed /> : <Plus className="size-4" aria-hidden />}
+            <Morph confirming={added}>
+              <Plus className="size-4" aria-hidden />
+            </Morph>
           </button>
         )}
       </div>

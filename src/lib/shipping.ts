@@ -73,6 +73,12 @@ export type ShippingSettings = {
   zones: ShippingZone[];
   /** What the shop promises anywhere it hasn't said otherwise. */
   eta: DeliveryEta;
+  /**
+   * Lagos, separately, because it always is: a rider crosses the city the same
+   * day, and a parcel to Sokoto goes on a bus. A shop that priced Lagos into a
+   * zone of its own gets that zone's window instead.
+   */
+  lagosEta: DeliveryEta;
   pickupEnabled: boolean;
   /** Where and when, shown wherever pickup is offered. */
   pickupNote: string;
@@ -90,7 +96,8 @@ export const DEFAULT_SHIPPING: ShippingSettings = {
   defaultFeeKobo: 500_000,
   freeOverKobo: 10_000_000,
   zones: [],
-  eta: { minHours: 24, maxHours: 24 },
+  eta: { minHours: 72, maxHours: 96 },
+  lagosEta: { minHours: 24, maxHours: 24 },
   pickupEnabled: true,
   pickupNote: "Collect from us — we'll message you when it's ready.",
   pickupLocations: [],
@@ -279,6 +286,33 @@ export function formatEta(eta: DeliveryEta): string {
   return `${Math.round(eta.minHours / 24)}–${Math.round(eta.maxHours / 24)} days`;
 }
 
+/**
+ * How long a zone takes: its own answer, or the shop's — and for a zone that
+ * is really Lagos, the Lagos answer rather than the national one.
+ */
+export function etaForZone(
+  shipping: ShippingSettings,
+  zone: ShippingZone | null,
+): DeliveryEta {
+  if (zone?.eta) return zone.eta;
+  if (zone && coversLagos(zone)) return shipping.lagosEta;
+  return zone ? shipping.eta : shipping.eta;
+}
+
+/** Whether a zone is made of Lagos — its areas, or the state itself. */
+export function coversLagos(zone: ShippingZone): boolean {
+  const lagos = AREA_STATE.toLowerCase();
+  return (
+    zone.areas.length > 0 ||
+    zone.states.some((name) => name.trim().toLowerCase() === lagos)
+  );
+}
+
+/** Whether any zone has already claimed Lagos, whole or in parts. */
+export function lagosIsZoned(shipping: ShippingSettings): boolean {
+  return shipping.zones.some(coversLagos);
+}
+
 function parseZone(raw: unknown): ShippingZone[] {
   if (typeof raw !== "object" || raw === null) return [];
   const value = raw as Record<string, unknown>;
@@ -319,6 +353,9 @@ export function parseShipping(raw: unknown): ShippingSettings {
     freeOverKobo: kobo(value.freeOverKobo, DEFAULT_SHIPPING.freeOverKobo),
     zones: Array.isArray(value.zones) ? value.zones.flatMap(parseZone) : [],
     eta: parseEta(value.eta, DEFAULT_SHIPPING.eta) ?? DEFAULT_SHIPPING.eta,
+    lagosEta:
+      parseEta(value.lagosEta, DEFAULT_SHIPPING.lagosEta) ??
+      DEFAULT_SHIPPING.lagosEta,
     pickupEnabled: value.pickupEnabled !== false,
     pickupNote:
       typeof value.pickupNote === "string"

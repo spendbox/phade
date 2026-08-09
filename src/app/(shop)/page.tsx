@@ -7,6 +7,7 @@ import { CollectionRail } from "@/components/shop/collection-rail";
 import { FeaturedStack } from "@/components/shop/featured-stack";
 import { ProductRail } from "@/components/shop/product-card";
 import { NewInGrid } from "@/components/shop/new-in-grid";
+import { Reveal } from "@/components/shop/reveal";
 import { ProductRegistry } from "@/components/shop/shop-provider";
 import { StoryHero } from "@/components/shop/story-hero";
 import { bestSellers, featured, getCatalogue, newIn } from "@/lib/shop-queries";
@@ -119,7 +120,7 @@ export default async function LandingPage() {
           )}
 
           {deck.length > 0 && (
-            <section className="mt-12 px-4 sm:mt-16 sm:px-6 lg:px-8">
+            <Reveal className="mt-12 px-4 sm:mt-16 sm:px-6 lg:px-8">
               {/* Dark, once, in the middle of an ivory page: the deck is the
                   one thing here meant to be played with rather than read, and
                   the light moving behind it says so. */}
@@ -152,20 +153,20 @@ export default async function LandingPage() {
                   <FeaturedStack products={deck} />
                 </div>
               </div>
-            </section>
+            </Reveal>
           )}
 
           {/* The shop's own words come straight after the deck: by here a
               reader has decided they like the look of the place, and that is
               the moment they will read a paragraph about who chose it. */}
           {content.about.enabled && (
-            <div className="mt-14 sm:mt-20">
+            <Reveal className="mt-14 sm:mt-20">
               <AboutSection about={content.about} />
-            </div>
+            </Reveal>
           )}
 
           {fresh.length > 0 && (
-            <section className="mt-14 sm:mt-20">
+            <Reveal className="mt-14 sm:mt-20">
               <Heading copy={sections.newIn} />
               <div className="mt-6">
                 <NewInGrid products={fresh} />
@@ -180,21 +181,21 @@ export default async function LandingPage() {
                   </Link>
                 </div>
               )}
-            </section>
+            </Reveal>
           )}
 
           {best.length > 0 && (
-            <section className="mt-14 sm:mt-20">
+            <Reveal className="mt-14 sm:mt-20">
               <Heading copy={sections.bestSellers} inline />
               <div className="mt-5">
                 <ProductRail products={best} />
               </div>
-            </section>
+            </Reveal>
           )}
 
           {/* Narrow, like the about block: a closing line is read, and the
               walls of pictures either side of it have had the width. */}
-          <section className="mx-auto mt-16 max-w-4xl px-4 sm:mt-20 sm:px-6 lg:px-8">
+          <Reveal className="mx-auto mt-16 max-w-4xl px-4 sm:mt-20 sm:px-6 lg:px-8">
             <div className="shop-glow rounded-[2rem] bg-canvas-deep px-6 py-12 text-center sm:px-10 sm:py-14">
               <p className="inline-flex items-center gap-2 rounded-full bg-noir/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-secondary">
                 <ShoppingBag className="size-3.5" aria-hidden />
@@ -221,7 +222,7 @@ export default async function LandingPage() {
                 </Link>
               )}
             </div>
-          </section>
+          </Reveal>
         </>
       )}
     </>

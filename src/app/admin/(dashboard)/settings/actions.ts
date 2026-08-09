@@ -305,10 +305,12 @@ export async function saveShipping(
     let rawZones: unknown = [];
     let rawPlaces: unknown = [];
     let rawEta: unknown = null;
+    let rawLagosEta: unknown = null;
     try {
       rawZones = JSON.parse(String(formData.get("zones") ?? "[]"));
       rawPlaces = JSON.parse(String(formData.get("pickup_locations") ?? "[]"));
       rawEta = JSON.parse(String(formData.get("eta") ?? "null"));
+      rawLagosEta = JSON.parse(String(formData.get("lagos_eta") ?? "null"));
     } catch {
       throw new Error("Couldn't read those zones. Try again.");
     }
@@ -346,6 +348,7 @@ export async function saveShipping(
       freeOverKobo: nairaToKobo(String(formData.get("free_over") ?? "")),
       zones: rawZones,
       eta: rawEta,
+      lagosEta: rawLagosEta,
       pickupEnabled: formData.get("pickup_enabled") === "on",
       pickupNote: String(formData.get("pickup_note") ?? "").trim(),
       pickupLocations: rawPlaces,

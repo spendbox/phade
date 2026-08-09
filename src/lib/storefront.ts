@@ -163,10 +163,9 @@ export const DEFAULT_ABOUT: AboutBlock = {
 
 export const DEFAULT_MENU: MenuLink[] = [
   { label: "Home", href: "/" },
-  { label: "Categories", href: "/shop" },
-  { label: "New in", href: "/shop?sort=new" },
+  { label: "Shop", href: "/shop" },
   { label: "Saved", href: "/saved" },
-  { label: "Track an order", href: "/track" },
+  { label: "Track order", href: "/track" },
   { label: "Contact us", href: CONTACT_HREF },
 ];
 

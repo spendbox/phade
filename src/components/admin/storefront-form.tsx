@@ -7,6 +7,7 @@ import {
   Loader2,
   MessageCircle,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import { Panel } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
 import {
   CONTACT_HREF,
+  DEFAULT_MENU,
   DEFAULT_SECTIONS,
   type MenuLink,
   type SectionCopy,
@@ -85,6 +87,8 @@ export function StorefrontForm({
   );
   const [menu, setMenu] = useState<MenuLink[]>(content.menu);
   const [whatsappOn, setWhatsappOn] = useState(content.support.whatsappEnabled);
+  /** Whether the menu's reset button is waiting to be pressed a second time. */
+  const [resetting, setResetting] = useState(false);
 
   function moveLink(index: number, by: -1 | 1) {
     const to = index + by;
@@ -118,20 +122,45 @@ export function StorefrontForm({
       <Panel
         title="Menu"
         action={
-          <button
-            type="button"
-            onClick={() => setMenu([...menu, { label: "", href: "/shop" }])}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
-          >
-            <Plus className="size-3.5" />
-            Add a line
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Asks once: restoring the shipped menu discards whatever is in
+                the panel, which is not something to do on a mis-tap. */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!resetting) {
+                  setResetting(true);
+                  return;
+                }
+                setMenu(DEFAULT_MENU.map((link) => ({ ...link })));
+                setResetting(false);
+              }}
+              onBlur={() => setResetting(false)}
+              className={cn(
+                "inline-flex items-center gap-1.5 text-xs font-medium",
+                resetting ? "text-critical" : "text-ink-secondary hover:text-ink",
+              )}
+            >
+              <RotateCcw className="size-3.5" />
+              {resetting ? "Replace the menu?" : "Reset to default"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMenu([...menu, { label: "", href: "/shop" }])}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+            >
+              <Plus className="size-3.5" />
+              Add a line
+            </button>
+          </div>
         }
       >
         <div className="space-y-4">
           <p className="text-sm text-ink-secondary">
-            What sits behind the ☰ on every shop page, in this order. Clear the
-            list entirely and the button goes away.
+            Where everything is — laid out across the header on a desktop, and
+            behind the ☰ on a phone, in this order. Clear the list entirely and
+            the menu goes away.
           </p>
 
           {menu.length === 0 ? (

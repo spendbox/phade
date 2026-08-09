@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Heart, Share2, ShoppingBag } from "lucide-react";
 
-import { Confirmed, useConfirmed } from "@/components/shop/confirm";
+import { Morph, useConfirmed } from "@/components/shop/confirm";
 import { useShop } from "@/components/shop/shop-provider";
 import { cn } from "@/lib/cn";
 import {
@@ -326,11 +326,9 @@ export function BuyActions({
           aria-label="Share"
           className="flex size-12 shrink-0 items-center justify-center rounded-full bg-canvas-deep text-ink transition hover:bg-line-strong active:scale-90"
         >
-          {shared ? (
-            <Confirmed className="size-5 text-brand" />
-          ) : (
+          <Morph confirming={shared} className="size-5">
             <Share2 className="size-5" aria-hidden />
-          )}
+          </Morph>
         </button>
 
         {/* The button answers for itself. Whatever it dropped into the bag is
@@ -347,17 +345,30 @@ export function BuyActions({
             added ? "bg-brand" : "bg-noir hover:bg-brand",
           )}
         >
-          {added ? (
-            <>
-              <Confirmed />
-              In your bag
-            </>
-          ) : (
-            <>
-              <ShoppingBag className="size-4" aria-hidden />
+          <Morph confirming={added}>
+            <ShoppingBag className="size-4" aria-hidden />
+          </Morph>
+          {/* The words cross-fade in place rather than the button re-laying
+              itself out around a shorter label. */}
+          <span className="relative grid place-items-center">
+            <span
+              className={cn(
+                "col-start-1 row-start-1 transition-all duration-300",
+                added ? "-translate-y-1 opacity-0" : "translate-y-0 opacity-100",
+              )}
+            >
               {soldOut ? "Sold out" : "Add to bag"}
-            </>
-          )}
+            </span>
+            <span
+              aria-live="polite"
+              className={cn(
+                "col-start-1 row-start-1 transition-all duration-300",
+                added ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
+              )}
+            >
+              In your bag
+            </span>
+          </span>
         </button>
       </div>
 

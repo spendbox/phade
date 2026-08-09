@@ -39,7 +39,9 @@ export function SiteHeader({
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:h-16 sm:gap-3 sm:px-6 lg:px-8">
         <SiteMenu links={menu} support={support} />
 
-        <Link href="/" className="shrink-0" aria-label="phadewoman — home">
+        {/* Ordered, not placed: the hamburger belongs left of the wordmark on a
+            phone, and the same lines belong right of it on a desktop. */}
+        <Link href="/" className="order-2 shrink-0" aria-label="phadewoman — home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={LOGO_TYPE}
@@ -49,7 +51,7 @@ export function SiteHeader({
           />
         </Link>
 
-        <div className="ml-auto flex items-center gap-0.5">
+        <div className="order-4 ml-auto flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => setSearching(true)}

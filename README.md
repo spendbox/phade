@@ -26,15 +26,20 @@ buy at `/`, and everything they do shows up at `/admin`.
 
 Navigation on a phone is a tab bar along the bottom — home, shop, saved, bag —
 because that is where a thumb is. On a wider screen the header takes over. A
-menu sits behind the ☰ in the top-left corner of both, written in the
-dashboard: Home, Categories, New in, Saved, Track an order and Contact us to
-begin with, and whatever the shop wants after that.
+menu is written in the dashboard — Home, Shop, Saved, Track order and Contact
+us to begin with, whatever the shop wants after that, and one button to put the
+defaults back. It sits behind a ☰ on a phone, where there is no room for a row
+of words beside a wordmark and three icons, and simply across the header on a
+desktop, where there is.
 
 Every page ends with three promises, and each is a button rather than a
 paragraph, because each is really a question. **Delivered nationwide** opens
 the price of every zone with how long it takes, the free-delivery threshold and
 whether collection is offered — all from Settings → Shipping, so it cannot
-promise something checkout won't honour. **Paid securely** shows the channels
+promise something checkout won't honour. Lagos is asked about separately, and
+answers separately: within 24 hours by default, against three to four days for
+the rest of Nigeria, because a rider crosses the city in an afternoon and a
+parcel to Sokoto goes on a bus. **Paid securely** shows the channels
 Paystack handles and says plainly that the card number never reaches this shop.
 **Here to help** is a message form that goes to the address in the dashboard,
 with a WhatsApp button beside it where the shop offers one.
@@ -332,10 +337,16 @@ A few decisions worth knowing:
   from stuck. That one call is on XMLHttpRequest, which reports upload
   progress, and the bar is the browser's own number rather than a guess on a
   timer.
-- **A button that did something says so.** Add to bag becomes a tick for a
-  second and then goes back to being a button, and the same goes for share and
-  the quick-add on a card. On a phone whatever changed is usually off screen,
-  and silence at the moment of pressing is what makes someone press again.
+- **A button that did something says so.** Add to bag *becomes* a tick for a
+  second and then comes back — both glyphs drawn, stacked, cross-faded through
+  a quarter-turn, so it is a movement rather than a swap someone has to notice.
+  Share and the quick-add on a card do the same. On a phone whatever changed is
+  usually off screen, and silence at the moment of pressing is what makes
+  someone press again.
+- **The front page arrives as you reach it.** Each section lifts into place on
+  an IntersectionObserver — once, never fading back out, and anything already
+  on screen at first paint is simply there. It gives a long scroll a rhythm and
+  tells a reader there is another thing below the one they are looking at.
 - **Messages need a mail provider, and work without one.** "Here to help" sends
   through Resend when `RESEND_API_KEY` is set. When it isn't — which is the
   state a shop is in the day it opens — the answer says so and hands the whole

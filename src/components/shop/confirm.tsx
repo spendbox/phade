@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { Check } from "lucide-react";
 
+import { cn } from "@/lib/cn";
+
 /**
  * "That worked."
  *
@@ -35,7 +37,50 @@ export function useConfirmed(
   ];
 }
 
-/** The tick itself, popping in wherever a label used to be. */
-export function Confirmed({ className }: { className?: string }) {
-  return <Check className={`pop-in ${className ?? "size-4"}`} aria-hidden />;
+/**
+ * One icon turning into another.
+ *
+ * Both are drawn, stacked, and cross-faded through a quarter-turn — so the
+ * plus doesn't vanish and a tick appear in its place, it *becomes* the tick
+ * and comes back. A swap is an event a shopper has to notice; a movement is
+ * one they feel.
+ *
+ * The box is sized rather than the glyphs, so the button never resizes as the
+ * two trade places.
+ */
+export function Morph({
+  confirming,
+  children,
+  className = "size-4",
+}: {
+  confirming: boolean;
+  /** What it is the rest of the time. */
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span className={cn("relative grid shrink-0 place-items-center", className)}>
+      <span
+        className={cn(
+          "col-start-1 row-start-1 flex items-center justify-center transition-all duration-300 ease-out",
+          confirming
+            ? "scale-50 rotate-90 opacity-0"
+            : "scale-100 rotate-0 opacity-100",
+        )}
+      >
+        {children}
+      </span>
+
+      <span
+        className={cn(
+          "col-start-1 row-start-1 flex items-center justify-center transition-all duration-300 ease-out",
+          confirming
+            ? "scale-100 rotate-0 opacity-100"
+            : "scale-50 -rotate-90 opacity-0",
+        )}
+      >
+        <Check className={className} strokeWidth={3} aria-hidden />
+      </span>
+    </span>
+  );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, Link2, Search } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -44,16 +45,64 @@ export function PathPicker({
   const listId = useId();
   const box = useRef<HTMLDivElement>(null);
 
+  const list = useRef<HTMLDivElement>(null);
+
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  /** Where to paint the list, in page coordinates. See below. */
+  const [at, setAt] = useState<{ top: number; left: number; width: number } | null>(
+    null,
+  );
+
+  /**
+   * The list is painted at the body, not under the button.
+   *
+   * Every settings panel is a rounded card that clips its contents, which is
+   * right for a card and fatal for a dropdown: opened on the last row of a
+   * panel, the options were cut off at the panel's edge and there was no way
+   * to reach them. A portal escapes the clip; the position has to be measured
+   * and carried across by hand, which is the price of that.
+   */
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    const place = () => {
+      const rect = box.current?.getBoundingClientRect();
+      if (!rect) return;
+      setAt({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      });
+    };
+
+    place();
+    // Anchored to the button, so it has to follow it. Capture, because the
+    // scroll that moves it is often a panel's own rather than the page's.
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (event: PointerEvent) => {
-      if (!box.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (box.current?.contains(target) || list.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const needle = query.trim().toLowerCase();
@@ -100,8 +149,14 @@ export function PathPicker({
         <ChevronDown className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
       </button>
 
-      {open && (
-        <div className="absolute inset-x-0 top-full z-30 mt-1 rounded-lg bg-surface p-1.5 shadow-xl ring-1 ring-line">
+      {open &&
+        at &&
+        typeof document !== "undefined" &&
+        createPortal(
+        <div
+          ref={list}
+          style={{ top: at.top, left: at.left, width: at.width }}
+          className="absolute z-[90] rounded-lg bg-surface p-1.5 shadow-xl ring-1 ring-line">
           <div className="relative mb-1.5">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-muted" />
             <input
@@ -171,8 +226,9 @@ export function PathPicker({
               Clear — no link
             </button>
           )}
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </div>
   );
 }

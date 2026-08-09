@@ -14,6 +14,7 @@ import { cn } from "@/lib/cn";
 import { formatNairaShort, koboToNairaInput, nairaToKobo } from "@/lib/format";
 import {
   AREA_STATE,
+  coversLagos,
   formatEta,
   LAGOS_AREAS,
   NIGERIAN_STATES,
@@ -45,6 +46,7 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
 
   const [zones, setZones] = useState<ShippingZone[]>(shipping.zones);
   const [eta, setEta] = useState<DeliveryEta>(shipping.eta);
+  const [lagosEta, setLagosEta] = useState<DeliveryEta>(shipping.lagosEta);
   const [pickup, setPickup] = useState(shipping.pickupEnabled);
   const [places, setPlaces] = useState<PickupLocation[]>(
     shipping.pickupLocations,
@@ -100,13 +102,32 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
             </Field>
           </div>
 
-          <Field
-            label="How long it takes"
-            hint={`Shown to shoppers as "${formatEta(eta)}". Leave both the same for a single figure. A zone can promise something different.`}
-          >
-            <EtaFields value={eta} onChange={setEta} />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Within Lagos"
+              hint={`Shown as "${formatEta(lagosEta)}".`}
+            >
+              <EtaFields value={lagosEta} onChange={setLagosEta} />
+            </Field>
+
+            <Field
+              label="Everywhere else"
+              hint={`Shown as "${formatEta(eta)}". Leave both numbers the same for a single figure.`}
+            >
+              <EtaFields value={eta} onChange={setEta} />
+            </Field>
+          </div>
+          <p className="text-xs text-ink-muted">
+            A rider crosses Lagos in an afternoon and a parcel to Sokoto goes on
+            a bus, so the two are asked separately. Any zone below can promise
+            something different again.
+          </p>
           <input type="hidden" name="eta" value={JSON.stringify(eta)} />
+          <input
+            type="hidden"
+            name="lagos_eta"
+            value={JSON.stringify(lagosEta)}
+          />
         </div>
       </Panel>
 
@@ -234,7 +255,11 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => update(zone.id, { eta: { ...eta } })}
+                      onClick={() =>
+                        update(zone.id, {
+                          eta: { ...(coversLagos(zone) ? lagosEta : eta) },
+                        })
+                      }
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
                     >
                       <Clock className="size-3.5" />

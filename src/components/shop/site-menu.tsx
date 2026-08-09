@@ -15,17 +15,16 @@ import {
 } from "@/lib/storefront";
 
 /**
- * The menu behind the hamburger.
+ * Where everything is.
  *
- * The header carries search, saved and the bag — the things a shopper reaches
- * for mid-thought — and nothing else, because a row of category links up there
- * competes with the rail of them pinned under it. But a shop still needs a way
- * to say where everything is, and "where is your contact page" is a question
- * people ask of the top-left corner. So: one button, and a panel.
+ * On a phone it is a hamburger and a sheet, because there is no room for a row
+ * of words beside a wordmark and three icons. On a wider screen there is room,
+ * so the same lines simply sit in the header — a hamburger on a desktop hides
+ * five words behind a click for no reason anyone could name.
  *
  * What is in it comes from Settings → Storefront, since a shop knows its own
- * rooms. One line is special — "Contact us" has no page behind it, so it opens
- * the message pop-up instead of navigating, and the panel closes underneath.
+ * rooms. One line is special: "Contact us" has no page behind it, so it opens
+ * the message pop-up instead of navigating.
  */
 export function SiteMenu({
   links,
@@ -38,10 +37,19 @@ export function SiteMenu({
   const [helping, setHelping] = useState(false);
   const pathname = usePathname();
 
-  // A shop that cleared every line meant to. No lines, no button. Read
+  // A shop that cleared every line meant to. No lines, no menu. Read
   // defensively because this arrives through a cache that can outlive the
   // shape it was written in — and a menu is not worth a broken shop.
   if (!links || links.length === 0) return null;
+
+  // Matched whole. "Shop" (/shop) and a "New in" (/shop?sort=new) somebody
+  // adds are different places, and comparing only the path lights both.
+  const here = (link: MenuLink) => pathname === link.href;
+
+  const contact = () => {
+    setOpen(false);
+    setHelping(true);
+  };
 
   return (
     <>
@@ -50,10 +58,42 @@ export function SiteMenu({
         onClick={() => setOpen(true)}
         aria-label="Menu"
         aria-expanded={open}
-        className="-ml-2 flex size-10 shrink-0 items-center justify-center rounded-full text-ink transition hover:bg-canvas-deep active:scale-90"
+        className="order-1 -ml-2 flex size-10 shrink-0 items-center justify-center rounded-full text-ink transition hover:bg-canvas-deep active:scale-90 lg:hidden"
       >
         <Menu className="size-5" aria-hidden />
       </button>
+
+      {/* The same lines, laid out, once there is width to lay them out in.
+          `min-w-0` and the truncation let a shop with eight rooms shrink
+          rather than push the bag off the end of the bar. */}
+      <nav
+        aria-label="Menu"
+        className="order-3 ml-2 hidden min-w-0 items-center gap-1 lg:flex"
+      >
+        {links.map((link, index) =>
+          link.href === CONTACT_HREF ? (
+            <button
+              key={`${link.href}-${index}`}
+              type="button"
+              onClick={contact}
+              className="max-w-40 truncate rounded-full px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-canvas-deep"
+            >
+              {link.label}
+            </button>
+          ) : (
+            <Link
+              key={`${link.href}-${index}`}
+              href={link.href}
+              className={cn(
+                "max-w-40 truncate rounded-full px-3 py-1.5 text-sm font-medium transition hover:bg-canvas-deep",
+                here(link) ? "text-brand" : "text-ink",
+              )}
+            >
+              {link.label}
+            </Link>
+          ),
+        )}
+      </nav>
 
       <Sheet
         open={open}
@@ -83,10 +123,7 @@ export function SiteMenu({
                 <li key={`${link.href}-${index}`}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      setHelping(true);
-                    }}
+                    onClick={contact}
                     className="flex w-full items-center gap-3 rounded-2xl px-3 py-3.5 text-left text-[15px] font-medium text-ink transition hover:bg-canvas-deep active:scale-[0.99]"
                   >
                     {link.label}
@@ -103,10 +140,7 @@ export function SiteMenu({
                     onClick={() => setOpen(false)}
                     className={cn(
                       "flex items-center rounded-2xl px-3 py-3.5 text-[15px] font-medium transition hover:bg-canvas-deep active:scale-[0.99]",
-                      // Matched whole. "Categories" (/shop) and "New in"
-                      // (/shop?sort=new) are different places, and comparing
-                      // only the path would light both of them at once.
-                      pathname === link.href ? "text-brand" : "text-ink",
+                      here(link) ? "text-brand" : "text-ink",
                     )}
                   >
                     {link.label}

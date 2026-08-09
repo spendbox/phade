@@ -16,7 +16,12 @@ import { HelpSheet } from "@/components/shop/help-sheet";
 import { Sheet } from "@/components/shop/sheet";
 import { cn } from "@/lib/cn";
 import { formatNairaShort } from "@/lib/format";
-import { formatEta, type ShippingSettings } from "@/lib/shipping";
+import {
+  etaForZone,
+  formatEta,
+  lagosIsZoned,
+  type ShippingSettings,
+} from "@/lib/shipping";
 import type { SupportDetails } from "@/lib/storefront";
 
 /**
@@ -168,17 +173,20 @@ function Delivery({ shipping }: { shipping: ShippingSettings }) {
           Delivered nationwide
         </Title>
 
-        {/* A parcel making its way along the line. It is the one picture that
-            says "on its way" without a word of copy. */}
-        <div className="mt-4 h-7 overflow-hidden rounded-full bg-canvas-deep">
-          <div className="van-track flex size-7 items-center justify-center rounded-full bg-noir text-white">
+        {/* A parcel making its way along the line, leaving a trail of road
+            behind it. It is the one picture that says "on its way" without a
+            word of copy. */}
+        <div className="relative mt-4 h-8 overflow-hidden rounded-full bg-canvas-deep">
+          <span className="van-road absolute inset-y-0 left-0 rounded-full bg-brand-soft" />
+          <span className="van-track absolute top-1 flex size-6 items-center justify-center rounded-full bg-noir text-white shadow-md">
             <Package className="size-3.5" aria-hidden />
-          </div>
+          </span>
         </div>
 
         <p className="mt-3 text-sm text-ink-secondary">
-          Most orders arrive {formatEta(shipping.eta).toLowerCase()} of being
-          sent out.
+          Most orders reach Lagos {formatEta(shipping.lagosEta).toLowerCase()},
+          and the rest of Nigeria in{" "}
+          {formatEta(shipping.eta).toLowerCase().replace(/^within /, "")}.
         </p>
       </div>
 
@@ -194,14 +202,30 @@ function Delivery({ shipping }: { shipping: ShippingSettings }) {
           <Row
             key={zone.id}
             name={zone.name}
-            note={formatEta(zone.eta ?? shipping.eta)}
+            note={formatEta(etaForZone(shipping, zone))}
             value={
               zone.feeKobo === 0 ? "Free" : formatNairaShort(zone.feeKobo)
             }
           />
         ))}
+
+        {/* Lagos always gets a line of its own, unless a zone already speaks
+            for it — it is where most of these parcels go and it is the one
+            place with a different answer. */}
+        {!lagosIsZoned(shipping) && (
+          <Row
+            name="Within Lagos"
+            note={formatEta(shipping.lagosEta)}
+            value={
+              shipping.defaultFeeKobo === 0
+                ? "Free"
+                : formatNairaShort(shipping.defaultFeeKobo)
+            }
+          />
+        )}
+
         <Row
-          name={shipping.zones.length > 0 ? "Everywhere else" : "Anywhere in Nigeria"}
+          name="Everywhere else in Nigeria"
           note={formatEta(shipping.eta)}
           value={
             shipping.defaultFeeKobo === 0
