@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Boxes, Minus, Plus } from "lucide-react";
+import { ArrowUpRight, Boxes } from "lucide-react";
 
 import { FilterBar } from "@/components/admin/filter-bar";
 import { MediaThumb } from "@/components/admin/media-thumb";
@@ -10,11 +10,11 @@ import { StockBadge, StockDot } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Panel, StatTile } from "@/components/ui/stat-tile";
 import { formatNaira, formatNairaCompact, formatNumber, formatRelative } from "@/lib/format";
+import { getCatalogueDefaults } from "@/lib/catalogue-settings";
 import { getInventory, getRecentMovements } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import type { InventoryMovementWithProduct } from "@/lib/types";
 
-import { nudgeStock } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Inventory" };
@@ -26,10 +26,12 @@ export default async function InventoryPage({
 }) {
   const { q, view } = await searchParams;
 
-  const [{ data: rows, error }, { data: movements }] = await Promise.all([
-    getInventory({ search: q, view }),
-    getRecentMovements(5),
-  ]);
+  const [{ data: rows, error }, { data: movements }, catalogue] =
+    await Promise.all([
+      getInventory({ search: q, view }),
+      getRecentMovements(5),
+      getCatalogueDefaults(),
+    ]);
 
   const configured = isSupabaseConfigured();
 
@@ -165,12 +167,12 @@ export default async function InventoryPage({
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex items-center justify-end gap-1.5">
-                            <NudgeButton id={row.id} delta={-1} />
-                            <NudgeButton id={row.id} delta={1} />
                             <StockDialog
                               productId={row.id}
                               productName={row.name}
                               currentStock={row.stock}
+                              colors={row.colors ?? []}
+                              palette={catalogue.colors}
                             />
                           </div>
                         </td>
@@ -219,15 +221,13 @@ export default async function InventoryPage({
                         stock={row.stock}
                         threshold={row.low_stock_threshold}
                       />
-                      <div className="flex items-center gap-1.5">
-                        <NudgeButton id={row.id} delta={-1} />
-                        <NudgeButton id={row.id} delta={1} />
-                        <StockDialog
-                          productId={row.id}
-                          productName={row.name}
-                          currentStock={row.stock}
-                        />
-                      </div>
+                      <StockDialog
+                        productId={row.id}
+                        productName={row.name}
+                        currentStock={row.stock}
+                        colors={row.colors ?? []}
+                        palette={catalogue.colors}
+                      />
                     </div>
                   </li>
                 ))}
@@ -285,21 +285,5 @@ export default async function InventoryPage({
         </Panel>
       </div>
     </div>
-  );
-}
-
-function NudgeButton({ id, delta }: { id: string; delta: number }) {
-  return (
-    <form action={nudgeStock}>
-      <input type="hidden" name="product_id" value={id} />
-      <input type="hidden" name="delta" value={delta} />
-      <button
-        type="submit"
-        aria-label={delta > 0 ? "Add one" : "Remove one"}
-        className="flex size-8 items-center justify-center rounded-lg text-ink-secondary ring-1 ring-inset ring-line-strong transition-colors hover:bg-plane hover:text-ink"
-      >
-        {delta > 0 ? <Plus className="size-3.5" /> : <Minus className="size-3.5" />}
-      </button>
-    </form>
   );
 }

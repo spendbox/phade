@@ -17,12 +17,17 @@ export function LoginForm({ next }: { next?: string }) {
     <form action={formAction} className="card space-y-4 p-5">
       {next && <input type="hidden" name="next" value={next} />}
 
-      <Field label="Email" htmlFor="email">
+      {/* The owner signs in with an email; everyone the owner added signs in
+          with a username. One field takes both — `type="text"`, because
+          `type="email"` refuses a perfectly good username. */}
+      <Field label="Email or username" htmlFor="email">
         <Input
           id="email"
           name="email"
-          type="email"
+          type="text"
           autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
           autoFocus
           required
           placeholder="you@phadewoman.com"

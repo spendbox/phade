@@ -28,7 +28,7 @@ import { MediaThumb } from "@/components/admin/media-thumb";
 import { SheetImport } from "@/components/admin/sheet-import";
 import { SelectCell, TextCell } from "@/components/admin/sheet-cells";
 import { SizePicker } from "@/components/admin/size-picker";
-import type { CatalogueDefaults } from "@/lib/catalogue-settings";
+import type { CatalogueDefaults } from "@/lib/catalogue";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/field";
@@ -779,7 +779,7 @@ function EditorModal({
             <SizePicker
               key={`sizes-${row.id}`}
               initial={row.sizes ?? []}
-              options={defaults.sizes}
+              runs={defaults.runs}
               onChange={(sizes) => {
                 valueRef.current = JSON.stringify(sizes);
               }}

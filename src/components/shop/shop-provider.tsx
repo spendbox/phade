@@ -236,6 +236,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   /**
    * The next piece along, without leaving the pop-up.
    *
+   * It wraps. A rail is a loop, not a corridor with walls at both ends: a
+   * shopper flicking through a row of eight and hitting a swipe that does
+   * nothing reads it as the pop-up having broken, not as having reached the
+   * end — and going round is what every feed they use all day already does.
+   *
    * The address bar is corrected rather than added to: a shopper who swiped
    * through nine dresses should get back to the grid with one press of Back,
    * not nine.
@@ -243,10 +248,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   const stepProduct = useCallback(
     (by: 1 | -1) => {
       setViewing((current) => {
-        if (!current) return current;
+        if (!current || queue.length < 2) return current;
         const at = queue.findIndex((item) => item.id === current.id);
-        const next = at === -1 ? undefined : queue[at + by];
-        if (!next) return current;
+        if (at === -1) return current;
+        const next = queue[(at + by + queue.length) % queue.length];
+        if (!next || next.id === current.id) return current;
 
         window.history.replaceState(
           null,

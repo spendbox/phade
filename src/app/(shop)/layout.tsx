@@ -49,7 +49,7 @@ export default async function ShopLayout({
           </p>
         )}
 
-        <SiteHeader />
+        <SiteHeader menu={content.menu} support={content.support} />
 
         <main className="flex-1">{children}</main>
 

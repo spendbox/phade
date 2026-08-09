@@ -26,7 +26,19 @@ export type InventoryReason =
   | "correction"
   | "damage";
 
-export type ProductColor = { name: string; hex: string };
+export type ProductColor = {
+  name: string;
+  hex: string;
+  /**
+   * How many of this colourway are on the shelf.
+   *
+   * Optional, because plenty of shops keep one number for a piece and always
+   * will. When every colour carries one, the product's `stock` is their sum —
+   * a shop that has three emerald and none in black can say so, and the black
+   * swatch stops being something a shopper can choose.
+   */
+  stock?: number;
+};
 
 /** The size run phadewoman stocks. Sizes are optional per product. */
 export const PRODUCT_SIZES = [6, 8, 10, 12, 14, 16, 18] as const;
@@ -113,7 +125,11 @@ export type ShippingAddress = {
   line2?: string;
   city?: string;
   state?: string;
+  /** Which part of Lagos, where that is how delivery is priced. */
+  area?: string;
   country?: string;
+  /** Where a collected order is being picked up from. */
+  pickup?: { name: string; address: string; note?: string };
   /** The number to ring first. */
   phone?: string;
   /** Every number given, including the first — a courier's second chance. */

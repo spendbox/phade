@@ -127,6 +127,33 @@ function subscribeMotion(onChange: () => void): () => void {
   return () => query.removeEventListener("change", onChange);
 }
 
+/**
+ * Which shape of screen this is — true wide, false narrow, null not yet known.
+ *
+ * Null on the server and for the first client render, so the markup the server
+ * sent and the markup React first produces are the same thing. Anything that
+ * branches on this has to have an answer for "don't know yet"; the alternative
+ * is a hydration mismatch, which React resolves by throwing the server's work
+ * away and rendering the whole subtree again.
+ */
+const WIDE = "(min-width: 640px)";
+
+function subscribeWidth(onChange: () => void): () => void {
+  const query = window.matchMedia(WIDE);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+export function useIsWide(): boolean | null {
+  const hydrated = useIsHydrated();
+  const wide = useSyncExternalStore(
+    subscribeWidth,
+    () => window.matchMedia(WIDE).matches,
+    () => false,
+  );
+  return hydrated ? wide : null;
+}
+
 /** True when this person has asked their system for less movement. */
 export function usePrefersReducedMotion(): boolean {
   return useSyncExternalStore(

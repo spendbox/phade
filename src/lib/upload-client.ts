@@ -100,8 +100,57 @@ async function prepareImage(file: File): Promise<File> {
   return encoded && encoded.size < file.size ? encoded : file;
 }
 
-/** Uploads one file and resolves to its public URL. Throws on failure. */
-export async function uploadMedia(file: File): Promise<string> {
+/**
+ * The PUT, with the browser reporting how far it has got.
+ *
+ * `fetch` cannot say — it resolves when the whole body has gone, and nothing
+ * before that — so a shop owner on Nigerian mobile data pushing a 40MB clip
+ * watched a spinner that told them nothing for two minutes and gave them no
+ * way to tell a slow upload from a stuck one. XMLHttpRequest is the only API
+ * in a browser that reports upload progress, so this one call stays on it.
+ */
+function put(
+  url: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", url);
+    request.setRequestHeader("Content-Type", file.type);
+
+    request.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      onProgress?.(Math.min(event.loaded / event.total, 1));
+    };
+
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) {
+        onProgress?.(1);
+        resolve();
+        return;
+      }
+      reject(new Error(`Upload failed for ${file.name}.`));
+    };
+    request.onerror = () =>
+      reject(new Error(`${file.name} couldn't be uploaded. Check the network.`));
+    request.onabort = () => reject(new Error(`${file.name} was cancelled.`));
+
+    request.send(file);
+  });
+}
+
+/**
+ * Uploads one file and resolves to its public URL. Throws on failure.
+ *
+ * `onProgress` reports 0 to 1 across the whole job — a phone photo spends a
+ * real fraction of its time being resized before a byte leaves the device, so
+ * that part counts too rather than sitting at zero and then jumping.
+ */
+export async function uploadMedia(
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<string> {
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new Error(`${file.name} is larger than 50MB.`);
   }
@@ -110,6 +159,9 @@ export async function uploadMedia(file: File): Promise<string> {
     file.type.startsWith("image/") || isHeicFile(file)
       ? await prepareImage(file)
       : file;
+
+  // Preparing is done; the transfer is the remaining nine tenths.
+  onProgress?.(0.08);
 
   const ticket = await fetch("/api/admin/upload-url", {
     method: "POST",
@@ -131,15 +183,9 @@ export async function uploadMedia(file: File): Promise<string> {
     throw new Error(issued.error ?? "Could not start the upload.");
   }
 
-  const put = await fetch(issued.uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": prepared.type },
-    body: prepared,
-  });
-
-  if (!put.ok) {
-    throw new Error(`Upload failed for ${file.name}.`);
-  }
+  await put(issued.uploadUrl, prepared, (fraction) =>
+    onProgress?.(0.08 + fraction * 0.92),
+  );
 
   return issued.publicUrl;
 }

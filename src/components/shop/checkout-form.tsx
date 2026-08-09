@@ -6,6 +6,7 @@ import {
   Check,
   Loader2,
   Lock,
+  MapPin,
   Plus,
   ShoppingBag,
   Store,
@@ -39,7 +40,9 @@ import {
   safeDetails,
 } from "@/lib/shopper-details";
 import {
+  AREA_STATE,
   cheapestFee,
+  LAGOS_AREAS,
   NIGERIAN_STATES,
   quoteDelivery,
   type ShippingSettings,
@@ -139,17 +142,29 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
   // The delivery charge depends on where it's going, so the state field is the
   // one input on this form that changes the total as you use it.
   const [state_, setState] = useState(stored.state);
+  // Lagos is asked about twice: the state, then the part of it. Getting a
+  // parcel to Ikoyi is not what it costs to get one to Ikorodu.
+  const [area, setArea] = useState(stored.area);
   const [note, setNote] = useState("");
+  const [pickupAt, setPickupAt] = useState(
+    () => shipping.pickupLocations[0]?.id ?? "",
+  );
 
   const delivering = fulfilment === "shipping";
+  const inLagos = delivering && state_ === AREA_STATE;
+  const counters = shipping.pickupLocations;
+  const collectingFrom = counters.find((place) => place.id === pickupAt);
 
   const whoDone =
     Boolean(name.trim()) &&
     EMAIL.test(email.trim()) &&
     digitCount(phones[0]?.number ?? "") >= 7;
   const whereDone =
-    !delivering || Boolean(line1.trim() && city.trim() && state_);
-  const ready = whoDone && whereDone;
+    !delivering ||
+    Boolean(line1.trim() && city.trim() && state_ && (!inLagos || area));
+  // Collection with nowhere chosen is an order nobody can hand over.
+  const howDone = delivering || counters.length === 0 || Boolean(collectingFrom);
+  const ready = howDone && whoDone && whereDone;
 
   const steps: StepKey[] = delivering
     ? ["how", "who", "where", "note"]
@@ -168,6 +183,14 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
   const reachable = (step: StepKey) =>
     (at(step) <= at("who") || whoDone) && (at(step) <= at("where") || whereDone);
 
+  const answered: Record<StepKey, boolean> = {
+    how: howDone,
+    who: whoDone,
+    where: whereDone,
+    note: ready,
+  };
+  const settled = steps.filter((step) => answered[step]).length;
+
   const lines = JSON.stringify(
     bag.map((line) => ({
       productId: line.productId,
@@ -185,6 +208,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
   const quote = quoteDelivery(shipping, subtotalKobo, {
     fulfilment,
     state: state_,
+    area,
   });
   const total = subtotalKobo - (coupon.applied?.amountKobo ?? 0) + quote.feeKobo;
 
@@ -215,7 +239,16 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
         // still leave the shopper with their details filled in next time.
         detailsStore.set(detailsFrom(new FormData(event.currentTarget)));
       }}
-      className="grid gap-8 px-4 pb-10 pt-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-12 lg:px-8"
+      className={cn(
+        "grid gap-8 px-4 pb-10 pt-4 sm:px-6 lg:gap-12 lg:px-8",
+        // The order and the way to pay for it arrive together, at the end. A
+        // summary pinned beside a half-answered form is a total that keeps
+        // moving under a shopper still trying to type their address, and a Pay
+        // button that has been sitting there greyed out since the first field.
+        ready
+          ? "lg:grid-cols-[minmax(0,1fr)_22rem]"
+          : "mx-auto w-full max-w-2xl",
+      )}
     >
       {/* Every answer, whether or not its step is open.
           A folded-up step is not rendered — that is what makes the form short —
@@ -234,7 +267,11 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
           <input type="hidden" name="line2" value={line2.trim()} />
           <input type="hidden" name="city" value={city.trim()} />
           <input type="hidden" name="state" value={state_} />
+          {inLagos && <input type="hidden" name="area" value={area} />}
         </>
+      )}
+      {!delivering && collectingFrom && (
+        <input type="hidden" name="pickup_location" value={collectingFrom.id} />
       )}
       {coupon.applied && (
         <input type="hidden" name="coupon" value={coupon.applied.code} />
@@ -254,20 +291,45 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
         ))}
 
       <div className="space-y-3">
+        <Progress
+          settled={settled}
+          total={steps.length}
+          ready={ready}
+          next={
+            !howDone
+              ? "How would you like it?"
+              : !whoDone
+                ? "Who is it for?"
+                : !whereDone
+                  ? "Where is it going?"
+                  : "Anything we should know?"
+          }
+        />
+
         <Step
           step={1}
           title="How would you like it?"
           summary={
             delivering
-              ? state_
-                ? `Delivered to ${state_}`
-                : "Delivered"
-              : "Collected from us"
+              ? [
+                  state_
+                    ? `Delivered to ${[area, state_].filter(Boolean).join(", ")}`
+                    : "Delivered — anywhere in Nigeria",
+                  quote.free
+                    ? "Free on this order"
+                    : state_
+                      ? `${formatNairaShort(quote.feeKobo)} delivery`
+                      : `From ${formatNairaShort(cheapest)}`,
+                ]
+              : collectingFrom
+                ? [`Collect from ${collectingFrom.name}`, collectingFrom.address]
+                : ["Collected from us"]
           }
           open={open === "how"}
-          done
+          done={howDone}
           onOpen={() => setOpen("how")}
           onNext={() => setOpen(whoDone && !delivering ? "note" : "who")}
+          nextDisabled={!howDone}
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Choice
@@ -295,16 +357,83 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
                 onChange={() => setFulfilment("pickup")}
                 icon={<Store className="size-4" aria-hidden />}
                 title="Picked up"
-                note="Free"
+                note={
+                  counters.length > 1
+                    ? `Free · ${counters.length} places`
+                    : "Free"
+                }
               />
             )}
           </div>
+
+          {/* Where to come, chosen rather than described: the address travels
+              on the order, so the confirmation says where to go. */}
+          {!delivering && counters.length > 0 && (
+            <fieldset className="mt-4">
+              <legend className="text-[13px] font-medium text-ink-secondary">
+                Collect from
+              </legend>
+              <ul className="mt-2 space-y-2">
+                {counters.map((place) => {
+                  const chosen = place.id === pickupAt;
+                  return (
+                    <li key={place.id}>
+                      <label
+                        className={cn(
+                          "flex cursor-pointer gap-3 rounded-2xl p-3.5 transition",
+                          chosen
+                            ? "bg-canvas ring-2 ring-noir"
+                            : "bg-canvas-deep/60 ring-1 ring-inset ring-line hover:ring-line-strong",
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="pickup_choice"
+                          value={place.id}
+                          checked={chosen}
+                          onChange={() => setPickupAt(place.id)}
+                          className="sr-only"
+                        />
+                        <MapPin
+                          className={cn(
+                            "mt-0.5 size-4 shrink-0",
+                            chosen ? "text-brand" : "text-ink-muted",
+                          )}
+                          aria-hidden
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium text-ink">
+                            {place.name}
+                          </span>
+                          <span className="block text-xs text-ink-secondary">
+                            {place.address}
+                          </span>
+                          {place.note && (
+                            <span className="mt-0.5 block text-xs text-ink-muted">
+                              {place.note}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </fieldset>
+          )}
         </Step>
 
         <Step
           step={2}
           title="Who is it for?"
-          summary={[name, email].filter(Boolean).join(" · ")}
+          summary={[
+            name,
+            email,
+            phones
+              .filter((phone) => digitCount(phone.number) >= 7)
+              .map(fullNumber)
+              .join(" · "),
+          ]}
           open={open === "who"}
           done={whoDone}
           locked={!reachable("who")}
@@ -354,7 +483,12 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
           <Step
             step={3}
             title="Where is it going?"
-            summary={[line1, city, state_].filter(Boolean).join(", ")}
+            summary={[
+              line1,
+              line2,
+              [city, state_].filter(Boolean).join(", "),
+              inLagos ? area : "",
+            ]}
             open={open === "where"}
             done={whereDone}
             locked={!reachable("where")}
@@ -409,6 +543,30 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
                   </p>
                 </div>
               </div>
+
+              {inLagos && (
+                <div>
+                  <label
+                    htmlFor="area"
+                    className="block text-[13px] font-medium text-ink-secondary"
+                  >
+                    Part of Lagos<span className="ml-0.5 text-critical">*</span>
+                  </label>
+                  <div className="mt-1.5">
+                    <SearchSelect
+                      id="area"
+                      options={[...LAGOS_AREAS]}
+                      value={area}
+                      onChange={setArea}
+                      placeholder="Ikeja, Lekki, Yaba…"
+                      emptyLabel="No area by that name"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    Lagos is an hour across. This is what the rider is given.
+                  </p>
+                </div>
+              )}
             </div>
           </Step>
         )}
@@ -416,7 +574,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
         <Step
           step={delivering ? 4 : 3}
           title="Anything we should know?"
-          summary="Optional"
+          summary={[note.trim() || "Nothing to add"]}
           open={open === "note"}
           done={ready}
           locked={!reachable("note")}
@@ -434,8 +592,12 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
         </Step>
       </div>
 
-      <aside className="lg:sticky lg:top-24 lg:self-start">
-        <div className="rounded-3xl bg-canvas-deep/60 p-5">
+      {/* Nothing to price until we know where it's going, and nothing to pay
+          with until then either. */}
+      <aside
+        className={cn("lg:sticky lg:top-24 lg:self-start", !ready && "hidden")}
+      >
+        <div className="rise rounded-3xl bg-canvas-deep/60 p-5">
           <h2 className="text-sm font-semibold text-ink">
             Your order
             <span className="ml-1.5 font-normal text-ink-muted tabular-nums">
@@ -496,8 +658,8 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
               <dt className="min-w-0 text-ink-secondary">
                 {!delivering
                   ? "Pickup"
-                  : state_
-                    ? `Delivery · ${state_}`
+                  : area || state_
+                    ? `Delivery · ${area || state_}`
                     : "Delivery"}
               </dt>
               <dd className="shrink-0 font-medium text-ink tabular-nums">
@@ -515,6 +677,16 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
               </dd>
             </div>
           </dl>
+
+          {!delivering && collectingFrom && (
+            <p className="mt-4 rounded-xl bg-canvas px-3 py-2.5 text-[13px] text-ink-secondary">
+              <span className="font-medium text-ink">
+                {collectingFrom.name}
+              </span>
+              <br />
+              {collectingFrom.address}
+            </p>
+          )}
 
           {!delivering && shipping.pickupNote && (
             <p className="mt-4 rounded-xl bg-canvas px-3 py-2.5 text-[13px] text-ink-secondary">
@@ -539,7 +711,7 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
 
           <button
             type="submit"
-            disabled={pending || state.ok === true || !ready}
+            disabled={pending || state.ok === true}
             className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-noir text-sm font-semibold text-white transition hover:bg-brand disabled:opacity-60"
           >
             {pending || state.ok === true ? (
@@ -551,14 +723,6 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
               ? "Taking you to payment…"
               : `Pay ${formatNairaShort(total)}`}
           </button>
-
-          {!ready && (
-            <p className="mt-2 text-center text-xs text-ink-muted">
-              {whoDone
-                ? "Add the address above and this opens."
-                : "Answer the steps above and this opens."}
-            </p>
-          )}
 
           <p className="mt-3 text-center text-xs text-ink-muted">
             Card, bank transfer and USSD, handled by Paystack. We never see your
@@ -572,16 +736,69 @@ function CheckoutFields({ shipping }: { shipping: ShippingSettings }) {
 }
 
 /**
+ * How far through this is, without having to count the boxes.
+ *
+ * A form that reveals itself one question at a time is kinder to answer and
+ * worse to estimate — a shopper cannot see how much is left, and a checkout
+ * whose end is out of sight is a checkout people abandon. So the bar says so,
+ * and names what is being asked right now.
+ */
+function Progress({
+  settled,
+  total,
+  next,
+  ready,
+}: {
+  settled: number;
+  total: number;
+  next: string;
+  ready: boolean;
+}) {
+  return (
+    <div className="px-1 pb-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="min-w-0 truncate text-[13px] font-medium text-ink">
+          {ready ? "Everything we need — you can pay below." : next}
+        </p>
+        <p className="shrink-0 text-xs tabular-nums text-ink-muted">
+          {settled} of {total}
+        </p>
+      </div>
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={settled}
+        aria-label="Checkout progress"
+        className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas-deep"
+      >
+        <div
+          className={cn(
+            "h-full rounded-full transition-[width] duration-500 ease-out",
+            ready ? "bg-brand" : "bg-noir",
+          )}
+          style={{ width: `${Math.round((settled / total) * 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
  * One step of the conversation.
  *
- * Answered and closed, it is a line you can see at a glance and reopen with a
- * press. Unreachable, it is a heading and nothing else — visible, so a shopper
- * knows how much is left, but not open for business until its turn.
+ * Answered and closed, it becomes a card of what was said — the whole answer,
+ * not a truncated line — and pressing anywhere on it opens it again. That is
+ * the part that makes a folded form trustworthy: a shopper can see that the
+ * address really did save before they pay for it to be used.
+ *
+ * Unreachable, it is a heading and nothing else — visible, so a shopper knows
+ * how much is left, but not open for business until its turn.
  */
 function Step({
   step,
   title,
-  summary,
+  summary = [],
   open,
   done,
   locked = false,
@@ -593,7 +810,8 @@ function Step({
 }: {
   step: number;
   title: string;
-  summary: string;
+  /** What was answered, a line at a time. Blank entries are left out. */
+  summary?: string[];
   open: boolean;
   done: boolean;
   locked?: boolean;
@@ -603,66 +821,92 @@ function Step({
   nextDisabled?: boolean;
   children: React.ReactNode;
 }) {
-  return (
-    <section
-      className={cn(
-        "rounded-3xl transition-colors",
-        open ? "bg-canvas-deep/40 p-4 sm:p-5" : "px-4 py-3.5",
-        locked && "opacity-45",
-      )}
-    >
-      <div className="flex items-center gap-3">
-        <span
-          className={cn(
-            "flex size-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold tabular-nums",
-            done && !open
-              ? "bg-noir text-white"
-              : open
-                ? "bg-brand text-white"
-                : "bg-canvas-deep text-ink-muted",
-          )}
-          aria-hidden
-        >
-          {done && !open ? <Check className="size-4" /> : step}
-        </span>
+  const lines = summary.filter(Boolean);
 
+  const badge = (
+    <span
+      className={cn(
+        "flex size-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold tabular-nums",
+        done && !open
+          ? "bg-noir text-white"
+          : open
+            ? "bg-brand text-white"
+            : "bg-canvas-deep text-ink-muted",
+      )}
+      aria-hidden
+    >
+      {done && !open ? <Check className="size-4" /> : step}
+    </span>
+  );
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={locked}
+        className={cn(
+          "flex w-full gap-3 rounded-3xl p-4 text-left transition",
+          done
+            ? "bg-canvas-deep/50 hover:bg-canvas-deep"
+            : "ring-1 ring-inset ring-line hover:ring-line-strong",
+          locked && "pointer-events-none opacity-45",
+        )}
+      >
+        {badge}
+
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline gap-3">
+            <span className="min-w-0 flex-1 text-sm font-semibold text-ink">
+              {title}
+            </span>
+            {!locked && (
+              <span className="shrink-0 text-xs font-medium text-ink-secondary underline underline-offset-4">
+                {done ? "Edit" : "Open"}
+              </span>
+            )}
+          </span>
+
+          {done && lines.length > 0 && (
+            <span className="mt-1.5 block space-y-0.5">
+              {lines.map((line) => (
+                <span
+                  key={line}
+                  className="block truncate text-[13px] text-ink-secondary"
+                >
+                  {line}
+                </span>
+              ))}
+            </span>
+          )}
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <section className="rounded-3xl bg-canvas-deep/40 p-4 sm:p-5">
+      <div className="flex items-center gap-3">
+        {badge}
         <h2 className="min-w-0 flex-1 text-sm font-semibold text-ink">
           {title}
         </h2>
+      </div>
 
-        {!open && !locked && (
+      <div className="mt-4">
+        {children}
+
+        {!last && (
           <button
             type="button"
-            onClick={onOpen}
-            className="shrink-0 text-xs font-medium text-ink-secondary underline underline-offset-4 hover:text-ink"
+            onClick={onNext}
+            disabled={nextDisabled}
+            className="mt-5 flex h-11 items-center justify-center rounded-full bg-noir px-6 text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {done ? "Change" : "Open"}
+            Continue
           </button>
         )}
       </div>
-
-      {!open && done && summary && (
-        <p className="mt-1 truncate pl-10 text-[13px] text-ink-secondary">
-          {summary}
-        </p>
-      )}
-
-      {open && (
-        <div className="mt-4">
-          {children}
-
-          {!last && (
-            <button
-              type="button"
-              onClick={onNext}
-              disabled={nextDisabled}
-              className="mt-5 flex h-11 items-center justify-center rounded-full bg-noir px-6 text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Continue
-            </button>
-          )}
-        </div>
-      )}
     </section>
   );
 }

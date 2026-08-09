@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, Home, Search, ShoppingBag } from "lucide-react";
+import { Heart, Home, ShoppingBag, Shirt } from "lucide-react";
 
 import { useShop } from "@/components/shop/shop-provider";
 import { cn } from "@/lib/cn";
@@ -31,8 +31,10 @@ export function TabBar() {
           <Home className="size-5" aria-hidden />
         </Tab>
 
+        {/* Not a magnifying glass. Search lives in the header, and two
+            identical icons a thumb's width apart are two ways to be wrong. */}
         <Tab href="/shop" label="Shop" active={pathname.startsWith("/shop")}>
-          <Search className="size-5" aria-hidden />
+          <Shirt className="size-5" aria-hidden />
         </Tab>
 
         <Tab href="/saved" label="Saved" active={pathname === "/saved"}>

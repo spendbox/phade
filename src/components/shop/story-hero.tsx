@@ -5,8 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Pause, Play } from "lucide-react";
 
 import { Media } from "@/components/shop/media";
-import { usePrefersReducedMotion } from "@/lib/browser-store";
+import { usePrefersReducedMotion, useIsWide } from "@/lib/browser-store";
 import { cn } from "@/lib/cn";
+import { readHints } from "@/lib/media";
 import type { StorefrontContent } from "@/lib/storefront";
 
 /**
@@ -33,7 +34,21 @@ export function StoryHero({
   content: StorefrontContent;
   hasShop: boolean;
 }) {
-  const frames = content.heroImages;
+  /**
+   * Only the frames meant for this screen.
+   *
+   * A shop can mark a shot as desktop-only or mobile-only, and a story that
+   * advanced onto one of the others would sit on a blank frame for five
+   * seconds. Until the browser has told us how wide it is, every frame counts
+   * — that keeps the server's markup and the first client render identical,
+   * and the set settles a tick later.
+   */
+  const wide = useIsWide();
+  const frames = content.heroImages.filter((url) => {
+    if (wide === null) return true;
+    const { screens } = readHints(url);
+    return !screens || screens === (wide ? "desktop" : "mobile");
+  });
   const [index, setIndex] = useState(0);
   /** Null until someone presses play or pause; their choice wins after that. */
   const [chosen, setChosen] = useState<boolean | null>(null);
@@ -42,6 +57,9 @@ export function StoryHero({
   // still — unless they press play, which is a clearer signal than a setting.
   const still = usePrefersReducedMotion();
   const playing = chosen ?? !still;
+
+  // The set can shrink under a rotation; the index must not point past it.
+  if (index >= frames.length && frames.length > 0) setIndex(0);
 
   const step = useCallback(
     (by: number) => {
@@ -92,6 +110,13 @@ export function StoryHero({
               position === index ? "opacity-100" : "opacity-0",
             )}
           >
+            {/* One picture, filling the frame, cropped where the shop said to
+                crop it — twice over, since a wide screen and a phone are not
+                the same shape and a single answer flatters neither. Nothing is
+                blurred behind it: a hero is the photograph, and a soft copy of
+                it filling the corners was a workaround for a choice the shop
+                is now able to make itself. See the hero editor in the
+                dashboard. */}
             <Media
               url={url}
               alt=""

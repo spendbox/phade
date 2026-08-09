@@ -5,6 +5,7 @@ import { Check, Clock, MapPin, Package, Store } from "lucide-react";
 
 import { ClearBag } from "@/components/shop/clear-bag";
 import { Media } from "@/components/shop/media";
+import { OrderProgress } from "@/components/shop/order-progress";
 import { formatLongDate, formatNairaShort } from "@/lib/format";
 import {
   isPaystackConfigured,
@@ -97,6 +98,21 @@ export default async function OrderPage({
       </div>
 
       <section className="mt-6 rounded-3xl bg-canvas-deep/60 p-5 sm:p-6">
+        <h2 className="text-sm font-semibold text-ink">Where it&apos;s got to</h2>
+        <div className="mt-4">
+          <OrderProgress status={order.status} fulfilment={order.fulfilment} />
+        </div>
+        <p className="mt-4 text-xs text-ink-muted">
+          This page updates itself as we move the order along — keep the link,
+          or find it again with your reference at{" "}
+          <Link href="/track" className="underline underline-offset-2 hover:text-ink">
+            /track
+          </Link>
+          .
+        </p>
+      </section>
+
+      <section className="mt-6 rounded-3xl bg-canvas-deep/60 p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-ink">What&apos;s coming</h2>
 
         <ul className="mt-4 space-y-3">
@@ -170,10 +186,26 @@ export default async function OrderPage({
         </h2>
 
         {order.fulfilment === "pickup" ? (
-          <p className="mt-2 text-sm text-ink-secondary">
-            We&apos;ll message {order.customer?.phone ?? "you"} when it&apos;s
-            ready to collect.
-          </p>
+          <div className="mt-2 text-sm text-ink-secondary">
+            {order.shipping_address?.pickup ? (
+              <address className="not-italic">
+                <span className="block font-medium text-ink">
+                  {order.shipping_address.pickup.name}
+                </span>
+                {order.shipping_address.pickup.address}
+                {order.shipping_address.pickup.note && (
+                  <span className="mt-1 block text-ink-muted">
+                    {order.shipping_address.pickup.note}
+                  </span>
+                )}
+              </address>
+            ) : (
+              <p>
+                We&apos;ll message {order.customer?.phone ?? "you"} when
+                it&apos;s ready to collect.
+              </p>
+            )}
+          </div>
         ) : (
           <address className="mt-2 not-italic text-sm text-ink-secondary">
             {order.customer?.full_name && (
@@ -182,6 +214,7 @@ export default async function OrderPage({
             {[
               order.shipping_address?.line1,
               order.shipping_address?.line2,
+              order.shipping_address?.area,
               order.shipping_address?.city,
               order.shipping_address?.state,
               order.shipping_address?.country,

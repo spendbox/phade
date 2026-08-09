@@ -10,6 +10,7 @@ import { ProductRegistry } from "@/components/shop/shop-provider";
 import { CategoryIcon } from "@/lib/category-icons";
 import { cn } from "@/lib/cn";
 import { bestSellers, getCatalogue, newIn } from "@/lib/shop-queries";
+import { getStorefront } from "@/lib/storefront";
 import type { ShopProduct } from "@/lib/shop";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +68,10 @@ export default async function ShopPage({
   searchParams: Promise<Query>;
 }) {
   const params = await searchParams;
-  const { products, categories, subcategories } = await getCatalogue();
+  const [{ products, categories, subcategories }, content] = await Promise.all([
+    getCatalogue(),
+    getStorefront(),
+  ]);
 
   const category = categories.find((entry) => entry.slug === params.category);
   const sub = params.sub?.trim() || null;
@@ -132,9 +136,17 @@ export default async function ShopPage({
                   ? `“${params.q?.trim()}”`
                   : (category?.name ?? (onSaleOnly ? "On sale" : "Everything"))}
               </h1>
+              {/* A category introduces itself with its description and a
+                  search with the words that were typed; the unfiltered shop
+                  had only a number until someone wrote it a line. */}
               <p className="mt-1 text-sm text-ink-secondary">
                 {filtered.length} piece{filtered.length === 1 ? "" : "s"}
-                {category?.description && !term && ` · ${category.description}`}
+                {!term &&
+                  (category?.description
+                    ? ` · ${category.description}`
+                    : !category && !onSaleOnly && content.shopNote
+                      ? ` · ${content.shopNote}`
+                      : "")}
               </p>
             </div>
           </div>

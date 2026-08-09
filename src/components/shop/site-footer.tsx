@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Mail, ShieldCheck, Truck } from "lucide-react";
 
+import { Assurances } from "@/components/shop/assurances";
 import {
   SOCIAL_PLATFORMS,
   SocialIcon,
@@ -17,6 +17,10 @@ import type { StorefrontContent } from "@/lib/storefront";
  * else the shop can be found. The extra bottom padding clears the tab bar on a
  * phone.
  *
+ * The promises are buttons: each is really a question — what will this cost to
+ * send to me, is my card safe, can I ask someone — and the answers are a
+ * table, a demonstration and a form, none of which fit in a paragraph.
+ *
  * The delivery line is worked out from the shipping rules rather than written
  * by hand, so it can't promise something checkout won't honour.
  */
@@ -26,7 +30,7 @@ export function SiteFooter({
   shipping,
 }: {
   categories: ShopCategory[];
-  content: Pick<StorefrontContent, "footerBlurb" | "socials">;
+  content: Pick<StorefrontContent, "footerBlurb" | "socials" | "support">;
   shipping: ShippingSettings;
 }) {
   const from = cheapestFee(shipping);
@@ -46,23 +50,11 @@ export function SiteFooter({
   return (
     <footer className="mt-16 border-t border-line bg-canvas-deep/60">
       <div className="mx-auto max-w-7xl px-4 py-12 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:pb-12">
-        <ul className="grid gap-4 sm:grid-cols-3">
-          <Assurance
-            icon={<Truck className="size-4" aria-hidden />}
-            title="Delivered nationwide"
-            body={delivery}
-          />
-          <Assurance
-            icon={<ShieldCheck className="size-4" aria-hidden />}
-            title="Paid securely"
-            body="Card, transfer and USSD through Paystack. We never see your card."
-          />
-          <Assurance
-            icon={<Mail className="size-4" aria-hidden />}
-            title="Here to help"
-            body="Questions about sizing or an order? Message us and we'll answer."
-          />
-        </ul>
+        <Assurances
+          shipping={shipping}
+          support={content.support}
+          deliveryLine={delivery}
+        />
 
         <div className="mt-12 grid gap-8 border-t border-line pt-10 sm:grid-cols-[1fr_auto]">
           <div>
@@ -110,6 +102,9 @@ export function SiteFooter({
               <li>
                 <FooterLink href="/saved">Saved</FooterLink>
               </li>
+              <li>
+                <FooterLink href="/track">Track an order</FooterLink>
+              </li>
             </ul>
           </nav>
         </div>
@@ -119,28 +114,6 @@ export function SiteFooter({
         </p>
       </div>
     </footer>
-  );
-}
-
-function Assurance({
-  icon,
-  title,
-  body,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-}) {
-  return (
-    <li className="rounded-2xl bg-canvas p-4">
-      <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <span className="flex size-7 items-center justify-center rounded-full bg-brand-soft text-brand">
-          {icon}
-        </span>
-        {title}
-      </p>
-      <p className="mt-2 text-sm text-ink-secondary">{body}</p>
-    </li>
   );
 }
 

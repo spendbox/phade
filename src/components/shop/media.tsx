@@ -1,8 +1,14 @@
-import Image from "next/image";
 import { ImageIcon } from "lucide-react";
 
+import { ImageFrame } from "@/components/shop/image-frame";
+import { VideoFrame } from "@/components/shop/video-frame";
 import { cn } from "@/lib/cn";
-import { isVideoUrl, objectPosition, readFocus } from "@/lib/media";
+import {
+  firstFrame,
+  isVideoUrl,
+  objectPosition,
+  readHints,
+} from "@/lib/media";
 
 /**
  * One frame of product media.
@@ -15,9 +21,11 @@ import { isVideoUrl, objectPosition, readFocus } from "@/lib/media";
  * Photos from the shop's own bucket go through `next/image`, which is the
  * single biggest thing standing between a grid of forty products and a phone
  * on Nigerian mobile data. The uploader stores at 1600px; a card renders at
- * about 180. Without this, every card downloads the full thing — twice, with
- * the hover image — and the shop feels slow for reasons no amount of clever
- * rendering can fix.
+ * about 180. Without this, every card downloads the full thing, and the shop
+ * feels slow for reasons no amount of clever rendering can fix.
+ *
+ * Everything below the fold loads lazily, and shimmers while it does — see
+ * `ImageFrame`.
  *
  * Anything else — an SVG, a brand asset, a URL from somewhere we haven't
  * listed in `next.config.ts` — falls back to a plain `<img>`. The optimiser
@@ -55,6 +63,7 @@ export function Media({
   priority = false,
   autoPlay = false,
   poster,
+  fit = "cover",
 }: {
   url: string | null | undefined;
   alt: string;
@@ -62,12 +71,23 @@ export function Media({
   className?: string;
   sizes?: string;
   priority?: boolean;
+  /**
+   * Whether a clip should be playing — true for the frame someone is actually
+   * looking at. It is driven, not merely requested: see `VideoFrame`.
+   */
   autoPlay?: boolean;
   /**
    * The still to hold on before a clip plays. The first frame of a video is
    * rarely the frame anyone would have chosen, so the shop can choose one.
    */
   poster?: string | null;
+  /**
+   * `cover` fills the box and crops; `contain` shows the whole picture and
+   * leaves room around it. The hero uses `contain` so that one photograph
+   * looks the same on a phone as on a laptop, instead of being cropped two
+   * different ways by two different shapes of screen.
+   */
+  fit?: "cover" | "contain";
 }) {
   if (!url) {
     return (
@@ -82,55 +102,60 @@ export function Media({
     );
   }
 
-  const { src, focus } = readFocus(url);
-  const framing = { objectPosition: objectPosition(focus) };
+  const hints = readHints(url);
+  const { src } = hints;
+  // The shop's own poster wins over anything a caller guessed at.
+  const still = hints.poster ?? poster ?? null;
+
+  /**
+   * Two crops, chosen by the screen.
+   *
+   * `object-position` can't be written twice in one inline style, so the two
+   * choices ride in as custom properties and a media query in `.framed` picks
+   * between them. That keeps this a server component — the alternative is
+   * measuring the viewport in the browser, which means a frame of the wrong
+   * crop on every first paint.
+   */
+  const framing = {
+    objectFit: fit,
+    "--frame-pos": objectPosition(hints.focus),
+    "--frame-pos-narrow": objectPosition(hints.mobileFocus),
+  } as React.CSSProperties;
 
   if (isVideoUrl(src)) {
     return (
-      <video
-        src={src}
+      <VideoFrame
+        // Trimmed clips carry their range as a media fragment, which the
+        // browser honours by itself. Untrimmed ones with no still to hold on
+        // are asked for the frame a tenth of a second in, so a clip is a
+        // picture rather than a black box while it loads.
+        src={
+          hints.trim
+            ? `${src}#t=${hints.trim.start},${hints.trim.end}`
+            : still
+              ? src
+              : firstFrame(src)
+        }
+        poster={still ?? undefined}
+        playing={autoPlay}
         style={framing}
-        poster={poster ?? undefined}
-        className={cn("object-cover", className)}
-        muted
-        loop
-        playsInline
-        autoPlay={autoPlay}
-        preload={autoPlay ? "auto" : "metadata"}
-        aria-label={alt}
+        className={cn("framed bg-canvas-deep", className)}
+        label={alt}
       />
     );
   }
 
-  // `fill` needs a positioned box, so the component brings its own rather than
+  // `fill` needs a positioned box, so the frame brings its own rather than
   // asking every caller to remember one.
-  if (isOptimisable(src)) {
-    return (
-      <span className={cn("relative block overflow-hidden", className)}>
-        <Image
-          src={src}
-          alt={alt}
-          fill
-          sizes={sizes}
-          priority={priority}
-          style={framing}
-          className="object-cover"
-        />
-      </span>
-    );
-  }
-
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <ImageFrame
       src={src}
       alt={alt}
       sizes={sizes}
+      priority={priority}
+      optimised={isOptimisable(src)}
       style={framing}
-      loading={priority ? "eager" : "lazy"}
-      fetchPriority={priority ? "high" : "auto"}
-      decoding="async"
-      className={cn("object-cover", className)}
+      className={className}
     />
   );
 }

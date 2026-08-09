@@ -37,17 +37,27 @@ export function ColorPicker({
   name = "colors",
   initial = [],
   suggestions = DEFAULT_SUGGESTIONS,
+  counted = false,
   onChange,
 }: {
   name?: string;
   initial?: ProductColor[];
   /** Quick picks — the shop's saved palette, set in Settings. */
   suggestions?: ProductColor[];
+  /** Ask how many of each, and add them up. Off for the shop-wide palette. */
+  counted?: boolean;
   onChange?: (colors: ProductColor[]) => void;
 }) {
-  const [colors, setColors] = useState<ProductColor[]>(initial);
+  // Counted from the moment it opens: a colourway carried over from a product
+  // that never kept per-colour numbers has no count, and an unanswered box is
+  // read as nought the first time this is saved.
+  const [colors, setColors] = useState<ProductColor[]>(() =>
+    counted ? initial.map((color) => ({ ...color, stock: color.stock ?? 0 })) : initial,
+  );
   const [draftName, setDraftName] = useState("");
   const [draftHex, setDraftHex] = useState("#a63655");
+  /** What is in each count box while it is being typed in, keyed by colour. */
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   function commit(next: ProductColor[]) {
     setColors(next);
@@ -60,40 +70,116 @@ export function ColorPicker({
     if (colors.some((item) => item.name.toLowerCase() === clean.toLowerCase())) {
       return;
     }
-    commit([...colors, { name: clean, hex: color.hex }]);
+    commit([
+      ...colors,
+      counted
+        ? { name: clean, hex: color.hex, stock: color.stock ?? 0 }
+        : { name: clean, hex: color.hex },
+    ]);
+  }
+
+  /**
+   * Typing over the count.
+   *
+   * A number field showing 0 with the caret behind it turns "13" into "013" —
+   * which parses to thirteen but reads as a mistake while it is being typed.
+   * So the field is a string while it is being edited: focusing selects what
+   * is there so the first keystroke replaces it, a leading zero is dropped as
+   * soon as a digit follows it, and clearing the box leaves it empty rather
+   * than snapping back to a 0 that has to be deleted again.
+   */
+  function setCount(name: string, raw: string) {
+    const cleaned = raw.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "");
+    setDrafts({ ...drafts, [name]: cleaned });
+    commit(
+      colors.map((item) =>
+        item.name === name ? { ...item, stock: Number(cleaned || 0) } : item,
+      ),
+    );
   }
 
   return (
     <div className="space-y-3">
       <input type="hidden" name={name} value={JSON.stringify(colors)} />
 
-      {colors.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
-          {colors.map((color) => (
-            <li
-              key={color.name}
-              className="inline-flex items-center gap-1.5 rounded-full bg-plane py-1 pl-1.5 pr-1 text-[13px] text-ink"
-            >
-              <span
-                aria-hidden
-                className="size-4 shrink-0 rounded-full ring-1 ring-inset ring-ink/10"
-                style={{ backgroundColor: color.hex }}
-              />
-              {color.name}
-              <button
-                type="button"
-                aria-label={`Remove ${color.name}`}
-                onClick={() =>
-                  commit(colors.filter((item) => item.name !== color.name))
-                }
-                className="flex size-5 items-center justify-center rounded-full text-ink-muted transition hover:bg-surface hover:text-critical"
+      {colors.length > 0 &&
+        (counted ? (
+          // One row per colourway, because each carries a number now and a
+          // number needs somewhere to be typed.
+          <ul className="space-y-1.5">
+            {colors.map((color) => (
+              <li
+                key={color.name}
+                className="flex items-center gap-2 rounded-lg bg-plane px-2 py-1.5"
               >
-                <X className="size-3" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                <span
+                  aria-hidden
+                  className="size-5 shrink-0 rounded-full ring-1 ring-inset ring-ink/10"
+                  style={{ backgroundColor: color.hex }}
+                />
+                <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
+                  {color.name}
+                </span>
+
+                <label className="sr-only" htmlFor={`stock-${color.name}`}>
+                  {color.name} in stock
+                </label>
+                <input
+                  id={`stock-${color.name}`}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={drafts[color.name] ?? String(color.stock ?? 0)}
+                  onFocus={(event) => event.target.select()}
+                  onChange={(event) => setCount(color.name, event.target.value)}
+                  onBlur={() => {
+                    const next = { ...drafts };
+                    delete next[color.name];
+                    setDrafts(next);
+                  }}
+                  className="h-8 w-20 rounded-md bg-surface px-2 text-right text-[13px] tabular-nums text-ink shadow-[0_0_0_1px_rgb(11_11_12_/_0.10)] focus:shadow-[0_0_0_2px_var(--color-brand)] focus:outline-none"
+                />
+
+                <button
+                  type="button"
+                  aria-label={`Remove ${color.name}`}
+                  onClick={() =>
+                    commit(colors.filter((item) => item.name !== color.name))
+                  }
+                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-muted transition hover:bg-surface hover:text-critical"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ul className="flex flex-wrap gap-1.5">
+            {colors.map((color) => (
+              <li
+                key={color.name}
+                className="inline-flex items-center gap-1.5 rounded-full bg-plane py-1 pl-1.5 pr-1 text-[13px] text-ink"
+              >
+                <span
+                  aria-hidden
+                  className="size-4 shrink-0 rounded-full ring-1 ring-inset ring-ink/10"
+                  style={{ backgroundColor: color.hex }}
+                />
+                {color.name}
+                <button
+                  type="button"
+                  aria-label={`Remove ${color.name}`}
+                  onClick={() =>
+                    commit(colors.filter((item) => item.name !== color.name))
+                  }
+                  className="flex size-5 items-center justify-center rounded-full text-ink-muted transition hover:bg-surface hover:text-critical"
+                >
+                  <X className="size-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ))}
 
       {/* Custom colour */}
       <div className="flex items-center gap-2">

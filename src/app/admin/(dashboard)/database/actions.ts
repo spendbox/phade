@@ -2,7 +2,7 @@
 
 import { revalidate } from "@/lib/admin-revalidate";
 
-import { actionError, requireAdmin } from "@/lib/guard";
+import { actionError, requireOwner } from "@/lib/guard";
 import { nairaToKobo, slugify } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { generateSku, categoryNameFor } from "@/lib/sku";
@@ -124,7 +124,7 @@ export async function updateCell(
   formData: FormData,
 ): Promise<SheetState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const id = String(formData.get("id") ?? "");
@@ -246,7 +246,7 @@ export async function addSheetRow(
   formData: FormData,
 ): Promise<SheetState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
     const settings = await getSettings();
 
@@ -288,7 +288,7 @@ export async function deleteSheetRows(
   formData: FormData,
 ): Promise<SheetState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     if (String(formData.get("confirmation") ?? "").trim() !== DELETE_CONFIRMATION) {
@@ -405,7 +405,7 @@ export async function importSheetRows(
   colorsJson: string,
 ): Promise<ImportState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
     const settings = await getSettings();
 

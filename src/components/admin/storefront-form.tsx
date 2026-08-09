@@ -1,7 +1,16 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Loader2, Search } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  MessageCircle,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+} from "lucide-react";
 
 import {
   saveStorefront,
@@ -9,6 +18,7 @@ import {
 } from "@/app/admin/(dashboard)/settings/actions";
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { MediaThumb } from "@/components/admin/media-thumb";
+import { PathPicker, type PagePath } from "@/components/admin/path-picker";
 import { Button } from "@/components/ui/button";
 import {
   SOCIAL_KEYS,
@@ -20,7 +30,10 @@ import { Field, Input, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
 import {
+  CONTACT_HREF,
+  DEFAULT_MENU,
   DEFAULT_SECTIONS,
+  type MenuLink,
   type SectionCopy,
   type StorefrontContent,
 } from "@/lib/storefront";
@@ -44,9 +57,12 @@ export type FeaturedOption = {
 export function StorefrontForm({
   content,
   products,
+  pages,
 }: {
   content: StorefrontContent;
   products: FeaturedOption[];
+  /** Everywhere a button could point, by name. See `getLinkablePages`. */
+  pages: PagePath[];
 }) {
   const [state, formAction, pending] = useActionState(
     saveStorefront,
@@ -62,11 +78,25 @@ export function StorefrontForm({
     ),
   );
   const [aboutOn, setAboutOn] = useState(content.about.enabled);
+  const [heroHref, setHeroHref] = useState(content.heroCtaHref);
+  const [aboutHref, setAboutHref] = useState(content.about.ctaHref);
   const [socials, setSocials] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       content.socials.map((link) => [link.platform, link.url]),
     ),
   );
+  const [menu, setMenu] = useState<MenuLink[]>(content.menu);
+  const [whatsappOn, setWhatsappOn] = useState(content.support.whatsappEnabled);
+  /** Whether the menu's reset button is waiting to be pressed a second time. */
+  const [resetting, setResetting] = useState(false);
+
+  function moveLink(index: number, by: -1 | 1) {
+    const to = index + by;
+    if (to < 0 || to >= menu.length) return;
+    const next = [...menu];
+    [next[index], next[to]] = [next[to], next[index]];
+    setMenu(next);
+  }
 
   return (
     <form action={formAction} className="space-y-5">
@@ -86,6 +116,184 @@ export function StorefrontForm({
           ),
         )}
       />
+
+      <input type="hidden" name="menu" value={JSON.stringify(menu)} />
+
+      <Panel
+        title="Menu"
+        action={
+          <div className="flex items-center gap-3">
+            {/* Asks once: restoring the shipped menu discards whatever is in
+                the panel, which is not something to do on a mis-tap. */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!resetting) {
+                  setResetting(true);
+                  return;
+                }
+                setMenu(DEFAULT_MENU.map((link) => ({ ...link })));
+                setResetting(false);
+              }}
+              onBlur={() => setResetting(false)}
+              className={cn(
+                "inline-flex items-center gap-1.5 text-xs font-medium",
+                resetting ? "text-critical" : "text-ink-secondary hover:text-ink",
+              )}
+            >
+              <RotateCcw className="size-3.5" />
+              {resetting ? "Replace the menu?" : "Reset to default"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMenu([...menu, { label: "", href: "/shop" }])}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+            >
+              <Plus className="size-3.5" />
+              Add a line
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-ink-secondary">
+            Where everything is — laid out across the header on a desktop, and
+            behind the ☰ on a phone, in this order. Clear the list entirely and
+            the menu goes away.
+          </p>
+
+          {menu.length === 0 ? (
+            <p className="rounded-lg bg-plane px-3 py-5 text-center text-sm text-ink-muted">
+              No menu. Add a line — Home, Categories, Contact us.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {menu.map((link, index) => (
+                <li
+                  key={index}
+                  className="grid gap-2 rounded-xl bg-plane p-2.5 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_auto] sm:items-center"
+                >
+                  <Input
+                    value={link.label}
+                    aria-label={`Menu line ${index + 1} — what it says`}
+                    onChange={(event) =>
+                      setMenu(
+                        menu.map((item, at) =>
+                          at === index
+                            ? { ...item, label: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                    placeholder="What it says"
+                  />
+
+                  {link.href === CONTACT_HREF ? (
+                    <p className="flex h-10 items-center gap-2 rounded-lg bg-surface px-3 text-[13px] text-ink-secondary ring-1 ring-inset ring-line">
+                      <MessageCircle className="size-3.5 shrink-0 text-brand" />
+                      Opens the message pop-up
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMenu(
+                            menu.map((item, at) =>
+                              at === index ? { ...item, href: "/shop" } : item,
+                            ),
+                          )
+                        }
+                        className="ml-auto shrink-0 text-xs font-medium underline underline-offset-4 hover:text-ink"
+                      >
+                        Point at a page
+                      </button>
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <PathPicker
+                          name={`menu_href_${index}`}
+                          value={link.href}
+                          onChange={(next) =>
+                            setMenu(
+                              menu.map((item, at) =>
+                                at === index ? { ...item, href: next } : item,
+                              ),
+                            )
+                          }
+                          pages={pages}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        title="Open the message pop-up instead"
+                        aria-label="Open the message pop-up instead"
+                        onClick={() =>
+                          setMenu(
+                            menu.map((item, at) =>
+                              at === index
+                                ? { ...item, href: CONTACT_HREF }
+                                : item,
+                            ),
+                          )
+                        }
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface hover:text-brand"
+                      >
+                        <MessageCircle className="size-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => moveLink(index, -1)}
+                      disabled={index === 0}
+                      aria-label="Move up"
+                      className="flex size-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface hover:text-ink disabled:opacity-30"
+                    >
+                      <ChevronUp className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLink(index, 1)}
+                      disabled={index === menu.length - 1}
+                      aria-label="Move down"
+                      className="flex size-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface hover:text-ink disabled:opacity-30"
+                    >
+                      <ChevronDown className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMenu(menu.filter((_, at) => at !== index))
+                      }
+                      aria-label="Remove this line"
+                      className="flex size-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-critical-soft hover:text-critical"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Panel>
+
+      <Panel title="The shop page">
+        <Field
+          label="Line under &ldquo;Everything&rdquo;"
+          htmlFor="shop_note"
+          hint="Shown beside the piece count at the head of /shop, where nothing is filtered. A category brings its own description; this is the one view that had only a number. Leave it blank for just the count."
+        >
+          <Input
+            id="shop_note"
+            name="shop_note"
+            defaultValue={content.shopNote}
+            placeholder="Every piece we have, in one place"
+          />
+        </Field>
+      </Panel>
 
       <Panel title="Announcement bar">
         <div className="space-y-4">
@@ -158,25 +366,26 @@ export function StorefrontForm({
               />
             </Field>
 
-            <Field
-              label="Button link"
-              htmlFor="hero_cta_href"
-              hint="A path like /shop, or a full https:// address."
-            >
-              <Input
+            <Field label="Button goes to" htmlFor="hero_cta_href">
+              <PathPicker
                 id="hero_cta_href"
                 name="hero_cta_href"
-                defaultValue={content.heroCtaHref}
-                placeholder="/shop"
+                pages={pages}
+                value={heroHref}
+                onChange={setHeroHref}
               />
             </Field>
           </div>
 
           <Field
-            label="Images"
-            hint="The first is the main hero. Add more and they run as a set."
+            label="Images and clips"
+            hint="The first is the main hero. Add more and they run as a set. Each one is framed for a desktop and for a phone separately, and can be shown on only one of them — the editor opens as it lands, and the crop button reopens it."
           >
-            <ImageUploader name="hero_images" initial={content.heroImages} />
+            <ImageUploader
+              name="hero_images"
+              initial={content.heroImages}
+              hero
+            />
           </Field>
         </div>
       </Panel>
@@ -203,7 +412,8 @@ export function StorefrontForm({
           name="collections"
           copy={content.sections.collections}
           fallback={DEFAULT_SECTIONS.collections}
-          where="The ring of categories under the hero."
+          pages={pages}
+          where="The rail of collections under the hero."
           cta={false}
         />
       </Panel>
@@ -214,6 +424,7 @@ export function StorefrontForm({
             name="featured"
             copy={content.sections.featured}
             fallback={DEFAULT_SECTIONS.featured}
+            pages={pages}
             where="The deck of cards a shopper swipes through."
           />
 
@@ -250,6 +461,7 @@ export function StorefrontForm({
           name="newIn"
           copy={content.sections.newIn}
           fallback={DEFAULT_SECTIONS.newIn}
+          pages={pages}
           where="The wall of what arrived most recently."
         />
       </Panel>
@@ -316,12 +528,13 @@ export function StorefrontForm({
               />
             </Field>
 
-            <Field label="Button link" htmlFor="about_cta_href">
-              <Input
+            <Field label="Button goes to" htmlFor="about_cta_href">
+              <PathPicker
                 id="about_cta_href"
                 name="about_cta_href"
-                defaultValue={content.about.ctaHref}
-                placeholder="/shop"
+                pages={pages}
+                value={aboutHref}
+                onChange={setAboutHref}
               />
             </Field>
           </div>
@@ -357,6 +570,7 @@ export function StorefrontForm({
           name="bestSellers"
           copy={content.sections.bestSellers}
           fallback={DEFAULT_SECTIONS.bestSellers}
+          pages={pages}
           where="The rail of what everyone else is buying."
         />
       </Panel>
@@ -366,6 +580,7 @@ export function StorefrontForm({
           name="closing"
           copy={content.sections.closing}
           fallback={DEFAULT_SECTIONS.closing}
+          pages={pages}
           where="The way into the shop, at the foot of the page. The heading is the small line above; the sentence below it is the large one."
           noteLabel="The big line"
           noteHint="Left empty it counts everything in stock for itself, and stays right as pieces sell. Write your own and it stays written."
@@ -429,6 +644,73 @@ export function StorefrontForm({
         </div>
       </Panel>
 
+      <Panel title="Here to help">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-secondary">
+            What happens when someone presses &ldquo;Here to help&rdquo; at the
+            foot of the page, or Contact us in the menu.
+          </p>
+
+          <Field
+            label="Where messages go"
+            htmlFor="support_email"
+            hint="Every message sent from the shop front arrives here."
+          >
+            <Input
+              id="support_email"
+              name="support_email"
+              type="email"
+              defaultValue={content.support.email}
+              placeholder="phadewoman@gmail.com"
+            />
+          </Field>
+
+          <Field label="What the pop-up says" htmlFor="support_note">
+            <Textarea
+              id="support_note"
+              name="support_note"
+              rows={2}
+              defaultValue={content.support.note}
+              placeholder="Ask us about sizing, an order, or anything else."
+            />
+          </Field>
+
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              name="whatsapp_enabled"
+              checked={whatsappOn}
+              onChange={(event) => setWhatsappOn(event.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-brand"
+            />
+            <span>
+              <span className="block text-sm font-medium text-ink">
+                Offer WhatsApp too
+              </span>
+              <span className="block text-xs text-ink-muted">
+                A second button that opens a chat with the number below.
+              </span>
+            </span>
+          </label>
+
+          {whatsappOn && (
+            <Field
+              label="WhatsApp number"
+              htmlFor="whatsapp_number"
+              hint="In full international form — 2348012345678, not 0801…"
+            >
+              <Input
+                id="whatsapp_number"
+                name="whatsapp_number"
+                inputMode="tel"
+                defaultValue={content.support.whatsappNumber}
+                placeholder="2348012345678"
+              />
+            </Field>
+          )}
+        </div>
+      </Panel>
+
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs" role="status">
           {state.ok === true && (
@@ -461,6 +743,7 @@ function SectionFields({
   copy,
   fallback,
   where,
+  pages,
   cta = true,
   noteLabel = "Subtext",
   noteHint = "The line under the heading. Leave it empty for no line at all.",
@@ -471,6 +754,7 @@ function SectionFields({
   fallback: SectionCopy;
   /** Where on the page this section shows up, in a few words. */
   where: string;
+  pages: PagePath[];
   cta?: boolean;
   noteLabel?: string;
   noteHint?: string;
@@ -481,6 +765,7 @@ function SectionFields({
   // shop that writes over an automatic line should be able to change its mind
   // without guessing what the line used to say.
   const [note, setNote] = useState(copy.note);
+  const [href, setHref] = useState(copy.ctaHref);
 
   return (
     <div className="space-y-4">
@@ -536,12 +821,13 @@ function SectionFields({
             />
           </Field>
 
-          <Field label="Button link" htmlFor={`${name}_cta_href`}>
-            <Input
+          <Field label="Button goes to" htmlFor={`${name}_cta_href`}>
+            <PathPicker
               id={`${name}_cta_href`}
               name={`${name}_cta_href`}
-              defaultValue={copy.ctaHref}
-              placeholder={fallback.ctaHref}
+              pages={pages}
+              value={href}
+              onChange={setHref}
             />
           </Field>
         </div>

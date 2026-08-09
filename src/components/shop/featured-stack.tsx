@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Heart, ShoppingBag } from "lucide-react";
 
 import { Media } from "@/components/shop/media";
 import { useShop } from "@/components/shop/shop-provider";
+import { posterFor } from "@/lib/media";
 import { LOGO_MARK } from "@/lib/brand";
 import { cn } from "@/lib/cn";
 import { formatNairaShort } from "@/lib/format";
@@ -266,6 +267,7 @@ function Card({
       <div className="relative min-h-0 flex-1 bg-canvas-deep">
         <Media
           url={product.media[0]}
+          poster={posterFor(product.media)}
           alt={product.name}
           priority={live}
           sizes="(min-width: 640px) 28rem, 92vw"

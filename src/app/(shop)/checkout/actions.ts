@@ -7,7 +7,13 @@ import { saveCart } from "@/lib/cart-store";
 import { checkCouponAgainst, type CouponLine } from "@/lib/coupons";
 import { initializeTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { getProductsForPricing } from "@/lib/shop-queries";
-import { getShipping, NIGERIAN_STATES, quoteDelivery } from "@/lib/shipping";
+import {
+  AREA_STATE,
+  getShipping,
+  LAGOS_AREAS,
+  NIGERIAN_STATES,
+  quoteDelivery,
+} from "@/lib/shipping";
 import { requireSupabase } from "@/lib/supabase";
 import type { Fulfilment, ShippingAddress } from "@/lib/types";
 
@@ -190,11 +196,14 @@ export async function placeOrder(
       return { ok: false, error: "Add a phone number we can reach you on." };
     }
 
+    const area = String(formData.get("area") ?? "").trim();
+
     const address: ShippingAddress = {
       line1: String(formData.get("line1") ?? "").trim(),
       line2: String(formData.get("line2") ?? "").trim() || undefined,
       city: String(formData.get("city") ?? "").trim(),
       state: String(formData.get("state") ?? "").trim(),
+      area: area || undefined,
       country: "Nigeria",
       phone,
       phones: phones.length > 1 ? phones : undefined,
@@ -219,6 +228,14 @@ export async function placeOrder(
       return { ok: false, error: "Choose a state from the list." };
     }
 
+    // Lagos is priced by area, so an area nobody recognises would be charged
+    // as though it were the whole state.
+    if (fulfilment === "shipping" && address.state === AREA_STATE) {
+      if (!area || !LAGOS_AREAS.some((name) => name === area)) {
+        return { ok: false, error: "Choose which part of Lagos from the list." };
+      }
+    }
+
     // ---- price it, from the catalogue rather than from the browser ---------
     const products = await getProductsForPricing(
       lines.map((line) => line.productId),
@@ -234,6 +251,25 @@ export async function placeOrder(
       return {
         ok: false,
         error: "Nothing in your bag is still available. Please start again.",
+      };
+    }
+
+    // A colourway with a count of its own is what limits that line: three of a
+    // dress in stock is not three in emerald.
+    const shortColour = priced.find(({ line, product }) => {
+      const chosen = product.colors.find((color) => color.name === line.color);
+      return chosen?.stock !== undefined && chosen.stock < line.quantity;
+    });
+    if (shortColour) {
+      const chosen = shortColour.product.colors.find(
+        (color) => color.name === shortColour.line.color,
+      );
+      return {
+        ok: false,
+        error:
+          (chosen?.stock ?? 0) <= 0
+            ? `${shortColour.product.name} in ${shortColour.line.color} has just sold out. Choose another colour to carry on.`
+            : `Only ${chosen?.stock} of ${shortColour.product.name} left in ${shortColour.line.color}. Lower the quantity to carry on.`,
       };
     }
 
@@ -262,12 +298,31 @@ export async function placeOrder(
       return { ok: false, error: "Collection isn't available — choose delivery." };
     }
 
+    // Where they are collecting from, resolved here rather than trusted: the
+    // browser sends an id, the address on the order comes from the shop's own
+    // settings.
+    const wantedPickup = String(formData.get("pickup_location") ?? "").trim();
+    const pickupAt =
+      fulfilment === "pickup"
+        ? (rules.pickupLocations.find((place) => place.id === wantedPickup) ??
+          null)
+        : null;
+
+    if (
+      fulfilment === "pickup" &&
+      rules.pickupLocations.length > 0 &&
+      !pickupAt
+    ) {
+      return { ok: false, error: "Choose where you're collecting from." };
+    }
+
     // Quoted on the merchandise total, before any coupon: a code takes money
     // off the clothes, not off the courier, and free-delivery thresholds are
     // met by what was actually spent on the shop.
     const shipping = quoteDelivery(rules, subtotal, {
       fulfilment,
       state: address.state,
+      area,
     }).feeKobo;
 
     // ---- coupon, re-checked rather than believed --------------------------
@@ -343,7 +398,21 @@ export async function placeOrder(
               discount_id: discount.id,
             }
           : {}),
-        shipping_address: fulfilment === "shipping" ? address : null,
+        // A collected order still has a "where": the counter they chose.
+        shipping_address:
+          fulfilment === "shipping"
+            ? address
+            : pickupAt
+              ? {
+                  phone,
+                  phones: phones.length > 1 ? phones : undefined,
+                  pickup: {
+                    name: pickupAt.name,
+                    address: pickupAt.address,
+                    note: pickupAt.note || undefined,
+                  },
+                }
+              : null,
         note: String(formData.get("note") ?? "").trim() || null,
       })
       .select("id")

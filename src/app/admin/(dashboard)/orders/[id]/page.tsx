@@ -220,6 +220,7 @@ export default async function OrderDetailPage({
                   {[
                     address.line1,
                     address.line2,
+                    address.area,
                     address.city,
                     address.state,
                     address.country,
@@ -250,6 +251,21 @@ export default async function OrderDetailPage({
                       </a>
                     ))}
                 </span>
+              </address>
+            ) : order.shipping_address?.pickup ? (
+              <address className="text-sm not-italic text-ink-secondary">
+                <span className="block font-medium text-ink">
+                  Collecting from {order.shipping_address.pickup.name}
+                </span>
+                {order.shipping_address.pickup.address}
+                {order.shipping_address.phone && (
+                  <a
+                    href={`tel:${order.shipping_address.phone.replace(/[^\d+]/g, "")}`}
+                    className="mt-1 block text-ink-muted hover:text-ink"
+                  >
+                    {order.shipping_address.phone}
+                  </a>
+                )}
               </address>
             ) : (
               <p className="text-sm text-ink-secondary">
