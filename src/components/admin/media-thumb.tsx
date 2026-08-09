@@ -19,10 +19,13 @@ export function MediaThumb({
   url,
   className,
   controls = false,
+  style,
 }: {
   url?: string | null;
   className?: string;
   controls?: boolean;
+  /** Overrides the framing — for a preview of a crop being chosen. */
+  style?: React.CSSProperties;
 }) {
   if (!url) {
     return (
@@ -39,7 +42,7 @@ export function MediaThumb({
   }
 
   const { src, focus } = readFocus(url);
-  const framing = { objectPosition: objectPosition(focus) };
+  const framing = { objectPosition: objectPosition(focus), ...style };
 
   if (isVideoUrl(src)) {
     return (

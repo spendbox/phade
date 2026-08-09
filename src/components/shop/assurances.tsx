@@ -217,9 +217,9 @@ function Delivery({ shipping }: { shipping: ShippingSettings }) {
             name="Within Lagos"
             note={formatEta(shipping.lagosEta)}
             value={
-              shipping.defaultFeeKobo === 0
+              shipping.lagosFeeKobo === 0
                 ? "Free"
-                : formatNairaShort(shipping.defaultFeeKobo)
+                : formatNairaShort(shipping.lagosFeeKobo)
             }
           />
         )}

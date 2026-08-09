@@ -74,54 +74,58 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
     <form action={formAction} className="space-y-5">
       <input type="hidden" name="zones" value={JSON.stringify(zones)} />
 
-      <Panel title="Everywhere else">
+      <Panel title="The two base prices">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Default delivery charge"
-              htmlFor="default_fee"
-              hint="What a state with no zone of its own costs."
-            >
-              <MoneyInput
-                id="default_fee"
-                name="default_fee"
-                defaultValue={koboToNairaInput(shipping.defaultFeeKobo)}
-              />
-            </Field>
-
-            <Field
-              label="Free delivery over"
-              htmlFor="free_over"
-              hint="Spend this much and delivery is free. Set 0 to always charge."
-            >
-              <MoneyInput
-                id="free_over"
-                name="free_over"
-                defaultValue={koboToNairaInput(shipping.freeOverKobo)}
-              />
-            </Field>
-          </div>
+          <p className="text-sm text-ink-secondary">
+            A rider crosses Lagos in an afternoon; a parcel to Sokoto goes on a
+            bus. One price for both is a loss on every Sokoto order or a Lagos
+            price nobody in Lagos will pay — so the two are asked separately.
+            Zones below override either of them.
+          </p>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
               label="Within Lagos"
-              hint={`Shown as "${formatEta(lagosEta)}".`}
+              htmlFor="lagos_fee"
+              hint={`Arrives "${formatEta(lagosEta).toLowerCase()}".`}
             >
-              <EtaFields value={lagosEta} onChange={setLagosEta} />
+              <div className="space-y-2">
+                <MoneyInput
+                  id="lagos_fee"
+                  name="lagos_fee"
+                  defaultValue={koboToNairaInput(shipping.lagosFeeKobo)}
+                />
+                <EtaFields value={lagosEta} onChange={setLagosEta} />
+              </div>
             </Field>
 
             <Field
-              label="Everywhere else"
-              hint={`Shown as "${formatEta(eta)}". Leave both numbers the same for a single figure.`}
+              label="Outside Lagos"
+              htmlFor="default_fee"
+              hint={`Arrives "${formatEta(eta).toLowerCase()}". What a state with no zone of its own costs.`}
             >
-              <EtaFields value={eta} onChange={setEta} />
+              <div className="space-y-2">
+                <MoneyInput
+                  id="default_fee"
+                  name="default_fee"
+                  defaultValue={koboToNairaInput(shipping.defaultFeeKobo)}
+                />
+                <EtaFields value={eta} onChange={setEta} />
+              </div>
             </Field>
           </div>
-          <p className="text-xs text-ink-muted">
-            A rider crosses Lagos in an afternoon and a parcel to Sokoto goes on
-            a bus, so the two are asked separately. Any zone below can promise
-            something different again.
-          </p>
+
+          <Field
+            label="Free delivery over"
+            htmlFor="free_over"
+            hint="Spend this much and delivery is free, wherever it's going. Set 0 to always charge."
+          >
+            <MoneyInput
+              id="free_over"
+              name="free_over"
+              defaultValue={koboToNairaInput(shipping.freeOverKobo)}
+            />
+          </Field>
           <input type="hidden" name="eta" value={JSON.stringify(eta)} />
           <input
             type="hidden"

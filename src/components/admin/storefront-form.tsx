@@ -363,10 +363,14 @@ export function StorefrontForm({
           </div>
 
           <Field
-            label="Images"
-            hint="The first is the main hero. Add more and they run as a set."
+            label="Images and clips"
+            hint="The first is the main hero. Add more and they run as a set. Each one is framed for a desktop and for a phone separately, and can be shown on only one of them — the editor opens as it lands, and the crop button reopens it."
           >
-            <ImageUploader name="hero_images" initial={content.heroImages} />
+            <ImageUploader
+              name="hero_images"
+              initial={content.heroImages}
+              hero
+            />
           </Field>
         </div>
       </Panel>

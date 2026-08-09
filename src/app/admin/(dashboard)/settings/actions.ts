@@ -345,6 +345,7 @@ export async function saveShipping(
 
     const content: ShippingSettings = parseShipping({
       defaultFeeKobo: nairaToKobo(String(formData.get("default_fee") ?? "")),
+      lagosFeeKobo: nairaToKobo(String(formData.get("lagos_fee") ?? "")),
       freeOverKobo: nairaToKobo(String(formData.get("free_over") ?? "")),
       zones: rawZones,
       eta: rawEta,

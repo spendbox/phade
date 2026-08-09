@@ -89,9 +89,29 @@ function isFocus(value: string): value is Focus {
  * server: the file resolves exactly as it did before, every URL already stored
  * keeps working, and none of these choices needed a column.
  */
+/** Which screens a piece of hero media is for. Null means both. */
+export type Screens = "desktop" | "mobile" | null;
+
 export type MediaHints = {
   src: string;
+  /** How it is framed on a wide screen. */
   focus: Focus;
+  /**
+   * How it is framed on a narrow one.
+   *
+   * A photograph cropped to fill a laptop and cropped to fill a phone are two
+   * different pictures — a 16:9 slice of a portrait shot keeps the waist and
+   * loses the face, and the same file in a 9:16 frame keeps the whole model.
+   * The shop is the only one who knows which part matters in each, so it
+   * chooses twice.
+   */
+  mobileFocus: Focus;
+  /**
+   * Or it simply isn't for both. Some shots only work wide and some only work
+   * tall, and hiding the wrong one beats cropping it into something nobody
+   * would have chosen.
+   */
+  screens: Screens;
   /** Seconds, when the shop has trimmed the clip. */
   trim: { start: number; end: number } | null;
   poster: string | null;
@@ -103,22 +123,38 @@ function seconds(raw: string | undefined): number | null {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+const BLANK: Omit<MediaHints, "src"> = {
+  focus: "center",
+  mobileFocus: "center",
+  screens: null,
+  trim: null,
+  poster: null,
+};
+
 export function readHints(url: string): MediaHints {
   const at = url.indexOf("#");
-  if (at === -1) return { src: url, focus: "center", trim: null, poster: null };
+  if (at === -1) return { src: url, ...BLANK };
 
   const src = url.slice(0, at);
   const params = new URLSearchParams(url.slice(at + 1));
 
   const wantedFocus = params.get("pos") ?? "";
+  const wantedMobile = params.get("mpos") ?? "";
   const [start, end] = (params.get("t") ?? "").split(",");
   const from = seconds(start);
   const to = seconds(end);
   const poster = params.get("poster");
+  const on = params.get("on");
+
+  const focus = isFocus(wantedFocus) ? wantedFocus : "center";
 
   return {
     src,
-    focus: isFocus(wantedFocus) ? wantedFocus : "center",
+    focus,
+    // Unset, a narrow screen frames it the way a wide one does — which is what
+    // every picture uploaded before this existed should keep doing.
+    mobileFocus: isFocus(wantedMobile) ? wantedMobile : focus,
+    screens: on === "desktop" || on === "mobile" ? on : null,
     trim: from !== null && to !== null && to > from ? { start: from, end: to } : null,
     poster: poster || null,
   };
@@ -134,6 +170,12 @@ export function withHints(
 
   const params = new URLSearchParams();
   if (merged.focus !== "center") params.set("pos", merged.focus);
+  // Only when it differs — a mobile crop that matches the desktop one is the
+  // default, and writing it would put a fragment on every URL for nothing.
+  if (merged.mobileFocus !== merged.focus) {
+    params.set("mpos", merged.mobileFocus);
+  }
+  if (merged.screens) params.set("on", merged.screens);
   if (merged.trim) {
     params.set("t", `${round(merged.trim.start)},${round(merged.trim.end)}`);
   }

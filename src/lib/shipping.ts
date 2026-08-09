@@ -66,8 +66,18 @@ export type PickupLocation = {
 };
 
 export type ShippingSettings = {
-  /** Charged for a state no zone claims. */
+  /**
+   * Charged for anywhere outside Lagos that no zone claims — which for most
+   * shops here is the whole of the rest of the country.
+   */
   defaultFeeKobo: number;
+  /**
+   * Lagos, separately, because it always is. A rider crosses the city; a
+   * parcel to Sokoto goes on a bus, and one price for both is either a loss
+   * on every Sokoto order or a Lagos price nobody in Lagos will pay. A zone
+   * built out of Lagos overrides this, as zones override everything.
+   */
+  lagosFeeKobo: number;
   /** Shop-wide free-delivery threshold. 0 turns it off. */
   freeOverKobo: number;
   zones: ShippingZone[];
@@ -94,6 +104,7 @@ export const SHIPPING_KEY = "shipping_settings";
 
 export const DEFAULT_SHIPPING: ShippingSettings = {
   defaultFeeKobo: 500_000,
+  lagosFeeKobo: 350_000,
   freeOverKobo: 10_000_000,
   zones: [],
   eta: { minHours: 72, maxHours: 96 },
@@ -350,6 +361,7 @@ export function parseShipping(raw: unknown): ShippingSettings {
 
   return {
     defaultFeeKobo: kobo(value.defaultFeeKobo, DEFAULT_SHIPPING.defaultFeeKobo),
+    lagosFeeKobo: kobo(value.lagosFeeKobo, DEFAULT_SHIPPING.lagosFeeKobo),
     freeOverKobo: kobo(value.freeOverKobo, DEFAULT_SHIPPING.freeOverKobo),
     zones: Array.isArray(value.zones) ? value.zones.flatMap(parseZone) : [],
     eta: parseEta(value.eta, DEFAULT_SHIPPING.eta) ?? DEFAULT_SHIPPING.eta,
@@ -430,7 +442,13 @@ export function quoteDelivery(
   }
 
   const zone = zoneFor(shipping, options.state, options.area);
-  const fee = zone ? zone.feeKobo : shipping.defaultFeeKobo;
+  const toLagos =
+    options.state?.trim().toLowerCase() === AREA_STATE.toLowerCase();
+  const fee = zone
+    ? zone.feeKobo
+    : toLagos
+      ? shipping.lagosFeeKobo
+      : shipping.defaultFeeKobo;
   const threshold = zone?.freeOverKobo ?? shipping.freeOverKobo;
 
   if (threshold > 0 && subtotalKobo >= threshold) {
@@ -454,8 +472,13 @@ export function quoteDelivery(
 export function cheapestFee(shipping: ShippingSettings): number {
   return shipping.zones.reduce(
     (lowest, zone) => Math.min(lowest, zone.feeKobo),
-    shipping.defaultFeeKobo,
+    Math.min(shipping.defaultFeeKobo, shipping.lagosFeeKobo),
   );
+}
+
+/** What a destination costs when no zone speaks for it. */
+export function baseFee(shipping: ShippingSettings, inLagos: boolean): number {
+  return inLagos ? shipping.lagosFeeKobo : shipping.defaultFeeKobo;
 }
 
 async function loadShipping(): Promise<ShippingSettings> {
@@ -476,7 +499,7 @@ async function loadShipping(): Promise<ShippingSettings> {
 export const getShipping = cache(async function getShipping(): Promise<ShippingSettings> {
   // Versioned for the same reason the storefront cache is: this holds the
   // parsed object, and it gained a delivery window.
-  return unstable_cache(loadShipping, ["shipping-settings", "v2"], {
+  return unstable_cache(loadShipping, ["shipping-settings", "v3"], {
     revalidate: 60,
     tags: [CATALOGUE_TAG],
   })();

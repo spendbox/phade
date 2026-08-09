@@ -36,10 +36,11 @@ Every page ends with three promises, and each is a button rather than a
 paragraph, because each is really a question. **Delivered nationwide** opens
 the price of every zone with how long it takes, the free-delivery threshold and
 whether collection is offered — all from Settings → Shipping, so it cannot
-promise something checkout won't honour. Lagos is asked about separately, and
-answers separately: within 24 hours by default, against three to four days for
-the rest of Nigeria, because a rider crosses the city in an afternoon and a
-parcel to Sokoto goes on a bus. **Paid securely** shows the channels
+promise something checkout won't honour. Lagos is priced and timed
+separately: ₦3,500 within 24 hours by default, against ₦5,000 and three to four
+days for the rest of Nigeria, because a rider crosses the city in an afternoon
+and a parcel to Sokoto goes on a bus — and one figure for both is either a loss
+on every Sokoto order or a Lagos price nobody in Lagos will pay. **Paid securely** shows the channels
 Paystack handles and says plainly that the card number never reaches this shop.
 **Here to help** is a message form that goes to the address in the dashboard,
 with a WhatsApp button beside it where the shop offers one.
@@ -59,7 +60,7 @@ with a WhatsApp button beside it where the shop offers one.
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | **General** — the default low-stock alert level. **Team** — who else can sign in, what they can do, and what the limited role is called. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and its size runs: name a run per type of product, put any whole number from 1 to 100 in it, and a product picks which run it belongs to rather than being offered a 12 and a 38 on the same row. Clothing and shoe runs ship as standard, and one button puts them back. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero, the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the menu behind the ☰, the footer blurb, social links, and where a message from "Here to help" goes — an address, and a WhatsApp number if the shop wants one offered. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — the default delivery charge, how long delivery takes (in hours, so "within 24 hours" is sayable), a free-delivery threshold, delivery zones by state — or as many separate Lagos zones as a shop wants, naming the parts each one covers so it prices only those and leaves the rest of Lagos for the next zone — each zone able to promise its own delivery window, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
+| **Settings** | **General** — the default low-stock alert level. **Team** — who else can sign in, what they can do, and what the limited role is called. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and its size runs: name a run per type of product, put any whole number from 1 to 100 in it, and a product picks which run it belongs to rather than being offered a 12 and a 38 on the same row. Clothing and shoe runs ship as standard, and one button puts them back. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero — whose every image and clip is framed for a desktop and for a phone separately, or marked for only one of them, in an editor that opens as the file lands — the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the menu behind the ☰, the footer blurb, social links, and where a message from "Here to help" goes — an address, and a WhatsApp number if the shop wants one offered. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — two base prices with a delivery window each, one for Lagos and one for everywhere else (in hours, so "within 24 hours" is sayable), a free-delivery threshold, delivery zones by state — or as many separate Lagos zones as a shop wants, naming the parts each one covers so it prices only those and leaves the rest of Lagos for the next zone — each zone able to promise its own delivery window, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -238,11 +239,15 @@ A few decisions worth knowing:
   each time that changes. Always muted, which is both good manners and the one
   case every browser allows without a tap. The file streams at whatever it was
   uploaded at; nothing is re-encoded or downscaled.
-- **The hero is the same picture everywhere.** A photograph shot for a shop is
-  usually portrait, and a wide screen cropping it to fill takes the model's
-  head off. So the hero shows the whole thing, over a blown-up blurred copy of
-  itself that fills whatever shape the screen is — a phone and a laptop see the
-  same composition rather than two different crops.
+- **The hero is cropped twice.** A photograph shot for a shop is usually
+  portrait, so a 16:9 slice of it keeps the waist and loses the face, while the
+  same file in a phone's frame keeps the whole model. Showing the whole picture
+  over a blurred copy of itself was a workaround for a decision nobody had been
+  given a way to make; now the shop makes it, once per shape, in an editor that
+  opens as the file lands. A shot that only works in one shape can say so and
+  simply won't appear on the other. Both answers ride in the URL fragment, and
+  a media query picks between them — so the crop is right on the first paint
+  rather than after the browser has told us how wide it is.
 - **The shop chooses where a picture is framed.** Every surface crops — a
   square tile, a 3:4 card, a hero — and a centred crop takes the head off a
   studio shot as happily as the hem. So each uploaded picture carries a
@@ -343,10 +348,6 @@ A few decisions worth knowing:
   Share and the quick-add on a card do the same. On a phone whatever changed is
   usually off screen, and silence at the moment of pressing is what makes
   someone press again.
-- **The front page arrives as you reach it.** Each section lifts into place on
-  an IntersectionObserver — once, never fading back out, and anything already
-  on screen at first paint is simply there. It gives a long scroll a rhythm and
-  tells a reader there is another thing below the one they are looking at.
 - **Messages need a mail provider, and work without one.** "Here to help" sends
   through Resend when `RESEND_API_KEY` is set. When it isn't — which is the
   state a shop is in the day it opens — the answer says so and hands the whole

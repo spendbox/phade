@@ -74,7 +74,7 @@ export function ImageFrame({
           fill
           priority={priority}
           className={cn(
-            "transition-opacity duration-500",
+            "framed transition-opacity duration-500",
             loaded ? "opacity-100" : "opacity-0",
           )}
         />
@@ -88,7 +88,7 @@ export function ImageFrame({
           fetchPriority={priority ? "high" : "auto"}
           decoding="async"
           className={cn(
-            "absolute inset-0 size-full transition-opacity duration-500",
+            "framed absolute inset-0 size-full transition-opacity duration-500",
             loaded ? "opacity-100" : "opacity-0",
           )}
         />

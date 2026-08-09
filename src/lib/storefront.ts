@@ -414,7 +414,7 @@ export const getStorefront = cache(async function getStorefront(): Promise<Store
   // The key carries a version: this cache holds the *parsed* object, so a
   // release that adds a field would otherwise keep serving yesterday's shape
   // — a page reading `content.menu.length` off an object that has no menu.
-  return unstable_cache(loadStorefront, ["storefront-content", "v2"], {
+  return unstable_cache(loadStorefront, ["storefront-content", "v3"], {
     revalidate: 60,
     tags: [CATALOGUE_TAG],
   })();

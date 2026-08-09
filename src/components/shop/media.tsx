@@ -103,13 +103,24 @@ export function Media({
   }
 
   const hints = readHints(url);
-  const { src, focus } = hints;
+  const { src } = hints;
   // The shop's own poster wins over anything a caller guessed at.
   const still = hints.poster ?? poster ?? null;
+
+  /**
+   * Two crops, chosen by the screen.
+   *
+   * `object-position` can't be written twice in one inline style, so the two
+   * choices ride in as custom properties and a media query in `.framed` picks
+   * between them. That keeps this a server component — the alternative is
+   * measuring the viewport in the browser, which means a frame of the wrong
+   * crop on every first paint.
+   */
   const framing = {
-    objectPosition: objectPosition(focus),
     objectFit: fit,
-  } as const;
+    "--frame-pos": objectPosition(hints.focus),
+    "--frame-pos-narrow": objectPosition(hints.mobileFocus),
+  } as React.CSSProperties;
 
   if (isVideoUrl(src)) {
     return (
@@ -128,7 +139,7 @@ export function Media({
         poster={still ?? undefined}
         playing={autoPlay}
         style={framing}
-        className={cn("bg-canvas-deep", className)}
+        className={cn("framed bg-canvas-deep", className)}
         label={alt}
       />
     );

@@ -197,6 +197,23 @@
     scroll-padding-inline: 0;
     scroll-snap-type: x mandatory;
   }
+  /* Where a picture is framed, which is not the same answer on both screens.
+
+     A 16:9 slice of a portrait shot keeps the waist and loses the face; the
+     same file in a phone's frame keeps the whole model. So the shop chooses
+     twice, and the two answers ride in as custom properties because
+     `object-position` cannot be written twice in one inline style. Narrow is
+     the base and wide is the override, so a picture that only ever had one
+     crop keeps it everywhere. */
+  .framed {
+    object-position: var(--frame-pos-narrow, var(--frame-pos, 50% 50%));
+  }
+  @media (min-width: 640px) {
+    .framed {
+      object-position: var(--frame-pos, 50% 50%);
+    }
+  }
+
   .rail::-webkit-scrollbar {
     display: none;
   }
