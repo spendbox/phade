@@ -3,7 +3,7 @@
 import { revalidate } from "@/lib/admin-revalidate";
 
 import { DEFAULT_CATEGORY_ICON, isCategoryIconKey } from "@/lib/category-icons";
-import { actionError, requireAdmin } from "@/lib/guard";
+import { actionError, requireOwner } from "@/lib/guard";
 import { slugify } from "@/lib/format";
 import { requireSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/types";
@@ -35,7 +35,7 @@ export async function saveCategory(
   formData: FormData,
 ): Promise<CategoryFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const id = text(formData, "id");
@@ -68,7 +68,7 @@ export async function saveCategory(
 }
 
 export async function deleteCategory(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const id = String(formData.get("id") ?? "");
@@ -112,7 +112,7 @@ export async function saveSubcategory(
   formData: FormData,
 ): Promise<SubcategoryFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const id = text(formData, "id");
@@ -161,7 +161,7 @@ export async function saveSubcategory(
 }
 
 export async function deleteSubcategory(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const id = String(formData.get("id") ?? "");

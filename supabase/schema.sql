@@ -263,6 +263,35 @@ create index if not exists carts_status_idx      on public.carts (status, last_a
 create index if not exists carts_last_active_idx on public.carts (last_active_at desc);
 
 -- ---------------------------------------------------------------------------
+-- Admin users
+--
+-- Who can sign in to the dashboard, and how much of it they get. The owner in
+-- the environment variables always works and needs no row here — this table is
+-- for the people the owner adds: a sales manager who handles the order book
+-- and sees nothing else, today, and whoever else tomorrow.
+--
+-- Passwords are stored as scrypt hashes (see src/lib/passwords.ts). Nothing in
+-- this table is readable by the anon key: RLS is on with no policies, and the
+-- dashboard reaches it with the service role from the server only.
+-- ---------------------------------------------------------------------------
+create table if not exists public.admin_users (
+  id            uuid primary key default gen_random_uuid(),
+  -- What they type to sign in. Lower-cased on the way in, so "Ada" and "ada"
+  -- can't be two people.
+  username      text not null unique,
+  name          text,
+  password_hash text not null,
+  role          text not null default 'staff'
+                  check (role in ('owner', 'staff')),
+  enabled       boolean not null default true,
+  last_seen_at  timestamptz,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index if not exists admin_users_enabled_idx on public.admin_users (enabled);
+
+-- ---------------------------------------------------------------------------
 -- App settings
 --
 -- Preferences the admin can change from the dashboard, rather than by editing
@@ -333,7 +362,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['categories', 'products', 'customers', 'orders', 'discounts']
+  foreach t in array array['categories', 'products', 'customers', 'orders', 'discounts', 'admin_users']
   loop
     execute format('drop trigger if exists set_updated_at on public.%I', t);
     execute format(
@@ -350,6 +379,7 @@ $$;
 -- server only, which bypasses RLS. We enable RLS with no policies so that the
 -- anon/public key can never read or write these tables directly.
 -- ---------------------------------------------------------------------------
+alter table public.admin_users         enable row level security;
 alter table public.app_settings        enable row level security;
 alter table public.subcategories       enable row level security;
 alter table public.carts               enable row level security;

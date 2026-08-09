@@ -42,7 +42,7 @@ because that is where a thumb is. On a wider screen the header takes over.
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | **General** — the default low-stock alert level. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and size run. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero, the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the footer blurb and social links. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state (or by parts of Lagos, for a shop that prices Lekki differently from Ikorodu) with their own prices, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
+| **Settings** | **General** — the default low-stock alert level. **Team** — who else can sign in, what they can do, and what the limited role is called. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and size run. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero, the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the footer blurb and social links. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state (or by parts of Lagos, for a shop that prices Lekki differently from Ikorodu) with their own prices, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -148,7 +148,9 @@ src/
     shop/                        Hero, collections, deck, wall, pop-up, bag, checkout
     ui/                          Buttons, fields, badges, panels
   lib/
-    auth.ts  session.ts          Admin credentials and session cookie
+    auth.ts  session.ts          Admin credentials, roles and session cookie
+    passwords.ts                 scrypt hashing for team logins
+    team.ts                      Who can sign in, and what they're called
     queries.ts                   All dashboard reads
     shop-queries.ts  shop.ts     All storefront reads, and what a shopper pays
     coupons.ts                   What a code is worth against a given bag
@@ -169,9 +171,18 @@ A few decisions worth knowing:
 - **Money is stored in kobo** (integers). Paystack works in kobo too, so amounts
   pass through untouched, and there is no floating-point drift. `src/lib/format.ts`
   is the only place that converts for display or parses admin input.
-- **Auth is environment-based.** The proxy gates `/admin`, and the dashboard
-  layout and every server action independently re-check the session, so nothing
-  depends on the proxy alone.
+- **The owner is an environment variable; everyone else is a row.** That login
+  works with no database at all and cannot be deleted from inside the
+  dashboard, which is what stops a shop locking itself out of its own shop.
+  Anyone else the owner adds signs in with a username and a password stored as
+  a salted scrypt hash — never recoverable, only replaceable.
+- **Two roles, one rule.** An owner sees everything; the limited role (called
+  "Sales manager" until the shop renames it) sees the order book and nothing
+  else. `canReach` in `src/lib/session.ts` is the single answer to "can they
+  see this", used by the middleware, the sidebar and the pages, so a menu can
+  never offer a door the server will refuse. The refusal that matters is
+  `requireOwner` next to each mutation: a server action is a URL, and a URL can
+  be called by anything.
 - **Stock changes are always logged.** Editing stock on the product page, using
   ±1, or using the adjustment dialog all write an `inventory_movements` row, so
   the history is a complete account rather than just a current number.

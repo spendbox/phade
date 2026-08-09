@@ -2,7 +2,7 @@
 
 import { revalidate } from "@/lib/admin-revalidate";
 
-import { actionError, requireAdmin } from "@/lib/guard";
+import { actionError, requireOwner } from "@/lib/guard";
 import { requireSupabase } from "@/lib/supabase";
 import type { ActionResult, InventoryReason } from "@/lib/types";
 import { INVENTORY_REASONS } from "@/lib/types";
@@ -18,7 +18,7 @@ export async function adjustStock(
   formData: FormData,
 ): Promise<StockFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const productId = String(formData.get("product_id") ?? "");
@@ -77,7 +77,7 @@ export async function adjustStock(
 
 /** One-click +1 / −1 from the inventory table. */
 export async function nudgeStock(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const productId = String(formData.get("product_id") ?? "");

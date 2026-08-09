@@ -3,7 +3,7 @@
 import { revalidate } from "@/lib/admin-revalidate";
 import { redirect } from "next/navigation";
 
-import { actionError, requireAdmin } from "@/lib/guard";
+import { actionError, requireOwner } from "@/lib/guard";
 import { nairaToKobo, slugify } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { categoryNameFor, generateSku } from "@/lib/sku";
@@ -178,7 +178,7 @@ export async function createProduct(
   formData: FormData,
 ): Promise<ProductFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
     const settings = await getSettings();
     const parsed = parseProduct(formData, settings.lowStockThreshold);
@@ -249,7 +249,7 @@ export async function createProductsBulk(
   formData: FormData,
 ): Promise<BulkCreateState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const categoryId = text(formData, "category_id") || null;
@@ -360,7 +360,7 @@ export async function updateProduct(
   formData: FormData,
 ): Promise<ProductFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const id = text(formData, "id");
@@ -404,7 +404,7 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const id = String(formData.get("id") ?? "");
@@ -421,7 +421,7 @@ export async function deleteProduct(formData: FormData): Promise<void> {
 }
 
 export async function duplicateProduct(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const id = String(formData.get("id") ?? "");
@@ -470,7 +470,7 @@ export async function bulkSetStatus(
   formData: FormData,
 ): Promise<BulkActionState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const ids = selectedIds(formData);
@@ -509,7 +509,7 @@ export async function bulkDelete(
   formData: FormData,
 ): Promise<BulkActionState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const ids = selectedIds(formData);
@@ -537,7 +537,7 @@ export async function bulkDelete(
 
 /** Quick status flip from the products table. */
 export async function setProductStatus(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const id = String(formData.get("id") ?? "");

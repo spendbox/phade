@@ -2,7 +2,7 @@
 
 import { revalidate } from "@/lib/admin-revalidate";
 
-import { actionError, requireAdmin } from "@/lib/guard";
+import { actionError, requireOwner } from "@/lib/guard";
 import {
   CATALOGUE_KEY,
   parseColorList,
@@ -31,7 +31,7 @@ export async function saveSettings(
   formData: FormData,
 ): Promise<SettingsFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const threshold = Number.parseInt(
@@ -106,7 +106,7 @@ export async function saveStorefront(
   formData: FormData,
 ): Promise<StorefrontFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const headline = String(formData.get("hero_headline") ?? "").trim();
@@ -209,7 +209,7 @@ export async function saveCatalogue(
   formData: FormData,
 ): Promise<CatalogueFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     let rawColors: unknown = [];
@@ -266,7 +266,7 @@ export async function saveShipping(
   formData: FormData,
 ): Promise<ShippingFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     let rawZones: unknown = [];

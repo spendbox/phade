@@ -24,6 +24,7 @@ import {
 import { signOutAction } from "@/app/admin/actions";
 import { LOGO_MARK, LOGO_TYPE } from "@/lib/brand";
 import { cn } from "@/lib/cn";
+import { canReach, type AdminRole } from "@/lib/session";
 import { SIDEBAR_COOKIE } from "@/lib/ui-cookies";
 
 /** The day-to-day run of the shop. */
@@ -44,6 +45,17 @@ const SECONDARY = [
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ] as const;
 
+/**
+ * Only what this role can actually open.
+ *
+ * A menu full of doors that bounce you back out is worse than a short menu:
+ * `canReach` is the same rule the middleware and the pages use, so the
+ * sidebar can never offer something the server will refuse.
+ */
+function visible<T extends { href: string }>(items: readonly T[], role: AdminRole): T[] {
+  return items.filter((item) => canReach(role, item.href));
+}
+
 function isActive(pathname: string, href: string, exact?: boolean): boolean {
   if (exact) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -56,10 +68,15 @@ function isActive(pathname: string, href: string, exact?: boolean): boolean {
  */
 export function AdminShell({
   email,
+  role = "owner",
+  roleLabel,
   defaultCollapsed = false,
   children,
 }: {
   email: string;
+  role?: AdminRole;
+  /** What this shop calls the limited role, for the corner of the sidebar. */
+  roleLabel?: string;
   defaultCollapsed?: boolean;
   children: React.ReactNode;
 }) {
@@ -97,6 +114,8 @@ export function AdminShell({
           pathname={pathname}
           collapsed={collapsed}
           email={email}
+          role={role}
+          roleLabel={roleLabel}
           onToggleCollapse={toggleCollapsed}
         />
       </aside>
@@ -115,6 +134,8 @@ export function AdminShell({
               pathname={pathname}
               collapsed={false}
               email={email}
+              role={role}
+              roleLabel={roleLabel}
               onClose={() => setDrawerOpen(false)}
             />
           </aside>
@@ -152,12 +173,16 @@ function SidebarContent({
   pathname,
   collapsed,
   email,
+  role,
+  roleLabel,
   onClose,
   onToggleCollapse,
 }: {
   pathname: string;
   collapsed: boolean;
   email: string;
+  role: AdminRole;
+  roleLabel?: string;
   onClose?: () => void;
   onToggleCollapse?: () => void;
 }) {
@@ -206,7 +231,7 @@ function SidebarContent({
       )}
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-        {NAV.map((item) => (
+        {visible(NAV, role).map((item) => (
           <NavLink
             key={item.href}
             {...item}
@@ -217,7 +242,7 @@ function SidebarContent({
         ))}
 
         <div className="!mt-5 space-y-1 border-t border-line pt-4">
-          {SECONDARY.map((item) => (
+          {visible(SECONDARY, role).map((item) => (
             <NavLink
               key={item.href}
               {...item}
@@ -245,7 +270,9 @@ function SidebarContent({
                 <p className="truncate text-[13px] font-medium text-ink">
                   Admin
                 </p>
-                <p className="truncate text-[11px] text-ink-muted">{email}</p>
+                <p className="truncate text-[11px] text-ink-muted">
+                  {role === "owner" ? email : (roleLabel ?? "Orders only")}
+                </p>
               </div>
             </>
           )}

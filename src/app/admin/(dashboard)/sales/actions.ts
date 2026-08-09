@@ -3,7 +3,7 @@
 import { revalidate } from "@/lib/admin-revalidate";
 
 import { nairaToKobo } from "@/lib/format";
-import { actionError, requireAdmin } from "@/lib/guard";
+import { actionError, requireOwner } from "@/lib/guard";
 import { requireSupabase } from "@/lib/supabase";
 import type { ActionResult, DiscountKind, DiscountScope } from "@/lib/types";
 
@@ -32,7 +32,7 @@ export async function saveSale(
   formData: FormData,
 ): Promise<SaleFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const id = text(formData, "id");
@@ -154,7 +154,7 @@ function friendly(message: string): string {
 
 /** Pause or resume without deleting the sale. */
 export async function toggleSale(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const id = String(formData.get("id") ?? "");
@@ -171,7 +171,7 @@ export async function toggleSale(formData: FormData): Promise<void> {
 }
 
 export async function deleteSale(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const id = String(formData.get("id") ?? "");
