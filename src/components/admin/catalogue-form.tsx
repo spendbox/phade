@@ -44,6 +44,23 @@ export function CatalogueForm({ defaults }: { defaults: CatalogueDefaults }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   /** Whether the reset button is waiting to be pressed a second time. */
   const [confirming, setConfirming] = useState(false);
+  /**
+   * The run just added, so it can be brought into view.
+   *
+   * The button that adds one lives in the panel's header and the run it adds
+   * lands at the foot of a list that is already two runs and twenty sizes
+   * long — so on anything smaller than a desktop, pressing it appeared to do
+   * nothing at all. It was working; it was just working off screen.
+   */
+  const [added, setAdded] = useState<string | null>(null);
+
+  /** Brings a newly added run into view and puts the caret in its name. */
+  const reveal = (node: HTMLInputElement | null) => {
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+    node.focus({ preventScroll: true });
+    setAdded(null);
+  };
 
   function updateRun(id: string, patch: Partial<SizeRun>) {
     setRuns((current) =>
@@ -197,12 +214,11 @@ export function CatalogueForm({ defaults }: { defaults: CatalogueDefaults }) {
 
             <button
               type="button"
-              onClick={() =>
-                setRuns([
-                  ...runs,
-                  { id: `run_${Date.now()}`, name: "", sizes: [] },
-                ])
-              }
+              onClick={() => {
+                const id = `run_${Date.now()}`;
+                setRuns([...runs, { id, name: "", sizes: [] }]);
+                setAdded(id);
+              }}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
             >
               <Plus className="size-3.5" />
@@ -229,6 +245,7 @@ export function CatalogueForm({ defaults }: { defaults: CatalogueDefaults }) {
                   <Field label="Run name" htmlFor={`run-${run.id}`}>
                     <Input
                       id={`run-${run.id}`}
+                      ref={run.id === added ? reveal : undefined}
                       value={run.name}
                       onChange={(event) =>
                         updateRun(run.id, { name: event.target.value })

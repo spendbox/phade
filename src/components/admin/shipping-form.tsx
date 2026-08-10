@@ -47,6 +47,20 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
   const [zones, setZones] = useState<ShippingZone[]>(shipping.zones);
   const [eta, setEta] = useState<DeliveryEta>(shipping.eta);
   const [lagosEta, setLagosEta] = useState<DeliveryEta>(shipping.lagosEta);
+  /**
+   * The zone just added, so it can be brought into view. The button that adds
+   * one sits in the panel's header and the zone lands at the foot of a list
+   * that is already several zones and thirty-odd state chips long — pressing
+   * it off a phone looked like pressing a button that did nothing.
+   */
+  const [added, setAdded] = useState<string | null>(null);
+
+  const reveal = (node: HTMLInputElement | null) => {
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+    node.focus({ preventScroll: true });
+    setAdded(null);
+  };
   const [pickup, setPickup] = useState(shipping.pickupEnabled);
   const [places, setPlaces] = useState<PickupLocation[]>(
     shipping.pickupLocations,
@@ -140,11 +154,12 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
         action={
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              const id = `zone_${Date.now()}`;
               setZones((current) => [
                 ...current,
                 {
-                  id: `zone_${Date.now()}`,
+                  id,
                   name: "",
                   states: [],
                   areas: [],
@@ -152,8 +167,9 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                   eta: null,
                   freeOverKobo: null,
                 },
-              ])
-            }
+              ]);
+              setAdded(id);
+            }}
             className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
           >
             <Plus className="size-3.5" />
@@ -175,6 +191,7 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                     <Field label="Zone name" htmlFor={`name-${zone.id}`}>
                       <Input
                         id={`name-${zone.id}`}
+                        ref={zone.id === added ? reveal : undefined}
                         value={zone.name}
                         onChange={(event) =>
                           update(zone.id, { name: event.target.value })
