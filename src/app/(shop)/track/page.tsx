@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, PackageSearch } from "lucide-react";
+
+import { ContactLink } from "@/components/shop/contact-link";
+import { getStorefront } from "@/lib/storefront";
 
 export const metadata: Metadata = {
   title: "Track your order",
@@ -30,6 +32,8 @@ export default async function TrackPage({
   const wanted = reference?.trim().toUpperCase();
 
   if (wanted) redirect(`/order/${encodeURIComponent(wanted)}`);
+
+  const content = await getStorefront();
 
   return (
     <div className="mx-auto max-w-lg px-4 py-12 sm:px-6 sm:py-16">
@@ -80,12 +84,7 @@ export default async function TrackPage({
       <p className="mt-6 text-[13px] text-ink-secondary">
         Can&apos;t find the reference? It&apos;s in the email we sent when you
         paid. If it isn&apos;t there,{" "}
-        <Link
-          href="/shop"
-          className="underline underline-offset-2 hover:text-ink"
-        >
-          message us
-        </Link>{" "}
+        <ContactLink support={content.support}>message us</ContactLink>{" "}
         with the name and phone number you ordered with and we&apos;ll look it
         up.
       </p>
