@@ -3,13 +3,14 @@
 import { revalidate } from "@/lib/admin-revalidate";
 import { redirect } from "next/navigation";
 
-import { actionError, requireAdmin } from "@/lib/guard";
+import { actionError, requireOwner } from "@/lib/guard";
 import { nairaToKobo, slugify } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { categoryNameFor, generateSku } from "@/lib/sku";
 import { requireSupabase } from "@/lib/supabase";
 import { DELETE_CONFIRMATION } from "@/lib/types";
 import { parseSizeList } from "@/lib/catalogue-settings";
+import { countedStock, parseColors } from "@/lib/product-colors";
 import type {
   ActionResult,
   ProductColor,
@@ -83,24 +84,14 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
     .map((tag) => tag.trim())
     .filter(Boolean);
 
-  let colors: ProductColor[] = [];
-  try {
-    const parsed: unknown = JSON.parse(text(formData, "colors") || "[]");
-    if (Array.isArray(parsed)) {
-      colors = parsed.flatMap((item): ProductColor[] => {
-        if (typeof item !== "object" || item === null) return [];
-        const entry = item as Record<string, unknown>;
-        const colorName = typeof entry.name === "string" ? entry.name.trim() : "";
-        const hex = typeof entry.hex === "string" ? entry.hex : "";
-        if (!colorName || !/^#[0-9a-fA-F]{3,8}$/.test(hex)) return [];
-        return [{ name: colorName, hex }];
-      });
-    }
-  } catch {
-    colors = [];
-  }
-
+  const colors = parseColors(text(formData, "colors"));
   const sizes = parseSizes(formData.get("sizes"));
+
+  // Colours that each carry a number are the count: the shop typed three
+  // emerald and none in black, and the total follows from that rather than
+  // from a second field someone has to remember to keep in step.
+  const stock =
+    countedStock(colors) ?? Math.max(integer(formData, "stock"), 0);
 
   return {
     name,
@@ -112,7 +103,7 @@ function parseProduct(formData: FormData, defaultLowStock = 5): ParsedProduct {
     cost_price_kobo: cost,
     sku: optional(formData, "sku"),
     subcategory: optional(formData, "subcategory"),
-    stock: Math.max(integer(formData, "stock"), 0),
+    stock,
     low_stock_threshold: Math.max(
       integer(formData, "low_stock_threshold", defaultLowStock),
       0,
@@ -161,7 +152,7 @@ export async function createProduct(
   formData: FormData,
 ): Promise<ProductFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
     const settings = await getSettings();
     const parsed = parseProduct(formData, settings.lowStockThreshold);
@@ -232,7 +223,7 @@ export async function createProductsBulk(
   formData: FormData,
 ): Promise<BulkCreateState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const categoryId = text(formData, "category_id") || null;
@@ -343,7 +334,7 @@ export async function updateProduct(
   formData: FormData,
 ): Promise<ProductFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const id = text(formData, "id");
@@ -387,7 +378,7 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const id = String(formData.get("id") ?? "");
@@ -404,7 +395,7 @@ export async function deleteProduct(formData: FormData): Promise<void> {
 }
 
 export async function duplicateProduct(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const id = String(formData.get("id") ?? "");
@@ -453,7 +444,7 @@ export async function bulkSetStatus(
   formData: FormData,
 ): Promise<BulkActionState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const ids = selectedIds(formData);
@@ -492,7 +483,7 @@ export async function bulkDelete(
   formData: FormData,
 ): Promise<BulkActionState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const ids = selectedIds(formData);
@@ -520,7 +511,7 @@ export async function bulkDelete(
 
 /** Quick status flip from the products table. */
 export async function setProductStatus(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireOwner();
   const supabase = requireSupabase();
 
   const id = String(formData.get("id") ?? "");

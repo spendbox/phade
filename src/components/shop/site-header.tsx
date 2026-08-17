@@ -6,8 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import { Heart, Search, ShoppingBag, X } from "lucide-react";
 
 import { useShop } from "@/components/shop/shop-provider";
+import { SiteMenu } from "@/components/shop/site-menu";
 import { LOGO_TYPE } from "@/lib/brand";
 import { cn } from "@/lib/cn";
+import type { MenuLink, SupportDetails } from "@/lib/storefront";
 
 /**
  * The bar across the top of every shop page.
@@ -15,19 +17,31 @@ import { cn } from "@/lib/cn";
  * The wordmark, and the three things a shopper reaches for from anywhere:
  * search, what they saved, and the bag.
  *
- * It carries no category links. The shop has a rail of them pinned under this
- * bar and the landing page has a row of rings, so a third copy up here was
- * only ever repeating what was already on screen.
+ * It carries no category links laid out across it. The shop has a rail of them
+ * pinned under this bar and the landing page has a row of them, so a third
+ * copy up here would only repeat what is already on screen — but "where is
+ * everything, and how do I reach you" is a question people ask of the top-left
+ * corner, so that is where the menu is.
  */
-export function SiteHeader() {
+export function SiteHeader({
+  menu,
+  support,
+}: {
+  menu: MenuLink[];
+  support: SupportDetails;
+}) {
   const { count, openBag, saved } = useShop();
   const [searching, setSearching] = useState(false);
   const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:h-16 sm:px-6 lg:px-8">
-        <Link href="/" className="shrink-0" aria-label="phadewoman — home">
+      <div className="relative mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:h-16 sm:gap-3 sm:px-6 lg:px-8">
+        <SiteMenu links={menu} support={support} />
+
+        {/* Ordered, not placed: the hamburger belongs left of the wordmark on a
+            phone, and the same lines belong right of it on a desktop. */}
+        <Link href="/" className="order-2 shrink-0" aria-label="phadewoman — home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={LOGO_TYPE}
@@ -37,7 +51,7 @@ export function SiteHeader() {
           />
         </Link>
 
-        <div className="ml-auto flex items-center gap-0.5">
+        <div className="order-4 ml-auto flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => setSearching(true)}

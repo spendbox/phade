@@ -108,6 +108,12 @@ export type AddToBagInput = {
   color?: string | null;
   size?: number | null;
   quantity?: number;
+  /**
+   * Skips the toast. For callers that confirm the addition themselves — the
+   * pop-up folds down into a receipt — where a toast on top of it would be the
+   * same news twice.
+   */
+  quiet?: boolean;
 };
 
 type ShopContextValue = {
@@ -130,8 +136,17 @@ type ShopContextValue = {
   closeBag: () => void;
 
   viewing: ShopProduct | null;
-  openProduct: (product: ShopProduct) => void;
+  /**
+   * Opens a product. `siblings` is the list it was tapped out of — the rail,
+   * the grid, the deck — so the pop-up can be swiped along it.
+   */
+  openProduct: (product: ShopProduct, siblings?: ShopProduct[]) => void;
   closeProduct: () => void;
+  /** Moves to the next or previous product in the list it came from. */
+  stepProduct: (by: 1 | -1) => void;
+  /** Where the open product sits in that list, and how long the list is. */
+  viewingAt: number;
+  viewingOf: number;
   /** Lets a pop-up be re-opened from a shared `#p=slug` link. */
   registerProducts: (products: ShopProduct[]) => void;
 
@@ -165,6 +180,8 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
 
   const [bagOpen, setBagOpen] = useState(false);
   const [viewing, setViewing] = useState<ShopProduct | null>(null);
+  /** The list the open product came from, for swiping along. */
+  const [queue, setQueue] = useState<ShopProduct[]>([]);
   const [toast, setToast] = useState<{ id: number; message: string } | null>(
     null,
   );
@@ -193,17 +210,60 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   }, [bag, ready, cartToken]);
 
   // ---- the pop-up follows the address bar ----------------------------------
-  const openProduct = useCallback((product: ShopProduct) => {
-    known.current.set(product.slug, product);
-    setViewing(product);
-    setBagOpen(false);
+  const openProduct = useCallback(
+    (product: ShopProduct, siblings?: ShopProduct[]) => {
+      // The list the product was tapped out of, so the pop-up can be swiped
+      // along it the way the grid underneath would have been scrolled.
+      const list =
+        siblings && siblings.some((item) => item.id === product.id)
+          ? siblings
+          : [product];
+      for (const item of list) known.current.set(item.slug, item);
 
-    const target = `${HASH_PREFIX}${encodeURIComponent(product.slug)}`;
-    if (window.location.hash !== target) {
-      window.history.pushState(null, "", target);
-      pushedHash.current = true;
-    }
-  }, []);
+      setQueue(list);
+      setViewing(product);
+      setBagOpen(false);
+
+      const target = `${HASH_PREFIX}${encodeURIComponent(product.slug)}`;
+      if (window.location.hash !== target) {
+        window.history.pushState(null, "", target);
+        pushedHash.current = true;
+      }
+    },
+    [],
+  );
+
+  /**
+   * The next piece along, without leaving the pop-up.
+   *
+   * It wraps. A rail is a loop, not a corridor with walls at both ends: a
+   * shopper flicking through a row of eight and hitting a swipe that does
+   * nothing reads it as the pop-up having broken, not as having reached the
+   * end — and going round is what every feed they use all day already does.
+   *
+   * The address bar is corrected rather than added to: a shopper who swiped
+   * through nine dresses should get back to the grid with one press of Back,
+   * not nine.
+   */
+  const stepProduct = useCallback(
+    (by: 1 | -1) => {
+      setViewing((current) => {
+        if (!current || queue.length < 2) return current;
+        const at = queue.findIndex((item) => item.id === current.id);
+        if (at === -1) return current;
+        const next = queue[(at + by + queue.length) % queue.length];
+        if (!next || next.id === current.id) return current;
+
+        window.history.replaceState(
+          null,
+          "",
+          `${HASH_PREFIX}${encodeURIComponent(next.slug)}`,
+        );
+        return next;
+      });
+    },
+    [queue],
+  );
 
   const closeProduct = useCallback(() => {
     setViewing(null);
@@ -236,8 +296,15 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       }
       const slug = decodeURIComponent(hash.slice(HASH_PREFIX.length));
       const product = known.current.get(slug);
-      if (product) setViewing(product);
-      else wanted.current = slug;
+      if (product) {
+        setViewing((current) => {
+          // Stepping through the queue rewrites the hash itself; reacting to
+          // that would be the pop-up chasing its own tail.
+          if (current?.slug === slug) return current;
+          setQueue([product]);
+          return product;
+        });
+      } else wanted.current = slug;
     };
 
     window.addEventListener("hashchange", onHashChange);
@@ -268,6 +335,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     if (!match) return;
 
     wanted.current = null;
+    setQueue([match]);
     setViewing(match);
   }, []);
 
@@ -283,7 +351,13 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   }, [toast]);
 
   const addToBag = useCallback(
-    ({ product, color = null, size = null, quantity = 1 }: AddToBagInput) => {
+    ({
+      product,
+      color = null,
+      size = null,
+      quantity = 1,
+      quiet = false,
+    }: AddToBagInput) => {
       const line: BagLine = {
         productId: product.id,
         slug: product.slug,
@@ -314,7 +388,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
 
-      say(`${product.name} added to your bag`);
+      if (!quiet) say(`${product.name} added to your bag`);
     },
     [say],
   );
@@ -374,6 +448,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       viewing,
       openProduct,
       closeProduct,
+      stepProduct,
+      viewingAt: viewing
+        ? queue.findIndex((item) => item.id === viewing.id)
+        : -1,
+      viewingOf: queue.length,
       registerProducts,
       toast,
       say,
@@ -395,6 +474,8 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       viewing,
       openProduct,
       closeProduct,
+      stepProduct,
+      queue,
       registerProducts,
       toast,
       say,

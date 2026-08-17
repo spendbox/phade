@@ -4,9 +4,16 @@ import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 
 import { saveCart } from "@/lib/cart-store";
+import { checkCouponAgainst, type CouponLine } from "@/lib/coupons";
 import { initializeTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { getProductsForPricing } from "@/lib/shop-queries";
-import { getShipping, NIGERIAN_STATES, quoteDelivery } from "@/lib/shipping";
+import {
+  AREA_STATE,
+  getShipping,
+  LAGOS_AREAS,
+  NIGERIAN_STATES,
+  quoteDelivery,
+} from "@/lib/shipping";
 import { requireSupabase } from "@/lib/supabase";
 import type { Fulfilment, ShippingAddress } from "@/lib/types";
 
@@ -14,10 +21,10 @@ import type { Fulfilment, ShippingAddress } from "@/lib/types";
  * Placing an order.
  *
  * The browser sends what a shopper chose — products, quantities, colours,
- * sizes — and never what any of it costs. Every price, every sale and the
- * delivery charge are worked out here against the catalogue as it stands right
- * now. That is the whole security model of the checkout: a bag is a request,
- * not a quote.
+ * sizes, a coupon code — and never what any of it costs. Every price, every
+ * sale, what the code is worth and the delivery charge are worked out here
+ * against the catalogue as it stands right now. That is the whole security
+ * model of the checkout: a bag is a request, not a quote.
  *
  * The order is written before payment starts, with our own reference on it, so
  * an abandoned payment leaves a pending order the dashboard can chase rather
@@ -38,6 +45,11 @@ type SubmittedLine = {
 };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Digits only: "+234 801 234 5678" is eleven digits and four separators. */
+function digits(value: string): number {
+  return (value.match(/\d/g) ?? []).length;
+}
 
 function readLines(raw: FormDataEntryValue | null): SubmittedLine[] {
   try {
@@ -64,6 +76,70 @@ function readLines(raw: FormDataEntryValue | null): SubmittedLine[] {
     });
   } catch {
     return [];
+  }
+}
+
+/**
+ * Prices the submitted bag from the catalogue, for a coupon to be judged
+ * against. Same route the order itself takes, so what a shopper is quoted when
+ * they type a code is what they are charged when they pay.
+ */
+async function couponLines(lines: SubmittedLine[]): Promise<CouponLine[]> {
+  const products = await getProductsForPricing(
+    lines.map((line) => line.productId),
+  );
+  const byId = new Map(products.map((product) => [product.id, product]));
+
+  return lines.flatMap((line) => {
+    const product = byId.get(line.productId);
+    return product
+      ? [
+          {
+            productId: product.id,
+            categoryId: product.categoryId,
+            priceKobo: product.priceKobo,
+            quantity: line.quantity,
+          },
+        ]
+      : [];
+  });
+}
+
+export type CouponState =
+  | { ok: true; code: string; name: string; amountKobo: number }
+  | { ok: false; error: string };
+
+/**
+ * Tries a coupon code against the bag, for the checkout page to show what it
+ * is worth before anyone commits to it.
+ *
+ * It answers with an amount, not with permission: the same check runs again
+ * inside `placeOrder`, which is the only one that decides what is charged.
+ */
+export async function tryCoupon(input: {
+  code: string;
+  lines: string;
+}): Promise<CouponState> {
+  try {
+    const lines = readLines(input.lines);
+    if (lines.length === 0) return { ok: false, error: "Your bag is empty." };
+
+    const result = await checkCouponAgainst(
+      String(input.code ?? ""),
+      await couponLines(lines),
+    );
+
+    return result.ok
+      ? {
+          ok: true,
+          code: result.coupon.code,
+          name: result.coupon.name,
+          amountKobo: result.coupon.amountKobo,
+        }
+      : result;
+  } catch (error) {
+    console.error("[checkout] coupon check failed", error);
+    return { ok: false, error: "We couldn't check that code just now." };
   }
 }
 
@@ -95,7 +171,20 @@ export async function placeOrder(
     const email = String(formData.get("email") ?? "")
       .trim()
       .toLowerCase();
-    const phone = String(formData.get("phone") ?? "").trim();
+
+    // One number or several, dialling code and all. The first is the one a
+    // courier rings; the rest ride along on the order so a busy line isn't a
+    // parcel back at the depot.
+    const phones = [
+      ...formData.getAll("phones"),
+      formData.get("phone") ?? "",
+    ]
+      .map((value) => String(value).trim().slice(0, 40))
+      .filter((value) => digits(value) >= 7)
+      .filter((value, index, all) => all.indexOf(value) === index)
+      .slice(0, 5);
+
+    const phone = phones[0] ?? "";
     const fulfilment: Fulfilment =
       formData.get("fulfilment") === "pickup" ? "pickup" : "shipping";
 
@@ -103,17 +192,21 @@ export async function placeOrder(
     if (!EMAIL.test(email)) {
       return { ok: false, error: "That email address doesn't look right." };
     }
-    if (phone.length < 7) {
+    if (!phone) {
       return { ok: false, error: "Add a phone number we can reach you on." };
     }
+
+    const area = String(formData.get("area") ?? "").trim();
 
     const address: ShippingAddress = {
       line1: String(formData.get("line1") ?? "").trim(),
       line2: String(formData.get("line2") ?? "").trim() || undefined,
       city: String(formData.get("city") ?? "").trim(),
       state: String(formData.get("state") ?? "").trim(),
+      area: area || undefined,
       country: "Nigeria",
       phone,
+      phones: phones.length > 1 ? phones : undefined,
     };
 
     if (
@@ -135,6 +228,14 @@ export async function placeOrder(
       return { ok: false, error: "Choose a state from the list." };
     }
 
+    // Lagos is priced by area, so an area nobody recognises would be charged
+    // as though it were the whole state.
+    if (fulfilment === "shipping" && address.state === AREA_STATE) {
+      if (!area || !LAGOS_AREAS.some((name) => name === area)) {
+        return { ok: false, error: "Choose which part of Lagos from the list." };
+      }
+    }
+
     // ---- price it, from the catalogue rather than from the browser ---------
     const products = await getProductsForPricing(
       lines.map((line) => line.productId),
@@ -150,6 +251,25 @@ export async function placeOrder(
       return {
         ok: false,
         error: "Nothing in your bag is still available. Please start again.",
+      };
+    }
+
+    // A colourway with a count of its own is what limits that line: three of a
+    // dress in stock is not three in emerald.
+    const shortColour = priced.find(({ line, product }) => {
+      const chosen = product.colors.find((color) => color.name === line.color);
+      return chosen?.stock !== undefined && chosen.stock < line.quantity;
+    });
+    if (shortColour) {
+      const chosen = shortColour.product.colors.find(
+        (color) => color.name === shortColour.line.color,
+      );
+      return {
+        ok: false,
+        error:
+          (chosen?.stock ?? 0) <= 0
+            ? `${shortColour.product.name} in ${shortColour.line.color} has just sold out. Choose another colour to carry on.`
+            : `Only ${chosen?.stock} of ${shortColour.product.name} left in ${shortColour.line.color}. Lower the quantity to carry on.`,
       };
     }
 
@@ -178,10 +298,56 @@ export async function placeOrder(
       return { ok: false, error: "Collection isn't available — choose delivery." };
     }
 
+    // Where they are collecting from, resolved here rather than trusted: the
+    // browser sends an id, the address on the order comes from the shop's own
+    // settings.
+    const wantedPickup = String(formData.get("pickup_location") ?? "").trim();
+    const pickupAt =
+      fulfilment === "pickup"
+        ? (rules.pickupLocations.find((place) => place.id === wantedPickup) ??
+          null)
+        : null;
+
+    if (
+      fulfilment === "pickup" &&
+      rules.pickupLocations.length > 0 &&
+      !pickupAt
+    ) {
+      return { ok: false, error: "Choose where you're collecting from." };
+    }
+
+    // Quoted on the merchandise total, before any coupon: a code takes money
+    // off the clothes, not off the courier, and free-delivery thresholds are
+    // met by what was actually spent on the shop.
     const shipping = quoteDelivery(rules, subtotal, {
       fulfilment,
       state: address.state,
+      area,
     }).feeKobo;
+
+    // ---- coupon, re-checked rather than believed --------------------------
+    const submittedCode = String(formData.get("coupon") ?? "").trim();
+    const coupon = submittedCode
+      ? await checkCouponAgainst(
+          submittedCode,
+          priced.map(({ line, product }) => ({
+            productId: product.id,
+            categoryId: product.categoryId,
+            priceKobo: product.priceKobo,
+            quantity: line.quantity,
+          })),
+        )
+      : null;
+
+    // A code that stopped working between typing it and paying stops the
+    // order. Charging the full price of a bag someone agreed to at a discount
+    // is the one outcome worse than making them try again.
+    if (coupon && !coupon.ok) {
+      return { ok: false, error: `${coupon.error} Remove it to carry on.` };
+    }
+
+    const discount = coupon?.ok ? coupon.coupon : null;
+    const total = subtotal - (discount?.amountKobo ?? 0) + shipping;
 
     const reference = newReference();
 
@@ -222,8 +388,31 @@ export async function placeOrder(
         fulfilment,
         subtotal_kobo: subtotal,
         shipping_kobo: shipping,
-        total_kobo: subtotal + shipping,
-        shipping_address: fulfilment === "shipping" ? address : null,
+        total_kobo: total,
+        // Only written when there is one, so a shop whose database predates
+        // coupons keeps taking ordinary orders.
+        ...(discount
+          ? {
+              discount_kobo: discount.amountKobo,
+              discount_code: discount.code,
+              discount_id: discount.id,
+            }
+          : {}),
+        // A collected order still has a "where": the counter they chose.
+        shipping_address:
+          fulfilment === "shipping"
+            ? address
+            : pickupAt
+              ? {
+                  phone,
+                  phones: phones.length > 1 ? phones : undefined,
+                  pickup: {
+                    name: pickupAt.name,
+                    address: pickupAt.address,
+                    note: pickupAt.note || undefined,
+                  },
+                }
+              : null,
         note: String(formData.get("note") ?? "").trim() || null,
       })
       .select("id")
@@ -272,15 +461,16 @@ export async function placeOrder(
     // ---- payment -----------------------------------------------------------
     const site = await origin();
 
-    if (!isPaystackConfigured()) {
-      // No payment provider connected yet: the order still lands, and the
-      // confirmation page says how it will be settled.
+    // No payment provider connected yet, or a coupon that covered the whole
+    // bag: either way there is nothing for Paystack to collect. The order
+    // still lands, and the confirmation page says how it will be settled.
+    if (!isPaystackConfigured() || total <= 0) {
       return { ok: true, redirect: `/order/${reference}` };
     }
 
     const { authorizationUrl } = await initializeTransaction({
       email,
-      amountKobo: subtotal + shipping,
+      amountKobo: total,
       reference,
       callbackUrl: `${site}/order/${reference}`,
       metadata: { order_id: orderId, customer_name: name },

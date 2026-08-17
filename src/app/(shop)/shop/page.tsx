@@ -4,10 +4,13 @@ import { SearchX, SlidersHorizontal } from "lucide-react";
 
 import { CategoryBar } from "@/components/shop/category-bar";
 import { ProductCard, ProductRail } from "@/components/shop/product-card";
+import { Rail } from "@/components/shop/rail";
 import { SectionHead } from "@/components/shop/section";
 import { ProductRegistry } from "@/components/shop/shop-provider";
+import { CategoryIcon } from "@/lib/category-icons";
 import { cn } from "@/lib/cn";
 import { bestSellers, getCatalogue, newIn } from "@/lib/shop-queries";
+import { getStorefront } from "@/lib/storefront";
 import type { ShopProduct } from "@/lib/shop";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +68,10 @@ export default async function ShopPage({
   searchParams: Promise<Query>;
 }) {
   const params = await searchParams;
-  const { products, categories, subcategories } = await getCatalogue();
+  const [{ products, categories, subcategories }, content] = await Promise.all([
+    getCatalogue(),
+    getStorefront(),
+  ]);
 
   const category = categories.find((entry) => entry.slug === params.category);
   const sub = params.sub?.trim() || null;
@@ -109,26 +115,43 @@ export default async function ShopPage({
     <>
       <ProductRegistry products={onPage} />
 
-      {/* Categories stay put at the top while the grid scrolls under them —
-          changing your mind is one tap, from anywhere on the page — and shrink
-          to a chip row once you're into the grid. */}
+      {/* Categories stay put at the top while the grid scrolls under them, so
+          changing your mind is one tap from anywhere on the page. */}
       <CategoryBar categories={categories} active={category?.slug} />
 
       <div className="px-4 pt-5 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-              {term
-                ? `“${params.q?.trim()}”`
-                : (category?.name ?? (onSaleOnly ? "On sale" : "Everything"))}
-            </h1>
-            <p className="mt-1 text-sm text-ink-secondary">
-              {filtered.length} piece{filtered.length === 1 ? "" : "s"}
-              {category?.description && !term && ` · ${category.description}`}
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            {/* The category's icon, at the head of its own page. The rail
+                above shows photographs; this is where the mark belongs. */}
+            {category && !term && (
+              <span className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-2xl bg-canvas-deep text-ink sm:size-12">
+                <CategoryIcon icon={category.icon} className="size-5 sm:size-6" />
+              </span>
+            )}
+
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+                {term
+                  ? `“${params.q?.trim()}”`
+                  : (category?.name ?? (onSaleOnly ? "On sale" : "Everything"))}
+              </h1>
+              {/* A category introduces itself with its description and a
+                  search with the words that were typed; the unfiltered shop
+                  had only a number until someone wrote it a line. */}
+              <p className="mt-1 text-sm text-ink-secondary">
+                {filtered.length} piece{filtered.length === 1 ? "" : "s"}
+                {!term &&
+                  (category?.description
+                    ? ` · ${category.description}`
+                    : !category && !onSaleOnly && content.shopNote
+                      ? ` · ${content.shopNote}`
+                      : "")}
+              </p>
+            </div>
           </div>
 
-          {/* `min-w-0` on the row, `.rail` on the group: without both, the
+          {/* `min-w-0` on the row, a rail around the group: without both, the
               sort options size to their content and take the page sideways
               with them. */}
           <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
@@ -139,10 +162,12 @@ export default async function ShopPage({
             <span className="sr-only" id="sort-label">
               Sort by
             </span>
-            <div
+            <Rail
               role="group"
               aria-labelledby="sort-label"
-              className="rail rail-edge rail-edge-deep gap-1.5 rounded-full bg-canvas-deep p-1"
+              tone="deep"
+              shellClassName="overflow-hidden rounded-full bg-canvas-deep p-1"
+              className="gap-1.5"
             >
               {(Object.keys(SORTS) as Sort[]).map((key) => (
                 <Link
@@ -160,12 +185,12 @@ export default async function ShopPage({
                   {SORTS[key]}
                 </Link>
               ))}
-            </div>
+            </Rail>
           </div>
         </div>
 
         {(subs.length > 0 || saleCount > 0 || filtering) && (
-          <div className="rail rail-edge mt-4 gap-2 pb-1">
+          <Rail shellClassName="mt-4" className="gap-2 pb-1">
             {saleCount > 0 && (
               <Chip
                 href={href({ sale: onSaleOnly ? undefined : "1" })}
@@ -190,7 +215,7 @@ export default async function ShopPage({
                 Clear all
               </Chip>
             )}
-          </div>
+          </Rail>
         )}
       </div>
 
@@ -202,6 +227,7 @@ export default async function ShopPage({
             <ProductCard
               key={product.id}
               product={product}
+              siblings={visible}
               priority={index < 4}
             />
           ))}

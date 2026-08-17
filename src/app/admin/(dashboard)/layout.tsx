@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/sidebar";
 import { getSession } from "@/lib/auth";
+import { getTeamSettings } from "@/lib/team";
 import { SIDEBAR_COOKIE } from "@/lib/ui-cookies";
 
 export const metadata = {
@@ -22,11 +23,16 @@ export default async function DashboardLayout({
   const session = await getSession();
   if (!session) redirect("/admin/login");
 
-  const store = await cookies();
+  const [store, team] = await Promise.all([cookies(), getTeamSettings()]);
   const collapsed = store.get(SIDEBAR_COOKIE)?.value === "collapsed";
 
   return (
-    <AdminShell email={session.email} defaultCollapsed={collapsed}>
+    <AdminShell
+      email={session.email}
+      role={session.role}
+      roleLabel={team.staffRoleName}
+      defaultCollapsed={collapsed}
+    >
       {children}
     </AdminShell>
   );

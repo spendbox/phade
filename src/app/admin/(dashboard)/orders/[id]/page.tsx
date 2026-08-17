@@ -8,6 +8,7 @@ import { ErrorNotice } from "@/components/admin/setup-notice";
 import { PaymentStatusBadge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/empty-state";
 import { Panel } from "@/components/ui/stat-tile";
+import { cn } from "@/lib/cn";
 import { formatDateTime, formatNaira } from "@/lib/format";
 import { getOrder } from "@/lib/queries";
 
@@ -101,6 +102,16 @@ export default async function OrderDetailPage({
                   {formatNaira(order.subtotal_kobo)}
                 </dd>
               </div>
+              {order.discount_kobo > 0 && (
+                <div className="flex justify-between gap-3">
+                  <dt className="min-w-0 truncate text-ink-secondary">
+                    Coupon{order.discount_code ? ` · ${order.discount_code}` : ""}
+                  </dt>
+                  <dd className="shrink-0 tabular-nums text-good-text">
+                    −{formatNaira(order.discount_kobo)}
+                  </dd>
+                </div>
+              )}
               <div className="flex justify-between">
                 <dt className="text-ink-secondary">
                   {order.fulfilment === "pickup" ? "Pickup" : "Shipping"}
@@ -209,6 +220,7 @@ export default async function OrderDetailPage({
                   {[
                     address.line1,
                     address.line2,
+                    address.area,
                     address.city,
                     address.state,
                     address.country,
@@ -219,12 +231,41 @@ export default async function OrderDetailPage({
                         {line}
                       </span>
                     ))}
-                  {address.phone && (
-                    <span className="mt-1 block text-ink-muted">
-                      {address.phone}
-                    </span>
-                  )}
+                  {/* Every number the customer gave, so a courier who can't
+                      get through has somewhere else to try. */}
+                  {(address.phones ?? [address.phone])
+                    .filter((line): line is string => Boolean(line))
+                    .map((line, index) => (
+                      <a
+                        key={line}
+                        href={`tel:${line.replace(/[^\d+]/g, "")}`}
+                        className={cn(
+                          "block text-ink-muted hover:text-ink",
+                          index === 0 && "mt-1",
+                        )}
+                      >
+                        {line}
+                        {index > 0 && (
+                          <span className="ml-1.5 text-xs">(alternate)</span>
+                        )}
+                      </a>
+                    ))}
                 </span>
+              </address>
+            ) : order.shipping_address?.pickup ? (
+              <address className="text-sm not-italic text-ink-secondary">
+                <span className="block font-medium text-ink">
+                  Collecting from {order.shipping_address.pickup.name}
+                </span>
+                {order.shipping_address.pickup.address}
+                {order.shipping_address.phone && (
+                  <a
+                    href={`tel:${order.shipping_address.phone.replace(/[^\d+]/g, "")}`}
+                    className="mt-1 block text-ink-muted hover:text-ink"
+                  >
+                    {order.shipping_address.phone}
+                  </a>
+                )}
               </address>
             ) : (
               <p className="text-sm text-ink-secondary">

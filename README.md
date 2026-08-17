@@ -14,16 +14,36 @@ buy at `/`, and everything they do shows up at `/admin`.
 
 | Page | What it does |
 | --- | --- |
-| **Landing** (`/`) | A hero told as a story: every image from Settings → Storefront becomes a frame with its own progress segment, advancing itself, tappable left and right. Categories sit under it as story rings. Featured products are posts. Then best sellers, new in, and everything else. |
-| **Shop** (`/shop`) | The catalogue, with a rail of category rings pinned under the header — it collapses to a chip row once you're into the grid, so navigation you've already read stops taking up a third of the screen. Subcategory chips, an on-sale filter, search, and five ways to sort. Every choice lives in the URL, so a narrowed shop is a link you can send someone and the back button undoes a filter. |
-| **A product** | Opens as a pop-up over whatever you were reading, never a page — the grid stays scrolled where it was, filters still on. Pictures swipe and snap, a double-tap saves, and Add to bag / Buy it now / save / share sit in a bar that never scrolls away. `/product/[slug]` renders the same thing as a real page, for shared links and search engines. |
+| **Landing** (`/`) | Built as a magazine rather than a catalogue. A hero told as a story: every image from Settings → Storefront becomes a frame with its own progress segment, advancing itself, tappable left and right. Categories sit under it as large soft-cornered squares you flick sideways through, each showing its own photograph from Settings → Categories and its icon until one is uploaded; the rail fades towards whichever side still has something behind it, and gives a cursor buttons to press. Featured pieces are a deck of cards you throw sideways, one at a time, on the one dark panel in an ivory page. Then the shop's own words, beside a picture or a clip it chose — by that point a reader has decided they like the look of the place, which is when they will read a paragraph about who chose it. Then what just landed, as tall tiles, because clothes are photographed head to hem and a wide box of a dress is a crop of the hem and the ceiling. Then best sellers and the way into the shop, whose big line counts everything actually in stock — units, not catalogue rows — until someone writes their own, over two slow clouds of brand colour that are the only moving thing on the page after the hero. Every heading, every line under one, and every button on the page is written in the dashboard. |
+| **Shop** (`/shop`) | The catalogue, with a rail of category pictures pinned under the header, and the category's icon at the head of its own page. The unfiltered view carries its own line under the count, written in the dashboard, since a category introduces itself with its description and a search with the words that were typed. Subcategory chips, an on-sale filter, search, and five ways to sort. Any row of filters wider than the screen fades at the edge it can still be scrolled towards, and stops fading once you reach the end. Every choice lives in the URL, so a narrowed shop is a link you can send someone and the back button undoes a filter. |
+| **A product** | Opens as a pop-up over whatever you were reading, never a page — the grid stays scrolled where it was, filters still on. Swiping sideways walks the row it was tapped out of, so a shopper can go through a rail or a wall of new arrivals without closing anything, and the row goes round — the last piece swipes back to the first, because a flick that does nothing reads as a broken pop-up rather than as an end. Each card arrives from the side it was pulled from rather than simply replacing the last one. A swipe that starts on the pictures still belongs to the pictures. Pictures swipe and snap one frame at a time, with the count on a dark pill so it survives a white studio backdrop; a cursor drags them across instead, or presses the dots, which are the position and the control at once; a double-tap saves; add to bag / save / share sit in a bar that never scrolls away. Once something is added the pop-up folds down to a small receipt — what went in, what the bag now holds, and the way back to shopping. `/product/[slug]` renders the same thing as a real page, for shared links and search engines. |
 | **Saved** (`/saved`) | Everything hearted on this device. No account needed. |
+| **Any sheet** | The bag and the product pop-up both rise from the bottom of a phone, and both are put away the same way: drag down and it follows your thumb, let go past the halfway point — or flick it — and it goes. Sideways is a different sentence, which a caller can claim. A sheet whose contents are scrolled is being read, so the pull scrolls it back to the top first and only then becomes a dismissal. |
 | **Bag** | A drawer, not a page, so adding something never costs anyone their place. It shows the delivery charge from the same rules checkout uses, and how much more buys free delivery. |
-| **Checkout** (`/checkout`) | Delivery or collection, contact details, address, note — filled in from last time, because a returning customer should not retype their address to buy a second dress. Picking a state prices the delivery from the shop's own zones, live. Every figure is re-derived on the server, so what the browser sends is only ever ids and quantities. Pays through Paystack; the order exists before payment starts. |
-| **Order** (`/order/[reference]`) | Where Paystack sends a shopper back to. It verifies the payment directly rather than waiting on the webhook, so the page is right immediately, and empties the bag only once the money has actually arrived. |
+| **Checkout** (`/checkout`) | Asked one step at a time — how it reaches them, who they are, where it goes, anything else — each step opening as the one before it is answered and folding into a card of what was said, which reopens with a press, so the form is a short conversation rather than three screens of boxes. A bar across the top says how far through it is and names what is being asked, because a form that reveals itself one question at a time is kinder to answer and harder to estimate. The order and the Pay button arrive together at the end, once there is an address to price them against. Filled in from last time, because a returning customer should not retype their address to buy a second dress. Phone numbers carry a dialling code, Nigeria already chosen, and there is room for a second one so a courier who can't get through has somewhere else to ring. The state is a list you type your way into rather than a wheel to spin, and choosing Lagos asks which part of Lagos, because Ikoyi and Ikorodu are not the same journey. Choosing collection asks which counter, from the addresses the shop keeps in Settings → Shipping. Picking a destination prices the delivery from the shop's own zones, live. A coupon code from a sale goes in beside the order summary and says what it takes off before anyone commits to it. Every figure is re-derived on the server, so what the browser sends is only ever ids, quantities and a code. Pays through Paystack; the order exists before payment starts. |
+| **Order** (`/order/[reference]`) | Where Paystack sends a shopper back to. It verifies the payment directly rather than waiting on the webhook, so the page is right immediately, and empties the bag only once the money has actually arrived. It also shows how far the shop has moved the order — paid, being packed, on its way, delivered — so the status the dashboard sets is the status the customer sees. |
+| **Track** (`/track`) | The same page, found again with the reference from the confirmation. No account, no login: the reference is unguessable and it is the only thing anyone needs to see where their parcel is. Somebody who can't find theirs gets the message pop-up in place rather than a link away — answering "I've lost my reference" by sending them to the shop is answering it with a shrug. |
 
 Navigation on a phone is a tab bar along the bottom — home, shop, saved, bag —
-because that is where a thumb is. On a wider screen the header takes over.
+because that is where a thumb is. On a wider screen the header takes over. A
+menu is written in the dashboard — Home, Shop, Saved, Track order and Contact
+us to begin with, whatever the shop wants after that, and one button to put the
+defaults back. It sits behind a ☰ on a phone, where there is no room for a row
+of words beside a wordmark and three icons, and centred across the header on a
+desktop, where there is.
+
+Every page ends with three promises, and each is a button rather than a
+paragraph, because each is really a question. **Delivered nationwide** opens
+the price of every zone with how long it takes, the free-delivery threshold and
+whether collection is offered — all from Settings → Shipping, so it cannot
+promise something checkout won't honour. Lagos is priced and timed
+separately: ₦3,500 within 24 hours by default, against ₦5,000 and three to four
+days for the rest of Nigeria, because a rider crosses the city in an afternoon
+and a parcel to Sokoto goes on a bus — and one figure for both is either a loss
+on every Sokoto order or a Lagos price nobody in Lagos will pay. **Paid securely** shows the channels
+Paystack handles and says plainly that the card number never reaches this shop.
+**Here to help** is a message form that goes to the address in the dashboard,
+with a WhatsApp button beside it where the shop offers one.
 
 ---
 
@@ -34,13 +54,13 @@ because that is where a thumb is. On a wider screen the header takes over.
 | **Dashboard** | Revenue over time, order status mix, top sellers, recent orders, low-stock alerts. Switchable 7 / 30 / 90 day window. |
 | **Orders** | Filter by status and type, open an order to see items, totals, payments, delivery address, and change its status. |
 | **Checkouts** | Carts that were started but never paid for, what was left in them, and how many made it through. Needs `STOREFRONT_API_KEY`. |
-| **Products** | Category, price, stock and status edit in place — changing a price shouldn't mean opening a product. Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name, price and stock side by side — autosaved as you work. Optional colourways and sizes, bulk-select rows to change status or delete. AI writes descriptions and suggests tags. SKUs generate themselves. |
+| **Products** | Category, price, stock and status edit in place — changing a price shouldn't mean opening a product. Bulk uploader: pick a category, drop in photos and videos, and every file becomes its own product to name, price and stock side by side — autosaved as you work. Optional colourways — each with its own count, which adds up to the stock on hand and takes a sold-out colour off the swatch row — and sizes, bulk-select rows to change status or delete. AI writes descriptions and suggests tags. SKUs generate themselves. |
 | **Database** | The whole catalogue as one editable spreadsheet — name, colour, size, quantity, sold, media, category, price, cost, status, SKU, subcategory, revenue and when it was added. Cells save as you leave them, new rows arrive as drafts, media / colours / sizes open in a dialog. Download the column template, import a CSV or Excel file with a progress bar, or open the sheet full screen. Falls back to cards on a phone. |
-| **Inventory** | Featured image, stock on hand and stock value, red/amber/green level indicators, one-click ±1, and a full adjustment dialog that records the reason. The five most recent movements sit on the page, with the full history one click away. |
+| **Inventory** | Featured image, stock on hand and stock value, red/amber/green level indicators, and one adjustment dialog with three ways in: add or remove, set an exact figure, or count by colourway. That last one edits each colour's number and makes their total the product's stock, which is the only way the two stay in step. Every change records its reason. The five most recent movements sit on the page, with the full history one click away. |
 | **Sales** | Start a sale across everything, chosen categories, or individual products — percentage or naira off, with an optional coupon code, schedule, minimum order and usage cap. |
 | **Payments** | Gross, fees, net and success rate from Paystack, a breakdown by channel, and the full transaction list. "Sync from Paystack" backfills on demand. |
 | **Customers** | Order counts, lifetime spend, last order, plus editable contact details and private notes. |
-| **Settings** | **General** — the default low-stock alert level. **Categories** — categories with a chosen icon (AI can grow a short description into a fuller one) and the subcategory list. **Catalogue** — the shop's colour palette and size run. **Storefront** — announcement bar, hero copy, hero images, call-to-action, featured products, the words that scroll under the hero, the footer blurb and the shop's social links. **Shipping** — the default delivery charge, a free-delivery threshold, delivery zones by state with their own prices, and whether collection is offered. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
+| **Settings** | **General** — the default low-stock alert level. **Team** — who else can sign in, what they can do, and what the limited role is called. **Categories** — categories with a chosen icon and a photograph of their own (both rails show the photograph; the icon heads the category's own page), AI to grow a short description into a fuller one, and the subcategory list. **Catalogue** — the shop's colour palette and its size runs: name a run per type of product, put any whole number from 1 to 100 in it, and a product picks which run it belongs to rather than being offered a 12 and a 38 on the same row. Clothing and shoe runs ship as standard, and one button puts them back. **Storefront** — laid out in the order the front page reads, one panel per section: the announcement bar, the hero — whose every image and clip is framed for a desktop and for a phone separately, or marked for only one of them, in an editor that opens as the file lands — the strip under it, then Collections, Featured, New in, About, Best sellers and the last block, each with its heading, its subtext and its button, and the about section carrying its own words plus a picture or a video with the placeholder frame of your choosing. Then the menu, the line under &ldquo;Everything&rdquo; at the head of the shop, the footer blurb, social links, and where a message from "Here to help" goes — an address, and a WhatsApp number if the shop wants one offered. A heading cleared to nothing takes its default back; a subtext or a button cleared to nothing stays gone. **Shipping** — two base prices with a delivery window each, one for Lagos and one for everywhere else (in hours, so "within 24 hours" is sayable), a free-delivery threshold, delivery zones by state — or as many separate Lagos zones as a shop wants, naming the parts each one covers so it prices only those and leaves the rest of Lagos for the next zone — each zone able to promise its own delivery window, whether collection is offered, and the addresses customers collect from. **Developers** — which integrations are connected, the environment variables behind them, and the Paystack webhook endpoint. |
 
 The layout is a fixed left sidebar on desktop (collapsible, remembered between
 visits) and an off-canvas drawer on mobile, with every table falling back to a
@@ -143,18 +163,22 @@ src/
       paystack/webhook/          Paystack webhook receiver
   components/
     admin/                       Shell, charts, forms, dialogs
-    shop/                        Hero, rings, cards, pop-up, bag, checkout
+    shop/                        Hero, collections, deck, wall, pop-up, bag, checkout
     ui/                          Buttons, fields, badges, panels
   lib/
-    auth.ts  session.ts          Admin credentials and session cookie
+    auth.ts  session.ts          Admin credentials, roles and session cookie
+    passwords.ts                 scrypt hashing for team logins
+    team.ts                      Who can sign in, and what they're called
     queries.ts                   All dashboard reads
     shop-queries.ts  shop.ts     All storefront reads, and what a shopper pays
+    coupons.ts                   What a code is worth against a given bag
     cart-store.ts                Writing a shopping session, from either caller
     browser-store.ts             localStorage and media queries, as React reads them
     supabase.ts  paystack.ts     Service clients
     format.ts                    Naira, dates, slugs
-    storefront.ts                Shop-front copy, stored as one settings row
-    catalogue-settings.ts        The shop's colour palette and size run
+    storefront.ts                Shop-front copy — one settings row, no migration
+    catalogue.ts                 The shop's colour palette and size runs
+    catalogue-settings.ts        …as this shop has saved them
     spreadsheet.ts               CSV and .xlsx reader, no dependencies
     xlsx-writer.ts               .xlsx writer for the import template
   proxy.ts                       Gates /admin behind a valid session
@@ -166,9 +190,18 @@ A few decisions worth knowing:
 - **Money is stored in kobo** (integers). Paystack works in kobo too, so amounts
   pass through untouched, and there is no floating-point drift. `src/lib/format.ts`
   is the only place that converts for display or parses admin input.
-- **Auth is environment-based.** The proxy gates `/admin`, and the dashboard
-  layout and every server action independently re-check the session, so nothing
-  depends on the proxy alone.
+- **The owner is an environment variable; everyone else is a row.** That login
+  works with no database at all and cannot be deleted from inside the
+  dashboard, which is what stops a shop locking itself out of its own shop.
+  Anyone else the owner adds signs in with a username and a password stored as
+  a salted scrypt hash — never recoverable, only replaceable.
+- **Two roles, one rule.** An owner sees everything; the limited role (called
+  "Sales manager" until the shop renames it) sees the order book and nothing
+  else. `canReach` in `src/lib/session.ts` is the single answer to "can they
+  see this", used by the middleware, the sidebar and the pages, so a menu can
+  never offer a door the server will refuse. The refusal that matters is
+  `requireOwner` next to each mutation: a server action is a URL, and a URL can
+  be called by anything.
 - **Stock changes are always logged.** Editing stock on the product page, using
   ±1, or using the adjustment dialog all write an `inventory_movements` row, so
   the history is a complete account rather than just a current number.
@@ -176,6 +209,61 @@ A few decisions worth knowing:
   signed URL and PUTs the file itself, so videos aren't limited by the
   serverless request body size. Images are downscaled before they leave the
   browser; videos are stored as-is.
+- **A web address is not a text box.** A slug is made from the name and never
+  shown while something is being created — there is nothing to decide yet. Once
+  it exists the address is out in the world, so it is displayed locked, and
+  changing it takes a deliberate press and a dialog that says what breaks:
+  every link already shared, and the search results that had found the page.
+- **Buttons point at pages, not at paths.** Every link a shop owner sets on
+  the front page is chosen from a searchable list of the shop's own pages —
+  collections, products, the shop, saved, tracking — rather than typed. A
+  mistyped path is a button that goes nowhere, found by a customer rather than
+  by the person who wrote it. Pasting a full address still works.
+- **Clips are trimmed without being re-encoded.** The in and out points ride
+  in the URL as a media fragment (`#t=1.4,8.2`) — the standard way to name a
+  range of a video, which browsers play by themselves — so cutting the wobbly
+  first second off a clip is instant, works from a phone on mobile data, and
+  can be undone later with nothing lost. The file in storage is never touched.
+  The placeholder is a real still: scrub to the frame worth showing, and it is
+  drawn to a canvas, encoded as WebP and uploaded like any other picture.
+- **A clip is never a black box.** A product whose cover is a video borrows the
+  next photograph in the same product as its poster, and where there isn't one
+  the browser is asked for the frame a tenth of a second in — a few kilobytes,
+  and a picture instead of a black rectangle. The dashboard's thumbnails do the
+  same.
+- **Playback is driven, not requested.** `autoplay` is answered once, when the
+  element is created, and browsers routinely decline it for a video that
+  appears inside a pop-up or becomes the frame in view after a swipe — which
+  left clips sitting on their posters. So whichever frame is being looked at is
+  told to play and every other one is told to stop, and the ask is repeated
+  each time that changes. Always muted, which is both good manners and the one
+  case every browser allows without a tap. The file streams at whatever it was
+  uploaded at; nothing is re-encoded or downscaled.
+- **The hero is cropped twice.** A photograph shot for a shop is usually
+  portrait, so a 16:9 slice of it keeps the waist and loses the face, while the
+  same file in a phone's frame keeps the whole model. Showing the whole picture
+  over a blurred copy of itself was a workaround for a decision nobody had been
+  given a way to make; now the shop makes it, once per shape, in an editor that
+  opens as the file lands. A shot that only works in one shape can say so and
+  simply won't appear on the other. Both answers ride in the URL fragment, and
+  a media query picks between them — so the crop is right on the first paint
+  rather than after the browser has told us how wide it is.
+- **The shop chooses where a picture is framed.** Every surface crops — a
+  square tile, a 3:4 card, a hero — and a centred crop takes the head off a
+  studio shot as happily as the hem. So each uploaded picture carries a
+  framing chosen on a three-by-three grid over the thumbnail itself, and it
+  rides in the URL's fragment (`…/dress.webp#pos=top`). A fragment is never
+  sent to a server, so the file resolves exactly as it did before, every URL
+  already stored keeps working, and no column had to change shape to hold nine
+  words.
+- **HEIC is converted, not refused.** It is what an iPhone takes photographs
+  in, so rejecting it asks a shop owner to do the computer's job. What lands in
+  storage is always a WebP, because half the browsers in the world can't
+  display a HEIC and a shopper would get a broken picture rather than a
+  photograph. Safari decodes it natively; everywhere else lazy-loads a decoder,
+  downloaded only by the shop that actually uploads one. A `.heic` whose type
+  the browser reports as the empty string — Chrome on Windows does this — is
+  recognised by its extension.
 - **The bulk uploader autosaves to the browser.** Drafts live in `localStorage`
   until you publish, so a closed tab or a refresh doesn't lose a batch. Nothing
   is written to the database until you hit Publish.
@@ -183,6 +271,13 @@ A few decisions worth knowing:
   quantities and nothing else; every price, every running sale and the delivery
   charge are resolved on the server against the catalogue as it stands. A bag is
   a request, not a quote.
+- **A coupon is worth what the shop says it is worth.** The checkout asks the
+  server what a code does to this exact bag, and asks again whenever the bag
+  changes — but the answer it shows is only a quote. `placeOrder` runs the same
+  check on the lines it is about to charge for, and a code that expired or ran
+  out in between stops the order rather than quietly billing full price. Usage
+  is counted on the pending → paid transition, beside the stock, so a limited
+  code isn't spent by a payment nobody completed.
 - **An order exists before the payment does.** It is written with our own
   reference, then Paystack is opened with that reference — so an abandoned
   payment leaves a pending order the dashboard can chase rather than nothing at
@@ -230,9 +325,35 @@ A few decisions worth knowing:
   from `NEXT_PUBLIC_SUPABASE_URL` in `next.config.ts` — so each surface gets the
   width it renders at, in AVIF or WebP. Anything from another host, or an SVG,
   falls back to a plain `<img>`, because the optimiser refuses hosts it wasn't
-  told about and a broken picture is worse than an unoptimised one. The hover
-  image on a card is `hidden lg:block` for the same reason: a phone has no
-  hover, and would otherwise download a second photo nobody can see.
+  told about and a broken picture is worse than an unoptimised one. A card
+  shows the one photograph the shop chose to lead with and keeps showing it:
+  a tile that swaps its picture under a passing cursor makes a grid twitch on
+  the way to somewhere else, and downloads a second photo to do it.
+- **Nothing waits on a blank screen.** Every route ships a skeleton of itself,
+  streamed the moment someone asks for it, so a slow connection shows the shape
+  of the page rather than white — which is indistinguishable from a page that
+  failed. Photographs load lazily and shimmer while they do, and the shimmer
+  sits *under* the picture rather than in place of it, so nothing swaps and
+  nothing jumps. An image already in cache is caught by a `complete` check in
+  the ref, since its load event fired before React was attached.
+- **Uploads report the real figure.** `fetch` cannot say how far a PUT has got —
+  it resolves at the end and says nothing before — so a shop owner pushing a
+  40MB clip on a phone tether watched a spinner that never distinguished slow
+  from stuck. That one call is on XMLHttpRequest, which reports upload
+  progress, and the bar is the browser's own number rather than a guess on a
+  timer.
+- **A button that did something says so.** Add to bag *becomes* a tick for a
+  second and then comes back — both glyphs drawn, stacked, cross-faded through
+  a quarter-turn, so it is a movement rather than a swap someone has to notice.
+  Share and the quick-add on a card do the same. On a phone whatever changed is
+  usually off screen, and silence at the moment of pressing is what makes
+  someone press again.
+- **Messages need a mail provider, and work without one.** "Here to help" sends
+  through Resend when `RESEND_API_KEY` is set. When it isn't — which is the
+  state a shop is in the day it opens — the answer says so and hands the whole
+  message to the shopper's own mail app, already written and addressed. A form
+  that silently drops what somebody took the trouble to type is worse than one
+  that takes an extra tap.
 - **Cart tracking is opt-in and closed by default.** `/api/cart` is for a
   separate front end: it writes without an admin session, so it answers `501`
   until `STOREFRONT_API_KEY` is set and `401` to anyone who doesn't send it. Our

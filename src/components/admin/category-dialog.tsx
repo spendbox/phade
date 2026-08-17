@@ -8,6 +8,8 @@ import {
   type CategoryFormState,
 } from "@/app/admin/(dashboard)/settings/categories/actions";
 import { IconPicker } from "@/components/admin/icon-picker";
+import { ImageUploader } from "@/components/admin/image-uploader";
+import { SlugField } from "@/components/admin/slug-field";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Field, Input, NumberInput, Textarea } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
@@ -97,6 +99,8 @@ function CategoryForm({
 }) {
   const [name, setName] = useState(category?.name ?? "");
   const [description, setDescription] = useState(category?.description ?? "");
+  const [image, setImage] = useState(category?.image_url ?? "");
+  const [slug, setSlug] = useState(category?.slug ?? "");
   const [writing, setWriting] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -133,8 +137,23 @@ function CategoryForm({
         />
       </Field>
 
-      <Field label="Icon" hint="Shown wherever this category appears">
+      <Field label="Icon" hint="Stands for this category in the shop's menu">
         <IconPicker defaultValue={category?.icon} />
+      </Field>
+
+      {/* The uploader speaks in lists; the column holds one URL. */}
+      <input type="hidden" name="image_url" value={image} />
+      <Field
+        label="Picture"
+        hint="Shown on the front page. Without one, the icon stands in."
+      >
+        <ImageUploader
+          name="category_image_upload"
+          limit={1}
+          initial={image ? [image] : []}
+          onChange={(media) => setImage(media[0] ?? "")}
+          hint="One photograph — it is shown as a circle, so keep the subject centred."
+        />
       </Field>
 
       <Field
@@ -170,14 +189,13 @@ function CategoryForm({
 
       {aiError && <p className="text-sm text-critical">{aiError}</p>}
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Slug" htmlFor="category-slug" hint="Leave blank to generate">
-          <Input
-            id="category-slug"
-            name="slug"
-            defaultValue={category?.slug ?? ""}
-          />
-        </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SlugField
+          value={slug}
+          onChange={setSlug}
+          prefix="/shop?category="
+          editing={Boolean(category)}
+        />
         <Field label="Sort order" htmlFor="category-sort" hint="Lower shows first">
           <NumberInput
             id="category-sort"

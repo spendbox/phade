@@ -3,9 +3,14 @@
 import { useState } from "react";
 import { Heart, Share2, ShoppingBag } from "lucide-react";
 
+import { Morph, useConfirmed } from "@/components/shop/confirm";
 import { useShop } from "@/components/shop/shop-provider";
 import { cn } from "@/lib/cn";
-import { MAX_LINE_QUANTITY, type ShopProduct } from "@/lib/shop";
+import {
+  LOW_STOCK_SHOWS_AT,
+  MAX_LINE_QUANTITY,
+  type ShopProduct,
+} from "@/lib/shop";
 
 /**
  * Choosing and buying: colour, size, how many, and the four things a shopper
@@ -29,7 +34,29 @@ import { MAX_LINE_QUANTITY, type ShopProduct } from "@/lib/shop";
 
 export type BuyControls = ReturnType<typeof useBuyControls>;
 
-export function useBuyControls(product: ShopProduct) {
+/** What a shopper settled on, handed back the moment it lands in the bag. */
+export type AddedChoice = {
+  color: string | null;
+  size: number | null;
+  quantity: number;
+};
+
+/** How many of one colourway are left, when the shop counts them that way. */
+function leftIn(product: ShopProduct, color: string | null): number | null {
+  if (!color) return null;
+  const chosen = product.colors.find((option) => option.name === color);
+  return chosen?.stock === undefined ? null : chosen.stock;
+}
+
+export function useBuyControls(
+  product: ShopProduct,
+  /**
+   * Told when something is actually added. A caller that takes this on also
+   * takes on saying so — the toast stands down, because the pop-up answers by
+   * folding itself down into a receipt instead.
+   */
+  onAdded?: (choice: AddedChoice) => void,
+) {
   const { addToBag, isSaved, toggleSaved, say } = useShop();
 
   const soldOut = product.stock <= 0;
@@ -44,7 +71,11 @@ export function useBuyControls(product: ShopProduct) {
   const [quantity, setQuantity] = useState(1);
   const [missing, setMissing] = useState<"color" | "size" | null>(null);
 
-  const ceiling = Math.max(1, Math.min(product.stock, MAX_LINE_QUANTITY));
+  // A colourway with its own count is the ceiling: there is no use letting
+  // someone order four of a dress when only one of them is in emerald.
+  const inColour = leftIn(product, color);
+  const available = inColour === null ? product.stock : inColour;
+  const ceiling = Math.max(1, Math.min(available, MAX_LINE_QUANTITY));
 
   function add(): boolean {
     if (soldOut) return false;
@@ -54,6 +85,11 @@ export function useBuyControls(product: ShopProduct) {
       say("Choose a colour first");
       return false;
     }
+    if (inColour !== null && inColour <= 0) {
+      setMissing("color");
+      say(`${color} has sold out — try another colour`);
+      return false;
+    }
     if (product.sizes.length > 0 && size === null) {
       setMissing("size");
       say("Choose a size first");
@@ -61,7 +97,8 @@ export function useBuyControls(product: ShopProduct) {
     }
 
     setMissing(null);
-    addToBag({ product, color, size, quantity });
+    addToBag({ product, color, size, quantity, quiet: Boolean(onAdded) });
+    onAdded?.({ color, size, quantity });
     return true;
   }
 
@@ -74,6 +111,8 @@ export function useBuyControls(product: ShopProduct) {
     quantity,
     missing,
     ceiling,
+    /** What's left in the chosen colourway, or null when nobody counts them. */
+    inColour,
     choose(next: { color?: string; size?: number }) {
       if (next.color !== undefined) setColor(next.color);
       if (next.size !== undefined) setSize(next.size);
@@ -132,29 +171,51 @@ export function BuyChoices({
           >
             Colour
             {color && <span className="text-ink"> · {color}</span>}
+            {controls.inColour !== null &&
+              controls.inColour > 0 &&
+              controls.inColour <= LOW_STOCK_SHOWS_AT && (
+                <span className="ml-1.5 text-brand">
+                  only {controls.inColour} left
+                </span>
+              )}
           </legend>
           <div className="mt-2 flex flex-wrap gap-2">
             {product.colors.map((option) => {
               const chosen = option.name === color;
+              const gone = option.stock !== undefined && option.stock <= 0;
+
               return (
                 <button
                   key={option.name}
                   type="button"
+                  disabled={gone}
                   onClick={() => controls.choose({ color: option.name })}
                   aria-pressed={chosen}
-                  title={option.name}
+                  title={gone ? `${option.name} — sold out` : option.name}
                   className={cn(
-                    "flex size-9 items-center justify-center rounded-full ring-1 transition",
+                    "relative flex size-9 items-center justify-center rounded-full ring-1 transition",
                     chosen
                       ? "ring-2 ring-noir ring-offset-2 ring-offset-canvas"
                       : "ring-line-strong hover:ring-noir",
+                    gone && "cursor-not-allowed opacity-40 hover:ring-line-strong",
                   )}
                 >
                   <span
                     className="size-7 rounded-full"
                     style={{ background: option.hex }}
                   />
-                  <span className="sr-only">{option.name}</span>
+                  {gone && (
+                    // A line through it: the swatch is still legible, and it is
+                    // obvious why it can't be pressed.
+                    <span
+                      aria-hidden
+                      className="absolute inset-x-0 top-1/2 h-px -rotate-45 bg-ink"
+                    />
+                  )}
+                  <span className="sr-only">
+                    {option.name}
+                    {gone ? " — sold out" : ""}
+                  </span>
                 </button>
               );
             })}
@@ -237,6 +298,8 @@ export function BuyActions({
   className?: string;
 }) {
   const { soldOut, saved } = controls;
+  const [added, confirm] = useConfirmed();
+  const [shared, confirmShare] = useConfirmed();
 
   return (
     <div className={className}>
@@ -256,21 +319,56 @@ export function BuyActions({
 
         <button
           type="button"
-          onClick={controls.share}
+          onClick={() => {
+            controls.share();
+            confirmShare();
+          }}
           aria-label="Share"
           className="flex size-12 shrink-0 items-center justify-center rounded-full bg-canvas-deep text-ink transition hover:bg-line-strong active:scale-90"
         >
-          <Share2 className="size-5" aria-hidden />
+          <Morph confirming={shared} className="size-5">
+            <Share2 className="size-5" aria-hidden />
+          </Morph>
         </button>
 
+        {/* The button answers for itself. Whatever it dropped into the bag is
+            off the top of the screen on a phone, and silence at the moment of
+            pressing is what makes someone press again. */}
         <button
           type="button"
-          onClick={controls.add}
+          onClick={() => {
+            if (controls.add()) confirm();
+          }}
           disabled={soldOut}
-          className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-noir text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-40"
+          className={cn(
+            "flex h-12 flex-1 items-center justify-center gap-2 rounded-full text-sm font-semibold text-white transition-colors duration-300 disabled:cursor-not-allowed disabled:opacity-40",
+            added ? "bg-brand" : "bg-noir hover:bg-brand",
+          )}
         >
-          <ShoppingBag className="size-4" aria-hidden />
-          {soldOut ? "Sold out" : "Add to bag"}
+          <Morph confirming={added}>
+            <ShoppingBag className="size-4" aria-hidden />
+          </Morph>
+          {/* The words cross-fade in place rather than the button re-laying
+              itself out around a shorter label. */}
+          <span className="relative grid place-items-center">
+            <span
+              className={cn(
+                "col-start-1 row-start-1 transition-all duration-300",
+                added ? "-translate-y-1 opacity-0" : "translate-y-0 opacity-100",
+              )}
+            >
+              {soldOut ? "Sold out" : "Add to bag"}
+            </span>
+            <span
+              aria-live="polite"
+              className={cn(
+                "col-start-1 row-start-1 transition-all duration-300",
+                added ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
+              )}
+            >
+              In your bag
+            </span>
+          </span>
         </button>
       </div>
 

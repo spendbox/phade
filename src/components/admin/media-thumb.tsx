@@ -1,20 +1,31 @@
 import { ImageIcon } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { isVideoUrl } from "@/lib/media";
+import {
+  firstFrame,
+  isVideoUrl,
+  objectPosition,
+  readFocus,
+} from "@/lib/media";
 
 /**
  * Renders a piece of product media. Videos get a real <video> element so the
  * admin can scrub what they uploaded rather than guessing from a filename.
+ *
+ * It crops the way the shop does, framing included, so the thumbnail beside a
+ * product is the picture a shopper will actually see.
  */
 export function MediaThumb({
   url,
   className,
   controls = false,
+  style,
 }: {
   url?: string | null;
   className?: string;
   controls?: boolean;
+  /** Overrides the framing — for a preview of a crop being chosen. */
+  style?: React.CSSProperties;
 }) {
   if (!url) {
     return (
@@ -30,14 +41,19 @@ export function MediaThumb({
     );
   }
 
-  if (isVideoUrl(url)) {
+  const { src, focus } = readFocus(url);
+  const framing = { objectPosition: objectPosition(focus), ...style };
+
+  if (isVideoUrl(src)) {
     return (
       <video
-        src={url}
-        className={cn("bg-ink object-cover", className)}
+        // A frame to look at rather than a black rectangle: see `firstFrame`.
+        src={firstFrame(src)}
+        preload="metadata"
+        style={framing}
+        className={cn("bg-plane object-cover", className)}
         muted
         playsInline
-        preload="metadata"
         controls={controls}
       />
     );
@@ -46,9 +62,10 @@ export function MediaThumb({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={url}
+      src={src}
       alt=""
       loading="lazy"
+      style={framing}
       className={cn("object-cover", className)}
     />
   );

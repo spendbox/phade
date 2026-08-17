@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Loader2, MapPin, Plus, Trash2 } from "lucide-react";
+import { Clock, Loader2, MapPin, Plus, Trash2 } from "lucide-react";
 
 import {
   saveShipping,
@@ -13,7 +13,13 @@ import { Panel } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
 import { formatNairaShort, koboToNairaInput, nairaToKobo } from "@/lib/format";
 import {
+  AREA_STATE,
+  coversLagos,
+  formatEta,
+  LAGOS_AREAS,
   NIGERIAN_STATES,
+  type DeliveryEta,
+  type PickupLocation,
   type ShippingSettings,
   type ShippingZone,
 } from "@/lib/shipping";
@@ -39,10 +45,37 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
   );
 
   const [zones, setZones] = useState<ShippingZone[]>(shipping.zones);
-  const [pickup, setPickup] = useState(shipping.pickupEnabled);
+  const [eta, setEta] = useState<DeliveryEta>(shipping.eta);
+  const [lagosEta, setLagosEta] = useState<DeliveryEta>(shipping.lagosEta);
+  /**
+   * The zone just added, so it can be brought into view. The button that adds
+   * one sits in the panel's header and the zone lands at the foot of a list
+   * that is already several zones and thirty-odd state chips long — pressing
+   * it off a phone looked like pressing a button that did nothing.
+   */
+  const [added, setAdded] = useState<string | null>(null);
 
+  const reveal = (node: HTMLInputElement | null) => {
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+    node.focus({ preventScroll: true });
+    setAdded(null);
+  };
+  const [pickup, setPickup] = useState(shipping.pickupEnabled);
+  const [places, setPlaces] = useState<PickupLocation[]>(
+    shipping.pickupLocations,
+  );
+
+  // Only a zone that takes a whole state claims it. A zone built out of parts
+  // of Lagos leaves Lagos free for the next one — which is the whole point of
+  // having more than one Lagos zone.
   const claimed = new Set(
-    zones.flatMap((zone) => zone.states.map((name) => name.toLowerCase())),
+    zones
+      .filter((zone) => zone.areas.length === 0)
+      .flatMap((zone) => zone.states.map((name) => name.toLowerCase())),
+  );
+  const claimedAreas = new Set(
+    zones.flatMap((zone) => zone.areas.map((name) => name.toLowerCase())),
   );
 
   function update(id: string, patch: Partial<ShippingZone>) {
@@ -55,33 +88,64 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
     <form action={formAction} className="space-y-5">
       <input type="hidden" name="zones" value={JSON.stringify(zones)} />
 
-      <Panel title="Everywhere else">
+      <Panel title="The two base prices">
         <div className="space-y-4">
+          <p className="text-sm text-ink-secondary">
+            A rider crosses Lagos in an afternoon; a parcel to Sokoto goes on a
+            bus. One price for both is a loss on every Sokoto order or a Lagos
+            price nobody in Lagos will pay — so the two are asked separately.
+            Zones below override either of them.
+          </p>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label="Default delivery charge"
-              htmlFor="default_fee"
-              hint="What a state with no zone of its own costs."
+              label="Within Lagos"
+              htmlFor="lagos_fee"
+              hint={`Arrives "${formatEta(lagosEta).toLowerCase()}".`}
             >
-              <MoneyInput
-                id="default_fee"
-                name="default_fee"
-                defaultValue={koboToNairaInput(shipping.defaultFeeKobo)}
-              />
+              <div className="space-y-2">
+                <MoneyInput
+                  id="lagos_fee"
+                  name="lagos_fee"
+                  defaultValue={koboToNairaInput(shipping.lagosFeeKobo)}
+                />
+                <EtaFields value={lagosEta} onChange={setLagosEta} />
+              </div>
             </Field>
 
             <Field
-              label="Free delivery over"
-              htmlFor="free_over"
-              hint="Spend this much and delivery is free. Set 0 to always charge."
+              label="Outside Lagos"
+              htmlFor="default_fee"
+              hint={`Arrives "${formatEta(eta).toLowerCase()}". What a state with no zone of its own costs.`}
             >
-              <MoneyInput
-                id="free_over"
-                name="free_over"
-                defaultValue={koboToNairaInput(shipping.freeOverKobo)}
-              />
+              <div className="space-y-2">
+                <MoneyInput
+                  id="default_fee"
+                  name="default_fee"
+                  defaultValue={koboToNairaInput(shipping.defaultFeeKobo)}
+                />
+                <EtaFields value={eta} onChange={setEta} />
+              </div>
             </Field>
           </div>
+
+          <Field
+            label="Free delivery over"
+            htmlFor="free_over"
+            hint="Spend this much and delivery is free, wherever it's going. Set 0 to always charge."
+          >
+            <MoneyInput
+              id="free_over"
+              name="free_over"
+              defaultValue={koboToNairaInput(shipping.freeOverKobo)}
+            />
+          </Field>
+          <input type="hidden" name="eta" value={JSON.stringify(eta)} />
+          <input
+            type="hidden"
+            name="lagos_eta"
+            value={JSON.stringify(lagosEta)}
+          />
         </div>
       </Panel>
 
@@ -90,18 +154,22 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
         action={
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              const id = `zone_${Date.now()}`;
               setZones((current) => [
                 ...current,
                 {
-                  id: `zone_${Date.now()}`,
+                  id,
                   name: "",
                   states: [],
+                  areas: [],
                   feeKobo: shipping.defaultFeeKobo,
+                  eta: null,
                   freeOverKobo: null,
                 },
-              ])
-            }
+              ]);
+              setAdded(id);
+            }}
             className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
           >
             <Plus className="size-3.5" />
@@ -123,6 +191,7 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                     <Field label="Zone name" htmlFor={`name-${zone.id}`}>
                       <Input
                         id={`name-${zone.id}`}
+                        ref={zone.id === added ? reveal : undefined}
                         value={zone.name}
                         onChange={(event) =>
                           update(zone.id, { name: event.target.value })
@@ -182,6 +251,44 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                   </button>
                 </div>
 
+                {/* Somewhere further away takes longer, and a shop that has
+                    bothered to price it separately usually knows by how much. */}
+                <div className="mt-3">
+                  {zone.eta ? (
+                    <Field
+                      label="How long this zone takes"
+                      hint={`Shoppers going here are told "${formatEta(zone.eta)}".`}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <EtaFields
+                          value={zone.eta}
+                          onChange={(next) => update(zone.id, { eta: next })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => update(zone.id, { eta: null })}
+                          className="text-xs font-medium text-ink-secondary underline underline-offset-4 hover:text-ink"
+                        >
+                          Use the shop-wide window
+                        </button>
+                      </div>
+                    </Field>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        update(zone.id, {
+                          eta: { ...(coversLagos(zone) ? lagosEta : eta) },
+                        })
+                      }
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+                    >
+                      <Clock className="size-3.5" />
+                      This zone takes longer
+                    </button>
+                  )}
+                </div>
+
                 <fieldset className="mt-3">
                   <legend className="flex items-center gap-1.5 text-[13px] font-medium text-ink-secondary">
                     <MapPin className="size-3.5 text-ink-muted" />
@@ -226,6 +333,79 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
                     })}
                   </div>
                 </fieldset>
+
+                {/* Lagos is twenty million people and an hour's drive
+                    across, so it can be split as finely as a shop likes: name
+                    the parts a zone covers and it prices only those, which
+                    leaves the rest of Lagos for the next zone. */}
+                {zone.areas.length === 0 &&
+                  !zone.states.includes(AREA_STATE) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        update(zone.id, { areas: [LAGOS_AREAS[0]] })
+                      }
+                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+                    >
+                      <Plus className="size-3.5" />
+                      Price parts of Lagos separately
+                    </button>
+                  )}
+
+                {(zone.states.includes(AREA_STATE) ||
+                  zone.areas.length > 0) && (
+                  <fieldset className="mt-3">
+                    <legend className="flex items-center gap-1.5 text-[13px] font-medium text-ink-secondary">
+                      <MapPin className="size-3.5 text-ink-muted" />
+                      Parts of Lagos
+                      <span className="text-ink-muted">
+                        ({zone.areas.length === 0
+                          ? "all of it"
+                          : zone.areas.length})
+                      </span>
+                    </legend>
+
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {LAGOS_AREAS.map((area) => {
+                        const chosen = zone.areas.includes(area);
+                        const taken =
+                          !chosen && claimedAreas.has(area.toLowerCase());
+
+                        return (
+                          <button
+                            key={area}
+                            type="button"
+                            disabled={taken}
+                            onClick={() =>
+                              update(zone.id, {
+                                areas: chosen
+                                  ? zone.areas.filter((entry) => entry !== area)
+                                  : [...zone.areas, area],
+                              })
+                            }
+                            aria-pressed={chosen}
+                            className={cn(
+                              "rounded-full px-2.5 py-1 text-xs transition",
+                              chosen
+                                ? "bg-noir font-medium text-white"
+                                : taken
+                                  ? "cursor-not-allowed bg-surface text-ink-muted opacity-50"
+                                  : "bg-surface text-ink-secondary hover:bg-line-strong hover:text-ink",
+                            )}
+                          >
+                            {area}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <p className="mt-2 text-xs text-ink-muted">
+                      {zone.areas.length === 0
+                        ? "None picked, so this zone covers all of Lagos. Pick some and it covers only those — and Lagos stays available for another zone at another price."
+                        : "This zone covers only these parts, at this price. Anywhere in Lagos nobody has named falls to a whole-Lagos zone, or to the default."}
+                    </p>
+                  </fieldset>
+                )}
               </li>
             ))}
           </ul>
@@ -251,15 +431,122 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
           <Field
             label="What to tell them"
             htmlFor="pickup_note"
-            hint="Where to come, and when. Shown at checkout and on the order."
+            hint="Shown at checkout and on the order, under whichever counter they chose."
           >
             <Input
               id="pickup_note"
               name="pickup_note"
               defaultValue={shipping.pickupNote}
               disabled={!pickup}
-              placeholder="Collect from the studio, Mon–Sat, 10am–6pm."
+              placeholder="Collect Mon–Sat, 10am–6pm."
             />
+          </Field>
+
+          <input
+            type="hidden"
+            name="pickup_locations"
+            value={JSON.stringify(places)}
+          />
+
+          <Field
+            label="Where they collect from"
+            hint={
+              places.length === 0
+                ? "No address yet — the checkout just says collection is free."
+                : `${places.length} to choose from at checkout.`
+            }
+            action={
+              <button
+                type="button"
+                onClick={() =>
+                  setPlaces((current) => [
+                    ...current,
+                    {
+                      id: `place_${Date.now()}`,
+                      name: "",
+                      address: "",
+                      note: "",
+                    },
+                  ])
+                }
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+              >
+                <Plus className="size-3.5" />
+                Add an address
+              </button>
+            }
+          >
+            {places.length === 0 ? (
+              <p className="rounded-lg bg-plane px-3 py-5 text-center text-sm text-ink-muted">
+                Add the shop, the studio, wherever a customer can walk in.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {places.map((place) => (
+                  <li key={place.id} className="rounded-xl bg-plane p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="grid flex-1 gap-3">
+                        <Input
+                          value={place.name}
+                          onChange={(event) =>
+                            setPlaces((current) =>
+                              current.map((entry) =>
+                                entry.id === place.id
+                                  ? { ...entry, name: event.target.value }
+                                  : entry,
+                              ),
+                            )
+                          }
+                          placeholder="The studio"
+                          aria-label="Name"
+                        />
+                        <Input
+                          value={place.address}
+                          onChange={(event) =>
+                            setPlaces((current) =>
+                              current.map((entry) =>
+                                entry.id === place.id
+                                  ? { ...entry, address: event.target.value }
+                                  : entry,
+                              ),
+                            )
+                          }
+                          placeholder="12 Awolowo Road, Ikoyi, Lagos"
+                          aria-label="Address"
+                        />
+                        <Input
+                          value={place.note}
+                          onChange={(event) =>
+                            setPlaces((current) =>
+                              current.map((entry) =>
+                                entry.id === place.id
+                                  ? { ...entry, note: event.target.value }
+                                  : entry,
+                              ),
+                            )
+                          }
+                          placeholder="Mon–Sat, 10am–6pm · ring the bell at the black gate"
+                          aria-label="Opening hours or directions"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPlaces((current) =>
+                            current.filter((entry) => entry.id !== place.id),
+                          )
+                        }
+                        aria-label={`Remove ${place.name || "address"}`}
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-critical-soft hover:text-critical"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Field>
         </div>
       </Panel>
@@ -286,5 +573,56 @@ export function ShippingForm({ shipping }: { shipping: ShippingSettings }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * A delivery window, as two numbers.
+ *
+ * Hours rather than days: a Lagos shop delivering the same afternoon would
+ * otherwise have to write "0 days", and "within 24 hours" is the promise a
+ * shopper here is used to reading. Setting both ends the same says one figure
+ * rather than a range, which is what most shops mean.
+ */
+function EtaFields({
+  value,
+  onChange,
+}: {
+  value: DeliveryEta;
+  onChange: (next: DeliveryEta) => void;
+}) {
+  const hours = (raw: string) => Math.min(Math.max(Number(raw) || 1, 1), 336);
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="number"
+        min={1}
+        max={336}
+        step={1}
+        inputMode="numeric"
+        value={value.minHours}
+        aria-label="Fastest, in hours"
+        onChange={(event) =>
+          onChange({ ...value, minHours: hours(event.target.value) })
+        }
+        className="h-10 w-20 rounded-lg bg-surface px-3 text-sm tabular-nums text-ink shadow-[0_0_0_1px_rgb(11_11_12_/_0.10)] focus:shadow-[0_0_0_2px_var(--color-brand)] focus:outline-none"
+      />
+      <span className="text-sm text-ink-muted">to</span>
+      <input
+        type="number"
+        min={1}
+        max={336}
+        step={1}
+        inputMode="numeric"
+        value={value.maxHours}
+        aria-label="Slowest, in hours"
+        onChange={(event) =>
+          onChange({ ...value, maxHours: hours(event.target.value) })
+        }
+        className="h-10 w-20 rounded-lg bg-surface px-3 text-sm tabular-nums text-ink shadow-[0_0_0_1px_rgb(11_11_12_/_0.10)] focus:shadow-[0_0_0_2px_var(--color-brand)] focus:outline-none"
+      />
+      <span className="text-sm text-ink-muted">hours</span>
+    </div>
   );
 }

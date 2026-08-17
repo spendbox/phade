@@ -9,8 +9,200 @@ const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v", ".ogv"];
 
 export function isVideoUrl(url: string | null | undefined): boolean {
   if (!url) return false;
-  const path = url.split("?")[0].toLowerCase();
+  const path = url.split("#")[0].split("?")[0].toLowerCase();
   return VIDEO_EXTENSIONS.some((extension) => path.endsWith(extension));
+}
+
+/**
+ * The still to show for a product whose cover is a clip.
+ *
+ * A `<video>` with nothing to hold on paints black until it has downloaded
+ * enough to decode a frame — so a shop that leads with video gets a grid of
+ * black rectangles, which reads as broken rather than as film. The next
+ * photograph in the same product is the honest stand-in: it is the same piece,
+ * shot by the same person, on the same day.
+ */
+export function posterFor(media: string[]): string | null {
+  return media.find((url) => !isVideoUrl(url)) ?? null;
+}
+
+/**
+ * Asks the browser for one frame.
+ *
+ * A media fragment of `#t=0.1` tells it to seek a tenth of a second in, which
+ * every browser will do off `preload="metadata"` — a few kilobytes rather than
+ * the whole clip — and paint what it finds. It is the difference between a
+ * black box and a picture for a product with no photograph to fall back on.
+ */
+export function firstFrame(url: string): string {
+  return url.includes("#t=") ? url : `${url}#t=0.1`;
+}
+
+// ---------------------------------------------------------------------------
+// Where a picture is framed
+// ---------------------------------------------------------------------------
+
+/**
+ * Which part of a picture to keep when a box crops it.
+ *
+ * Every surface in the shop crops: a square tile, a 3:4 card, a hero. A studio
+ * shot of a dress with the model's head near the top loses the head to a
+ * centred crop, and the shop owner is the only person who knows which part of
+ * their own photograph matters. So they choose, once, when they upload it.
+ *
+ * The choice rides along in the URL's fragment — `…/dress.webp#pos=top`.
+ * A fragment is never sent to a server, so the file still resolves exactly as
+ * it did before, every URL already stored keeps working untouched, and no
+ * column had to change shape to hold nine words.
+ */
+export const FOCUS_POSITIONS = {
+  "top-left": "0% 0%",
+  top: "50% 0%",
+  "top-right": "100% 0%",
+  left: "0% 50%",
+  center: "50% 50%",
+  right: "100% 50%",
+  "bottom-left": "0% 100%",
+  bottom: "50% 100%",
+  "bottom-right": "100% 100%",
+} as const;
+
+export type Focus = keyof typeof FOCUS_POSITIONS;
+
+export const FOCUS_KEYS = Object.keys(FOCUS_POSITIONS) as Focus[];
+
+function isFocus(value: string): value is Focus {
+  return value in FOCUS_POSITIONS;
+}
+
+/**
+ * Everything the shop has decided about one piece of media, carried in the
+ * URL's fragment.
+ *
+ * `…/dress.webp#pos=top` frames a photograph. `…/clip.mp4#t=1.4,8.2` trims a
+ * video to the seconds worth keeping — that is the standard media fragment,
+ * which browsers honour without any help from us, so "trimming" costs no
+ * re-encoding and no upload. `…&poster=<url>` is the still to hold on before
+ * it plays.
+ *
+ * All of it lives in the fragment because a fragment is never sent to a
+ * server: the file resolves exactly as it did before, every URL already stored
+ * keeps working, and none of these choices needed a column.
+ */
+/** Which screens a piece of hero media is for. Null means both. */
+export type Screens = "desktop" | "mobile" | null;
+
+export type MediaHints = {
+  src: string;
+  /** How it is framed on a wide screen. */
+  focus: Focus;
+  /**
+   * How it is framed on a narrow one.
+   *
+   * A photograph cropped to fill a laptop and cropped to fill a phone are two
+   * different pictures — a 16:9 slice of a portrait shot keeps the waist and
+   * loses the face, and the same file in a 9:16 frame keeps the whole model.
+   * The shop is the only one who knows which part matters in each, so it
+   * chooses twice.
+   */
+  mobileFocus: Focus;
+  /**
+   * Or it simply isn't for both. Some shots only work wide and some only work
+   * tall, and hiding the wrong one beats cropping it into something nobody
+   * would have chosen.
+   */
+  screens: Screens;
+  /** Seconds, when the shop has trimmed the clip. */
+  trim: { start: number; end: number } | null;
+  poster: string | null;
+};
+
+function seconds(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+const BLANK: Omit<MediaHints, "src"> = {
+  focus: "center",
+  mobileFocus: "center",
+  screens: null,
+  trim: null,
+  poster: null,
+};
+
+export function readHints(url: string): MediaHints {
+  const at = url.indexOf("#");
+  if (at === -1) return { src: url, ...BLANK };
+
+  const src = url.slice(0, at);
+  const params = new URLSearchParams(url.slice(at + 1));
+
+  const wantedFocus = params.get("pos") ?? "";
+  const wantedMobile = params.get("mpos") ?? "";
+  const [start, end] = (params.get("t") ?? "").split(",");
+  const from = seconds(start);
+  const to = seconds(end);
+  const poster = params.get("poster");
+  const on = params.get("on");
+
+  const focus = isFocus(wantedFocus) ? wantedFocus : "center";
+
+  return {
+    src,
+    focus,
+    // Unset, a narrow screen frames it the way a wide one does — which is what
+    // every picture uploaded before this existed should keep doing.
+    mobileFocus: isFocus(wantedMobile) ? wantedMobile : focus,
+    screens: on === "desktop" || on === "mobile" ? on : null,
+    trim: from !== null && to !== null && to > from ? { start: from, end: to } : null,
+    poster: poster || null,
+  };
+}
+
+/** Rebuilds a URL from its file and whatever the shop has chosen about it. */
+export function withHints(
+  url: string,
+  next: Partial<Omit<MediaHints, "src">>,
+): string {
+  const current = readHints(url);
+  const merged = { ...current, ...next };
+
+  const params = new URLSearchParams();
+  if (merged.focus !== "center") params.set("pos", merged.focus);
+  // Only when it differs — a mobile crop that matches the desktop one is the
+  // default, and writing it would put a fragment on every URL for nothing.
+  if (merged.mobileFocus !== merged.focus) {
+    params.set("mpos", merged.mobileFocus);
+  }
+  if (merged.screens) params.set("on", merged.screens);
+  if (merged.trim) {
+    params.set("t", `${round(merged.trim.start)},${round(merged.trim.end)}`);
+  }
+  if (merged.poster) params.set("poster", merged.poster);
+
+  const fragment = params.toString();
+  return fragment ? `${merged.src}#${fragment}` : merged.src;
+}
+
+function round(value: number): number {
+  return Math.max(Math.round(value * 10) / 10, 0);
+}
+
+/** Splits a stored URL into the file and how it should be framed. */
+export function readFocus(url: string): { src: string; focus: Focus } {
+  const { src, focus } = readHints(url);
+  return { src, focus };
+}
+
+/** Stores a framing choice on a URL. Centre is the default, so it stores none. */
+export function withFocus(url: string, focus: Focus): string {
+  return withHints(url, { focus });
+}
+
+/** The CSS for a framing choice. */
+export function objectPosition(focus: Focus): string {
+  return FOCUS_POSITIONS[focus];
 }
 
 export const ACCEPTED_IMAGE_TYPES = [
@@ -26,10 +218,44 @@ export const ACCEPTED_VIDEO_TYPES = [
   "video/quicktime",
 ];
 
+/** What may be stored, and so what the upload endpoint will sign for. */
 export const ACCEPTED_MEDIA_TYPES = [
   ...ACCEPTED_IMAGE_TYPES,
   ...ACCEPTED_VIDEO_TYPES,
 ];
+
+/**
+ * HEIC — what an iPhone actually takes photographs in.
+ *
+ * It is missing from the list above on purpose: half the browsers in the world
+ * can't display one, so a HEIC that reached the storefront would be a broken
+ * picture for the shopper rather than a photograph. It is converted in the
+ * browser before it is uploaded (see `@/lib/upload-client`), and what lands in
+ * storage is a WebP like everything else.
+ *
+ * The extensions matter as much as the types: asked for a `.heic`, Chrome on
+ * Windows hands over a file whose `type` is the empty string.
+ */
+export const HEIC_TYPES = ["image/heic", "image/heif", "image/heic-sequence"];
+const HEIC_EXTENSIONS = [".heic", ".heif"];
+
+export function isHeicFile(file: { name: string; type: string }): boolean {
+  if (HEIC_TYPES.includes(file.type.toLowerCase())) return true;
+  const name = file.name.toLowerCase();
+  return HEIC_EXTENSIONS.some((extension) => name.endsWith(extension));
+}
+
+/** What a file picker will let someone choose — storable, or convertible. */
+export const PICKABLE_MEDIA_TYPES = [
+  ...ACCEPTED_MEDIA_TYPES,
+  ...HEIC_TYPES,
+  ...HEIC_EXTENSIONS,
+];
+
+/** The picker's filter, which a `type` of "" must still be able to pass. */
+export function isPickableMedia(file: { name: string; type: string }): boolean {
+  return ACCEPTED_MEDIA_TYPES.includes(file.type) || isHeicFile(file);
+}
 
 /** Matches Supabase Storage's default per-file ceiling. */
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;

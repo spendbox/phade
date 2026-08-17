@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
 
 import { Media } from "@/components/shop/media";
 import { useShop } from "@/components/shop/shop-provider";
@@ -13,8 +13,20 @@ import type { ShopProduct } from "@/lib/shop";
  *
  * One frame at a time, snapped, swiped with a thumb — the browser does the
  * scrolling, so it has the momentum and the rubber-banding a hand-written
- * carousel never quite gets right. Dots say how many there are. Arrows appear
- * for a cursor, which cannot swipe.
+ * carousel never quite gets right. It has no arrows of its own: the pop-up
+ * already carries a pair for moving along the row of products, and a second
+ * pair a few pixels away, meaning something else entirely, is how a shopper
+ * ends up on a dress they never asked to see.
+ *
+ * A mouse can't swipe, so it gets two ways in instead of a second pair of
+ * chevrons: the frame drags under the cursor like a photograph on a table, and
+ * the dots that show the position are also the way to jump to one.
+ *
+ * Whatever says "there are more pictures" has to say it over the pictures
+ * themselves, and fashion photography is mostly white studio wall. Plain white
+ * dots disappear into it, so the count and the dots each sit on a dark pill of
+ * their own: the same cue on a black leather bag and on an ivory abaya shot
+ * against paper.
  *
  * Double-tapping saves the product, because that is what double-tapping a
  * photo has meant for a decade, and a shopper should not have to be told.
@@ -44,20 +56,29 @@ export function ProductGallery({
 
     const onScroll = () => {
       const width = element.clientWidth || 1;
-      setIndex(Math.round(element.scrollLeft / width));
+      const at = Math.round(element.scrollLeft / width);
+      // Rubber-banding at either end can scroll past the last frame.
+      setIndex(Math.min(Math.max(at, 0), element.children.length - 1));
     };
     element.addEventListener("scroll", onScroll, { passive: true });
     return () => element.removeEventListener("scroll", onScroll);
   }, []);
 
-  function go(step: number) {
+  /** Jumps to a frame — what the dots do, and what a keyboard gets. */
+  function goTo(position: number) {
     const element = rail.current;
     if (!element) return;
-    const target = Math.min(Math.max(index + step, 0), media.length - 1);
-    element.scrollTo({ left: element.clientWidth * target, behavior: "smooth" });
+    element.scrollTo({
+      left: element.clientWidth * position,
+      behavior: "smooth",
+    });
   }
 
-  function onPointerUp() {
+  function onPointerUp(event: React.PointerEvent) {
+    // A mouse that has just dragged the picture across is not tapping it.
+    if (drag.current.moved > 6) return;
+    if (event.pointerType === "mouse" && event.detail > 1) return;
+
     const now = Date.now();
     if (now - lastTap.current < 320) {
       if (!saved) toggleSaved(product.id);
@@ -68,18 +89,74 @@ export function ProductGallery({
     lastTap.current = now;
   }
 
+  // ---- drag the picture, for a pointer that can't swipe ---------------------
+  const drag = useRef({ on: false, startX: 0, from: 0, moved: 0 });
+
+  function onPointerDown(event: React.PointerEvent) {
+    drag.current.moved = 0;
+    const element = rail.current;
+    if (event.pointerType !== "mouse" || !element) return;
+    drag.current = {
+      on: true,
+      startX: event.clientX,
+      from: element.scrollLeft,
+      moved: 0,
+    };
+    // Mandatory snapping and a drag are the same argument: every pixel between
+    // two frames is a position the browser instantly pulls back out of, so the
+    // picture wouldn't follow the cursor at all. Snapping comes back the
+    // moment it is let go, which is when it has something to do.
+    element.style.scrollSnapType = "none";
+  }
+
+  function onPointerMove(event: React.PointerEvent) {
+    const element = rail.current;
+    if (!drag.current.on || !element) return;
+    const by = event.clientX - drag.current.startX;
+    drag.current.moved = Math.max(drag.current.moved, Math.abs(by));
+    // Instant, or every frame of the drag would be animated a beat behind
+    // the cursor it is supposed to be following.
+    element.scrollTo({ left: drag.current.from - by, behavior: "instant" });
+  }
+
+  function endDrag() {
+    const element = rail.current;
+    if (!drag.current.on || !element) return;
+    drag.current.on = false;
+
+    // Read where the drag ended before snapping is turned back on: restoring
+    // it makes the browser jump to a frame of its own choosing, and reading
+    // afterwards would only ever find the one it had already picked.
+    const landed = Math.min(
+      Math.max(Math.round(element.scrollLeft / (element.clientWidth || 1)), 0),
+      media.length - 1,
+    );
+
+    element.style.scrollSnapType = "";
+    goTo(landed);
+  }
+
   return (
     <div className={cn("relative bg-canvas-deep", className)}>
-      <div ref={rail} className="rail size-full" onPointerUp={onPointerUp}>
+      <div
+        ref={rail}
+        className="rail rail-frames size-full"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerLeave={endDrag}
+        onPointerUpCapture={endDrag}
+        onPointerUp={onPointerUp}
+        onDragStart={(event) => event.preventDefault()}
+      >
         {media.map((url, position) => (
           <div key={`${url}-${position}`} className="h-full w-full">
             <Media
               url={url || null}
               alt={`${product.name}, image ${position + 1}`}
               priority={position === 0}
-              autoPlay={position === 0}
+              autoPlay={position === index}
               sizes="(min-width: 640px) 55vw, 100vw"
-              className="size-full"
+              className="size-full select-none"
             />
           </div>
         ))}
@@ -106,58 +183,38 @@ export function ProductGallery({
 
       {media.length > 1 && (
         <>
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
-            {media.map((url, position) => (
-              <span
-                key={`dot-${url}-${position}`}
-                className={cn(
-                  "h-1.5 rounded-full transition-all",
-                  position === index ? "w-4 bg-white" : "w-1.5 bg-white/55",
-                )}
-              />
-            ))}
+          {/* The dots are also the controls. They already say where you are,
+              and a cursor needs somewhere to press that isn't another arrow. */}
+          <div className="absolute inset-x-0 bottom-3 flex justify-center">
+            <span className="flex items-center gap-0.5 rounded-full bg-noir/55 px-1.5 py-0.5 backdrop-blur-sm">
+              {media.map((url, position) => (
+                <button
+                  key={`dot-${url}-${position}`}
+                  type="button"
+                  onClick={() => goTo(position)}
+                  onPointerUp={(event) => event.stopPropagation()}
+                  aria-label={`Picture ${position + 1}`}
+                  aria-current={position === index}
+                  className="flex h-6 items-center px-1"
+                >
+                  <span
+                    className={cn(
+                      "block h-1.5 rounded-full transition-all",
+                      position === index ? "w-4 bg-white" : "w-1.5 bg-white/60",
+                    )}
+                  />
+                </button>
+              ))}
+            </span>
           </div>
 
-          <Arrow side="left" onClick={() => go(-1)} disabled={index === 0} />
-          <Arrow
-            side="right"
-            onClick={() => go(1)}
-            disabled={index === media.length - 1}
-          />
+          {/* The count, not just the position: "1/5" is what tells a shopper
+              there is anything to swipe to in the first place. */}
+          <span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-noir/55 px-2 py-1 text-[11px] font-semibold tabular-nums text-white backdrop-blur-sm">
+            {Math.min(index + 1, media.length)}/{media.length}
+          </span>
         </>
       )}
     </div>
-  );
-}
-
-function Arrow({
-  side,
-  onClick,
-  disabled,
-}: {
-  side: "left" | "right";
-  onClick: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      // Two quick clicks on an arrow are two clicks on an arrow, not a
-      // double-tap on the photo behind it.
-      onPointerUp={(event) => event.stopPropagation()}
-      disabled={disabled}
-      aria-label={side === "left" ? "Previous image" : "Next image"}
-      className={cn(
-        "absolute top-1/2 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full bg-canvas/80 text-noir backdrop-blur transition hover:bg-canvas disabled:opacity-0 sm:flex",
-        side === "left" ? "left-2" : "right-2",
-      )}
-    >
-      {side === "left" ? (
-        <ChevronLeft className="size-5" aria-hidden />
-      ) : (
-        <ChevronRight className="size-5" aria-hidden />
-      )}
-    </button>
   );
 }

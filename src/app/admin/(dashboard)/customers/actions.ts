@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { actionError, requireAdmin } from "@/lib/guard";
+import { actionError, requireOwner } from "@/lib/guard";
 import { requireSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/types";
 
@@ -13,7 +13,7 @@ export async function saveCustomer(
   formData: FormData,
 ): Promise<CustomerFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const id = String(formData.get("id") ?? "");

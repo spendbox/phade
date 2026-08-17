@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { actionError, requireAdmin } from "@/lib/guard";
+import { actionError, requireOwner } from "@/lib/guard";
 import { isPaystackConfigured, listTransactions } from "@/lib/paystack";
 import { recordTransaction } from "@/lib/record-payment";
 import { requireSupabase } from "@/lib/supabase";
@@ -22,7 +22,7 @@ export async function syncPaystack(
   _formData: FormData,
 ): Promise<SyncState> {
   try {
-    await requireAdmin();
+    await requireOwner();
 
     if (!isPaystackConfigured()) {
       throw new Error(

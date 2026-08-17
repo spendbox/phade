@@ -2,11 +2,11 @@
 
 import { revalidate } from "@/lib/admin-revalidate";
 
-import { actionError, requireAdmin } from "@/lib/guard";
+import { actionError, requireOwner } from "@/lib/guard";
 import {
   CATALOGUE_KEY,
   parseColorList,
-  parseSizeList,
+  parseRuns,
   type CatalogueDefaults,
 } from "@/lib/catalogue-settings";
 import { nairaToKobo } from "@/lib/format";
@@ -17,6 +17,7 @@ import {
   type ShippingSettings,
 } from "@/lib/shipping";
 import {
+  CONTACT_HREF,
   parseStorefront,
   STOREFRONT_KEY,
   type StorefrontContent,
@@ -31,7 +32,7 @@ export async function saveSettings(
   formData: FormData,
 ): Promise<SettingsFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const threshold = Number.parseInt(
@@ -62,6 +63,23 @@ export async function saveSettings(
 
 export type StorefrontFormState = ActionResult | { ok: null };
 
+/**
+ * The front page's sections, named the same way in the form, in the parser and
+ * in the stored row — so adding one is a field named `<key>_heading` and
+ * nothing else.
+ */
+const SECTION_KEYS = [
+  "collections",
+  "featured",
+  "newIn",
+  "bestSellers",
+  "closing",
+] as const;
+
+function text(formData: FormData, key: string): string {
+  return String(formData.get(key) ?? "").trim();
+}
+
 function jsonList(formData: FormData, key: string): string[] {
   try {
     const parsed: unknown = JSON.parse(String(formData.get(key) ?? "[]"));
@@ -84,24 +102,47 @@ function socialLinks(formData: FormData): { platform: string; url: string }[] {
   }
 }
 
+function menuLinks(formData: FormData): { label: string; href: string }[] {
+  try {
+    const parsed: unknown = JSON.parse(String(formData.get("menu") ?? "[]"));
+    return Array.isArray(parsed)
+      ? (parsed as { label: string; href: string }[])
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function saveStorefront(
   _previous: StorefrontFormState,
   formData: FormData,
 ): Promise<StorefrontFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     const headline = String(formData.get("hero_headline") ?? "").trim();
     if (!headline) throw new Error("The hero needs a headline.");
 
-    const ctaHref = String(formData.get("hero_cta_href") ?? "").trim();
+    const ctaHref = text(formData, "hero_cta_href");
+
     // Only same-site paths and full URLs — a bare word would send shoppers
     // somewhere the browser resolves unpredictably.
-    if (ctaHref && !/^(\/|https?:\/\/)/.test(ctaHref)) {
-      throw new Error(
-        "The button link must start with / for a page on this site, or https:// for somewhere else.",
-      );
+    for (const link of [
+      ctaHref,
+      text(formData, "about_cta_href"),
+      ...SECTION_KEYS.map((key) => text(formData, `${key}_cta_href`)),
+      // `#contact` opens the message pop-up rather than going anywhere, so it
+      // is the one menu destination that isn't an address.
+      ...menuLinks(formData)
+        .map((link) => link.href)
+        .filter((href) => href !== CONTACT_HREF),
+    ]) {
+      if (link && !/^(\/|https?:\/\/)/.test(link)) {
+        throw new Error(
+          "A button link must start with / for a page on this site, or https:// for somewhere else.",
+        );
+      }
     }
 
     const content: StorefrontContent = {
@@ -112,11 +153,38 @@ export async function saveStorefront(
       heroImages: jsonList(formData, "hero_images"),
       heroCtaLabel: String(formData.get("hero_cta_label") ?? "").trim(),
       heroCtaHref: ctaHref,
-      featuredHeading: String(formData.get("featured_heading") ?? "").trim(),
       featuredProductIds: String(formData.get("featured_product_ids") ?? "")
         .split(",")
         .map((id) => id.trim())
         .filter(Boolean),
+      // Parsed rather than assigned: a heading cleared to nothing takes its
+      // default back, and the same guard the storefront reads through is the
+      // one that decides what a blank field means.
+      sections: parseStorefront({
+        sections: Object.fromEntries(
+          SECTION_KEYS.map((key) => [
+            key,
+            {
+              heading: text(formData, `${key}_heading`),
+              note: text(formData, `${key}_note`),
+              ctaLabel: text(formData, `${key}_cta_label`),
+              ctaHref: text(formData, `${key}_cta_href`),
+            },
+          ]),
+        ),
+      }).sections,
+      about: parseStorefront({
+        about: {
+          enabled: formData.get("about_enabled") === "on",
+          eyebrow: text(formData, "about_eyebrow"),
+          heading: text(formData, "about_heading"),
+          body: text(formData, "about_body"),
+          ctaLabel: text(formData, "about_cta_label"),
+          ctaHref: text(formData, "about_cta_href"),
+          mediaUrl: jsonList(formData, "about_media")[0] ?? "",
+          posterUrl: jsonList(formData, "about_poster")[0] ?? "",
+        },
+      }).about,
       // One word per line is easier to edit than a comma-separated string, and
       // it can't be broken by a word that contains a comma.
       marquee: String(formData.get("marquee") ?? "")
@@ -124,6 +192,19 @@ export async function saveStorefront(
         .map((word) => word.trim())
         .filter(Boolean)
         .slice(0, 20),
+      // The menu and the support details go through the same parser the shop
+      // front reads them with, so a line with no words or a WhatsApp number
+      // with no digits is dropped here rather than half-rendered there.
+      menu: parseStorefront({ menu: menuLinks(formData) }).menu,
+      shopNote: text(formData, "shop_note"),
+      support: parseStorefront({
+        support: {
+          email: text(formData, "support_email"),
+          whatsappEnabled: formData.get("whatsapp_enabled") === "on",
+          whatsappNumber: text(formData, "whatsapp_number"),
+          note: text(formData, "support_note"),
+        },
+      }).support,
       footerBlurb: String(formData.get("footer_blurb") ?? "").trim(),
       socials: parseStorefront({ socials: socialLinks(formData) }).socials,
     };
@@ -158,14 +239,14 @@ export async function saveCatalogue(
   formData: FormData,
 ): Promise<CatalogueFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     let rawColors: unknown = [];
-    let rawSizes: unknown = [];
+    let rawRuns: unknown = [];
     try {
       rawColors = JSON.parse(String(formData.get("colors") ?? "[]"));
-      rawSizes = JSON.parse(String(formData.get("sizes") ?? "[]"));
+      rawRuns = JSON.parse(String(formData.get("runs") ?? "[]"));
     } catch {
       throw new Error("Couldn't read those values. Try again.");
     }
@@ -175,10 +256,14 @@ export async function saveCatalogue(
       throw new Error("Keep at least one colour in the palette.");
     }
 
-    const content: CatalogueDefaults = {
-      colors,
-      sizes: parseSizeList(rawSizes),
-    };
+    const runs = parseRuns(rawRuns);
+    // A run with no name or no sizes is dropped by the parser rather than
+    // stored half-made; saying so beats a silent disappearance.
+    if (Array.isArray(rawRuns) && rawRuns.length > 0 && runs.length === 0) {
+      throw new Error("Give every size run a name and at least one size.");
+    }
+
+    const content: CatalogueDefaults = { colors, runs };
 
     const { error } = await supabase.from("app_settings").upsert(
       {
@@ -215,12 +300,18 @@ export async function saveShipping(
   formData: FormData,
 ): Promise<ShippingFormState> {
   try {
-    await requireAdmin();
+    await requireOwner();
     const supabase = requireSupabase();
 
     let rawZones: unknown = [];
+    let rawPlaces: unknown = [];
+    let rawEta: unknown = null;
+    let rawLagosEta: unknown = null;
     try {
       rawZones = JSON.parse(String(formData.get("zones") ?? "[]"));
+      rawPlaces = JSON.parse(String(formData.get("pickup_locations") ?? "[]"));
+      rawEta = JSON.parse(String(formData.get("eta") ?? "null"));
+      rawLagosEta = JSON.parse(String(formData.get("lagos_eta") ?? "null"));
     } catch {
       throw new Error("Couldn't read those zones. Try again.");
     }
@@ -228,10 +319,26 @@ export async function saveShipping(
     if (Array.isArray(rawZones)) {
       for (const zone of rawZones as Record<string, unknown>[]) {
         const named = typeof zone?.name === "string" && zone.name.trim();
-        const covers = Array.isArray(zone?.states) && zone.states.length > 0;
+        // Either whole states, or named parts of Lagos — but something.
+        const covers =
+          (Array.isArray(zone?.states) && zone.states.length > 0) ||
+          (Array.isArray(zone?.areas) && zone.areas.length > 0);
         if (!named || !covers) {
           throw new Error(
-            "Every zone needs a name and at least one state. Remove the empty one, or fill it in.",
+            "Every zone needs a name and somewhere it covers. Remove the empty one, or fill it in.",
+          );
+        }
+      }
+    }
+
+    if (Array.isArray(rawPlaces)) {
+      for (const place of rawPlaces as Record<string, unknown>[]) {
+        const named = typeof place?.name === "string" && place.name.trim();
+        const located =
+          typeof place?.address === "string" && place.address.trim();
+        if (!named || !located) {
+          throw new Error(
+            "A pickup address needs a name and an address. Remove the empty one, or fill it in.",
           );
         }
       }
@@ -239,10 +346,14 @@ export async function saveShipping(
 
     const content: ShippingSettings = parseShipping({
       defaultFeeKobo: nairaToKobo(String(formData.get("default_fee") ?? "")),
+      lagosFeeKobo: nairaToKobo(String(formData.get("lagos_fee") ?? "")),
       freeOverKobo: nairaToKobo(String(formData.get("free_over") ?? "")),
       zones: rawZones,
+      eta: rawEta,
+      lagosEta: rawLagosEta,
       pickupEnabled: formData.get("pickup_enabled") === "on",
       pickupNote: String(formData.get("pickup_note") ?? "").trim(),
+      pickupLocations: rawPlaces,
     });
 
     const { error } = await supabase.from("app_settings").upsert(

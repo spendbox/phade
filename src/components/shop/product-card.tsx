@@ -2,8 +2,11 @@
 
 import { Heart, Plus } from "lucide-react";
 
+import { Morph, useConfirmed } from "@/components/shop/confirm";
 import { Media } from "@/components/shop/media";
+import { Rail } from "@/components/shop/rail";
 import { useShop } from "@/components/shop/shop-provider";
+import { posterFor } from "@/lib/media";
 import { cn } from "@/lib/cn";
 import { formatNairaShort } from "@/lib/format";
 import { isNewIn, percentOff, type ShopProduct } from "@/lib/shop";
@@ -23,14 +26,18 @@ import { isNewIn, percentOff, type ShopProduct } from "@/lib/shop";
  */
 export function ProductCard({
   product,
+  siblings,
   priority = false,
   className,
 }: {
   product: ShopProduct;
+  /** The grid or rail this card sits in, so the pop-up can be swiped along it. */
+  siblings?: ShopProduct[];
   priority?: boolean;
   className?: string;
 }) {
   const { openProduct, isSaved, toggleSaved, addToBag } = useShop();
+  const [added, confirm] = useConfirmed();
 
   const off = percentOff(product);
   const soldOut = product.stock <= 0;
@@ -47,28 +54,21 @@ export function ProductCard({
       <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-canvas-deep">
         <Media
           url={product.media[0]}
+          poster={posterFor(product.media)}
           alt={product.name}
           priority={priority}
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 45vw"
           className="size-full transition-transform duration-500 group-hover:scale-[1.04]"
         />
 
-        {product.media[1] && (
-          // The second photo on hover — the closest a mouse gets to turning a
-          // garment around. `hidden lg:block` is not styling: a phone has no
-          // hover, and without it every card in the grid downloads a second
-          // picture nobody can ever see.
-          <Media
-            url={product.media[1]}
-            alt=""
-            sizes="25vw"
-            className="absolute inset-0 hidden size-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 lg:block"
-          />
-        )}
+        {/* No second picture on hover. A tile that swaps its photograph as the
+            cursor crosses it makes a grid twitch on the way to somewhere else,
+            and the shot the shop chose to lead with is the one that should be
+            there when someone looks. The other pictures are a tap away. */}
 
         <button
           type="button"
-          onClick={() => openProduct(product)}
+          onClick={() => openProduct(product, siblings)}
           className="tap absolute inset-0 z-10 size-full"
           aria-label={`${product.name}, ${formatNairaShort(product.priceKobo)}`}
         />
@@ -111,17 +111,27 @@ export function ProductCard({
         {!soldOut && (
           <button
             type="button"
-            onClick={() =>
-              needsChoice ? openProduct(product) : addToBag({ product })
-            }
+            onClick={() => {
+              if (needsChoice) {
+                openProduct(product, siblings);
+                return;
+              }
+              addToBag({ product });
+              confirm();
+            }}
             aria-label={
               needsChoice
                 ? `Choose options for ${product.name}`
                 : `Add ${product.name} to bag`
             }
-            className="absolute bottom-2 right-2 z-30 flex size-9 items-center justify-center rounded-full bg-noir text-white shadow-lg transition hover:bg-brand active:scale-90"
+            className={cn(
+              "absolute bottom-2 right-2 z-30 flex size-9 items-center justify-center rounded-full text-white shadow-lg transition active:scale-90",
+              added ? "bg-brand" : "bg-noir hover:bg-brand",
+            )}
           >
-            <Plus className="size-4" aria-hidden />
+            <Morph confirming={added}>
+              <Plus className="size-4" aria-hidden />
+            </Morph>
           </button>
         )}
       </div>
@@ -159,17 +169,18 @@ export function ProductRail({
   priority?: boolean;
 }) {
   return (
-    <div className="rail rail-edge gap-3 px-4 pb-1 sm:gap-4 sm:px-6 lg:px-8">
+    <Rail className="gap-3 px-4 pb-1 sm:gap-4 sm:px-6 lg:px-8">
       {products.map((product, index) => (
         <ProductCard
           key={product.id}
           product={product}
+          siblings={products}
           priority={priority && index < 3}
           className="w-[45vw] max-w-[15rem] sm:w-52 lg:w-56"
         />
       ))}
       {/* A hair of room past the last card, so it can snap clear of the edge. */}
       <div className="w-1 shrink-0" aria-hidden />
-    </div>
+    </Rail>
   );
 }

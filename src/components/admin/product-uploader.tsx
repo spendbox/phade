@@ -11,6 +11,7 @@ import {
   Plus,
   Sparkles,
   Tag,
+  Scissors,
   Trash2,
   Upload,
   X,
@@ -23,8 +24,10 @@ import {
 import { ColorPicker } from "@/components/admin/color-picker";
 import { SizePicker } from "@/components/admin/size-picker";
 import { SelectField } from "@/components/ui/select-field";
-import type { CatalogueDefaults } from "@/lib/catalogue-settings";
+import type { CatalogueDefaults } from "@/lib/catalogue";
 import { MediaThumb } from "@/components/admin/media-thumb";
+import { UploadProgress } from "@/components/admin/upload-progress";
+import { VideoEditor } from "@/components/admin/video-editor";
 import { Button, buttonClass } from "@/components/ui/button";
 import {
   Field,
@@ -37,7 +40,7 @@ import {
 import { describeProduct, mergeTags, suggestTags } from "@/lib/ai-client";
 import { CategoryIcon } from "@/lib/category-icons";
 import { cn } from "@/lib/cn";
-import { ACCEPTED_MEDIA_TYPES } from "@/lib/media";
+import { isPickableMedia, isVideoUrl, PICKABLE_MEDIA_TYPES } from "@/lib/media";
 import { uploadMedia } from "@/lib/upload-client";
 import type { Category, ProductColor, ProductStatus } from "@/lib/types";
 
@@ -144,6 +147,10 @@ export function ProductUploader({
   const [showRestored, setShowRestored] = useState(Boolean(restored));
 
   const [uploading, setUploading] = useState(0);
+  /** What is going up right now, and how far. See `UploadProgress`. */
+  const [going, setGoing] = useState<{ id: number; name: string; at: number }[]>(
+    [],
+  );
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -189,10 +196,13 @@ export function ProductUploader({
     );
   }
 
+  /** The clip open in the trim editor, and the draft it belongs to. */
+  const [editing, setEditing] = useState<{ draftId: string; url: string } | null>(
+    null,
+  );
+
   async function handleFiles(files: FileList | File[]) {
-    const list = [...files].filter((file) =>
-      ACCEPTED_MEDIA_TYPES.includes(file.type),
-    );
+    const list = [...files].filter(isPickableMedia);
     if (list.length === 0) return;
 
     const target = addToDraftRef.current;
@@ -202,8 +212,14 @@ export function ProductUploader({
     setUploading((count) => count + list.length);
 
     for (const file of list) {
+      const id = Date.now() + Math.random();
+      setGoing((current) => [...current, { id, name: file.name, at: 0 }]);
       try {
-        const url = await uploadMedia(file);
+        const url = await uploadMedia(file, (at) =>
+          setGoing((current) =>
+            current.map((item) => (item.id === id ? { ...item, at } : item)),
+          ),
+        );
         if (target) {
           // Extra media for one product rather than a new product.
           setDrafts((current) =>
@@ -222,6 +238,7 @@ export function ProductUploader({
         );
       } finally {
         setUploading((count) => count - 1);
+        setGoing((current) => current.filter((item) => item.id !== id));
       }
     }
   }
@@ -309,7 +326,7 @@ export function ProductUploader({
       <input
         ref={fileInputRef}
         type="file"
-        accept={ACCEPTED_MEDIA_TYPES.join(",")}
+        accept={PICKABLE_MEDIA_TYPES.join(",")}
         multiple
         className="hidden"
         onChange={(event) => {
@@ -370,6 +387,23 @@ export function ProductUploader({
         </p>
       </div>
 
+      <UploadProgress going={going} />
+
+      {editing && (
+        <VideoEditor
+          url={editing.url}
+          open
+          onClose={() => setEditing(null)}
+          onSave={(next) =>
+            update(editing.draftId, {
+              media: (
+                drafts.find((draft) => draft.id === editing.draftId)?.media ?? []
+              ).map((item) => (item === editing.url ? next : item)),
+            })
+          }
+        />
+      )}
+
       {drafts.length === 0 ? (
         <Dropzone
           onFiles={handleFiles}
@@ -389,6 +423,21 @@ export function ProductUploader({
                       className="aspect-square w-full rounded-lg ring-1 ring-inset ring-line"
                       controls
                     />
+
+                    {/* One product at a time, as each is added: trim the clip
+                        and pick the frame it rests on before publishing. */}
+                    {isVideoUrl(draft.media[0]) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditing({ draftId: draft.id, url: draft.media[0] })
+                        }
+                        className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-plane text-xs font-medium text-ink transition hover:bg-line-strong"
+                      >
+                        <Scissors className="size-3.5" />
+                        Trim &amp; placeholder
+                      </button>
+                    )}
 
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {draft.media.slice(1).map((url) => (
@@ -831,7 +880,7 @@ function MoreDetails({
         <SizePicker
           name={`sizes-${draft.id}`}
           initial={draft.sizes}
-          options={defaults.sizes}
+          runs={defaults.runs}
           onChange={(sizes) => onChange({ sizes })}
         />
       </Field>
