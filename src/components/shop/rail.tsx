@@ -81,13 +81,23 @@ export function Rail({
 
     // The rail can stop overflowing without ever being scrolled — a rotated
     // phone, a font that finally loaded, a filter row that lost a chip.
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    for (const child of element.children) observer.observe(child);
+    // Both guarded rather than assumed. A rail that can't watch itself resize
+    // still scrolls and still fades on scroll — but an older browser throwing
+    // here would take the whole page down with it, because this runs on the
+    // front page and a thrown effect leaves React nothing to render.
+    const observer =
+      typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+
+    if (observer) {
+      observer.observe(element);
+      // `element.children` is an HTMLCollection, which older engines don't
+      // make iterable; the array copy is the version that works everywhere.
+      for (const child of Array.from(element.children)) observer.observe(child);
+    }
 
     return () => {
       element.removeEventListener("scroll", measure);
-      observer.disconnect();
+      observer?.disconnect();
     };
   }, [measure, children]);
 
