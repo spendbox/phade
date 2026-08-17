@@ -16,6 +16,11 @@ export type SyncState = ActionResult | { ok: null };
  * The webhook keeps things current in normal operation; this is the backfill
  * for a fresh deployment, and the repair path if a webhook delivery was ever
  * missed. Records upsert on reference, so running it twice changes nothing.
+ *
+ * It deliberately sends no order emails. A backfill can reach back months, and
+ * a shop connecting Paystack for the first time should not post a receipt to
+ * everyone who ever bought something. A single order that needs its email after
+ * a missed webhook can be settled from the order page instead.
  */
 export async function syncPaystack(
   _previous: SyncState,

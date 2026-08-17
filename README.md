@@ -354,6 +354,23 @@ A few decisions worth knowing:
   message to the shopper's own mail app, already written and addressed. A form
   that silently drops what somebody took the trouble to type is worse than one
   that takes an extra tap.
+- **An order emails twice, and only once.** A settled order sends a receipt to
+  the shopper and an alert to the shop. Both ride on the `pending → paid`
+  transition — the same one that takes stock off the shelf — so a redelivered
+  webhook, or the webhook racing the shopper's own return from Paystack, still
+  produces exactly one of each. The one order that never sees that transition
+  is the one with nothing to pay (no Paystack, or a coupon that covered the
+  bag), and it sends from the checkout instead. The Paystack backfill sends
+  nothing at all: it walks the last hundred transactions, and a shop connecting
+  Paystack for the first time should not post a receipt for a sale from March.
+- **Email copy is a setting; email structure is code.** Settings → Developers
+  edits the subject, heading and the paragraphs either side of each message.
+  The item table, the totals, the address block and the button are rendered by
+  `lib/order-email.ts`, and every editable field is escaped on its way into the
+  HTML — so a shop can rewrite every sentence and cannot produce a receipt that
+  arrives broken. There's a "send yourself one" button beside it that runs a
+  sample order through the real sender, because the alternative is finding out
+  from a customer.
 - **Cart tracking is opt-in and closed by default.** `/api/cart` is for a
   separate front end: it writes without an admin session, so it answers `501`
   until `STOREFRONT_API_KEY` is set and `401` to anyone who doesn't send it. Our

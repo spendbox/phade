@@ -1,6 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { sendOrderEmails } from "@/lib/order-email";
 import { mapPaystackStatus, type PaystackTransaction } from "@/lib/paystack";
+
+export type RecordOptions = {
+  /**
+   * Whether a newly paid order emails the customer and the shop.
+   *
+   * On for the live paths — the webhook, and the shopper landing back on their
+   * own order page — because a payment arriving there is a payment that just
+   * happened. Off for the Paystack backfill, which walks the last hundred
+   * transactions and would otherwise post a fresh receipt for a sale from
+   * three months ago the first time a shop runs it.
+   */
+  notify?: boolean;
+};
 
 /**
  * Writes one Paystack transaction into our tables.
@@ -12,6 +26,7 @@ import { mapPaystackStatus, type PaystackTransaction } from "@/lib/paystack";
 export async function recordTransaction(
   supabase: SupabaseClient,
   transaction: PaystackTransaction,
+  options: RecordOptions = {},
 ): Promise<void> {
   const email = transaction.customer?.email?.toLowerCase() ?? null;
   const status = mapPaystackStatus(transaction.status);
@@ -78,6 +93,11 @@ export async function recordTransaction(
     // coupon can't be counted twice either.
     await takeStock(supabase, orderId);
     await countCouponUse(supabase, orderId);
+
+    // The receipt rides on that same transition, which is what stops a
+    // redelivered webhook — or the order page and the webhook racing each
+    // other — from sending a customer two of them.
+    if (options.notify) await sendOrderEmails(supabase, orderId);
   }
 
   // 3. Payment — upsert on reference so redelivered webhooks don't duplicate.

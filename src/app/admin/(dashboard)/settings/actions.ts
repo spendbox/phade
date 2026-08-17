@@ -9,7 +9,13 @@ import {
   parseRuns,
   type CatalogueDefaults,
 } from "@/lib/catalogue-settings";
+import {
+  EMAIL_TEMPLATES_KEY,
+  parseEmailTemplates,
+  type EmailTemplates,
+} from "@/lib/email-templates";
 import { nairaToKobo } from "@/lib/format";
+import { sendTestOrderEmail } from "@/lib/order-email";
 import { SETTING_KEYS } from "@/lib/settings";
 import {
   parseShipping,
@@ -222,6 +228,98 @@ export async function saveStorefront(
     revalidate("/admin/settings/storefront");
     revalidate("/");
     return { ok: true, message: "Storefront updated." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export type EmailTemplatesFormState = ActionResult | { ok: null };
+
+/**
+ * The words in the order emails.
+ *
+ * Stored through the same parser the sender reads them with, so a field
+ * cleared to nothing takes our wording back here rather than reaching a
+ * customer as an empty subject line. The tokens are not validated: one that
+ * doesn't exist is left standing in the text, which is visible in the test
+ * email and fixable, where a rejected save would only be baffling.
+ */
+export async function saveEmailTemplates(
+  _previous: EmailTemplatesFormState,
+  formData: FormData,
+): Promise<EmailTemplatesFormState> {
+  try {
+    await requireOwner();
+    const supabase = requireSupabase();
+
+    const notifyEmail = text(formData, "notify_email");
+    if (notifyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notifyEmail)) {
+      throw new Error("That notification address doesn't look right.");
+    }
+
+    const content: EmailTemplates = parseEmailTemplates({
+      enabled: formData.get("emails_enabled") === "on",
+      shopName: text(formData, "shop_name"),
+      notifyEmail,
+      customer: {
+        subject: text(formData, "customer_subject"),
+        heading: text(formData, "customer_heading"),
+        intro: text(formData, "customer_intro"),
+        outro: text(formData, "customer_outro"),
+      },
+      shop: {
+        subject: text(formData, "shop_subject"),
+        heading: text(formData, "shop_heading"),
+        intro: text(formData, "shop_intro"),
+        outro: text(formData, "shop_outro"),
+      },
+    });
+
+    const { error } = await supabase.from("app_settings").upsert(
+      {
+        key: EMAIL_TEMPLATES_KEY,
+        value: content,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" },
+    );
+    if (error) throw new Error(error.message);
+
+    revalidate("/admin/settings/developers");
+    return { ok: true, message: "Email templates saved." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export type TestEmailState = ActionResult | { ok: null };
+
+/**
+ * Sends one of the order emails, filled with a sample order, to the signed-in
+ * owner — so the whole chain can be proved before a real customer is the one
+ * testing it.
+ */
+export async function sendTestEmail(
+  _previous: TestEmailState,
+  formData: FormData,
+): Promise<TestEmailState> {
+  try {
+    const session = await requireOwner();
+
+    const which = formData.get("which") === "shop" ? "shop" : "customer";
+
+    // Their own sign-in unless they typed something — though a shop can sign in
+    // with a plain username, so it only stands in when it is an address.
+    const typed = text(formData, "test_to");
+    const to = typed || session.email;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      throw new Error("Type the address to send the test to.");
+    }
+
+    const result = await sendTestOrderEmail(which, to);
+    if (!result.ok) throw new Error(result.error);
+
+    return { ok: true, message: `Test sent to ${to}.` };
   } catch (error) {
     return actionError(error);
   }

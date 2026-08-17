@@ -2,6 +2,7 @@
 
 import { revalidate } from "@/lib/admin-revalidate";
 import { actionError, requireAdmin } from "@/lib/guard";
+import { sendOrderEmails } from "@/lib/order-email";
 import { takeStock } from "@/lib/record-payment";
 import { requireSupabase } from "@/lib/supabase";
 import {
@@ -79,6 +80,10 @@ export async function updateOrderStatus(formData: FormData): Promise<void> {
  *
  * Stock comes off at the same moment, through the same helper the webhook
  * uses, so a sale rung up by hand leaves the same trail as one taken online.
+ *
+ * The order emails go too, for the same reason: a customer who paid by
+ * transfer is owed the same receipt as one who paid by card, and this is also
+ * the way to get a receipt out after a webhook delivery was missed.
  */
 async function settleByHand(
   supabase: ReturnType<typeof requireSupabase>,
@@ -107,6 +112,7 @@ async function settleByHand(
   );
 
   await takeStock(supabase, order.id);
+  await sendOrderEmails(supabase, order.id);
 }
 
 export async function saveOrderNote(

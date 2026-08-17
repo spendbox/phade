@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 
 import { saveCart } from "@/lib/cart-store";
 import { checkCouponAgainst, type CouponLine } from "@/lib/coupons";
+import { sendOrderEmails } from "@/lib/order-email";
 import { initializeTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { getProductsForPricing } from "@/lib/shop-queries";
 import {
@@ -464,7 +465,12 @@ export async function placeOrder(
     // No payment provider connected yet, or a coupon that covered the whole
     // bag: either way there is nothing for Paystack to collect. The order
     // still lands, and the confirmation page says how it will be settled.
+    //
+    // This is the one path where an order is finished without a payment ever
+    // arriving, so the emails go from here. Everywhere else they ride on the
+    // pending -> paid transition, which is why a card order can't get two.
     if (!isPaystackConfigured() || total <= 0) {
+      await sendOrderEmails(supabase, orderId);
       return { ok: true, redirect: `/order/${reference}` };
     }
 
