@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await recordTransaction(supabase, event.data);
+    await recordTransaction(supabase, event.data, { notify: true });
   } catch {
     // A 5xx makes Paystack retry, which is what we want for a transient fault.
     return NextResponse.json({ error: "Could not record." }, { status: 500 });

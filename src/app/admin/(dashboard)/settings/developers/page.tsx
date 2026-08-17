@@ -1,9 +1,13 @@
 import { Check, Minus } from "lucide-react";
 
+import { EmailTemplatesForm } from "@/components/admin/email-templates-form";
 import { Panel } from "@/components/ui/stat-tile";
 import { adminCredentialsState } from "@/lib/auth";
 import { cn } from "@/lib/cn";
+import { isEmailConfigured, isSenderVerified } from "@/lib/email";
+import { getEmailTemplates } from "@/lib/email-templates";
 import { isPaystackConfigured } from "@/lib/paystack";
+import { getStorefront } from "@/lib/storefront";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +16,10 @@ export const metadata = { title: "Developers · Settings" };
 export default async function DevelopersSettingsPage() {
   const credentials = adminCredentialsState();
   const configured = isSupabaseConfigured();
+  const [templates, storefront] = await Promise.all([
+    getEmailTemplates(),
+    getStorefront(),
+  ]);
 
   const integrations = [
     {
@@ -43,11 +51,12 @@ export default async function DevelopersSettingsPage() {
         "Powers the write/improve buttons on product and category descriptions, and tag suggestions. OPENAI_MODEL is optional and defaults to gpt-4o-mini.",
     },
     {
-      name: "Messages from the shop front",
-      ready: Boolean(process.env.RESEND_API_KEY),
-      variables: ["RESEND_API_KEY", "CONTACT_FROM"],
-      detail:
-        "Sends the “Here to help” form to the address set in Settings → Storefront. Until it is set, the form hands the message to the shopper's own mail app instead — nothing is lost, it just takes them one more tap. CONTACT_FROM is optional and must be an address on a domain verified with Resend.",
+      name: "Email — Resend",
+      ready: isEmailConfigured(),
+      variables: ["RESEND_API_KEY", "CONTACT_FROM", "NEXT_PUBLIC_SITE_URL"],
+      detail: isSenderVerified()
+        ? "Sends order receipts, your own new-order alerts, and the “Here to help” form. CONTACT_FROM is the address they're sent from and must be on a domain verified with Resend. NEXT_PUBLIC_SITE_URL is optional and sets where the links in an email point."
+        : "Sends order receipts, your own new-order alerts, and the “Here to help” form. CONTACT_FROM is not set, so mail goes out from onboarding@resend.dev — fine for messages to yourself, wrong on a receipt. Verify a domain with Resend and set it to an address on that domain.",
     },
     {
       name: "Cart tracking",
@@ -103,6 +112,14 @@ export default async function DevelopersSettingsPage() {
             </li>
           ))}
         </ul>
+      </Panel>
+
+      <Panel title="Order emails">
+        <EmailTemplatesForm
+          templates={templates}
+          supportEmail={storefront.support.email}
+          canSend={isEmailConfigured()}
+        />
       </Panel>
 
       <Panel title="Webhook endpoint">

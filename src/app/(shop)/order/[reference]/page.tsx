@@ -45,7 +45,9 @@ export default async function OrderPage({
     const supabase = getSupabase();
     try {
       const transaction = await verifyTransaction(reference);
-      if (supabase) await recordTransaction(supabase, transaction);
+      if (supabase) {
+        await recordTransaction(supabase, transaction, { notify: true });
+      }
       order = (await getOrderByReference(reference)) ?? order;
     } catch {
       // Not paid yet, or Paystack is unreachable. The webhook will settle it,

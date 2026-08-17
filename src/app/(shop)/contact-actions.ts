@@ -1,5 +1,7 @@
 "use server";
 
+import { isEmailConfigured, sendEmail } from "@/lib/email";
+import { getEmailTemplates } from "@/lib/email-templates";
 import { getStorefront } from "@/lib/storefront";
 
 /**
@@ -49,33 +51,23 @@ export async function sendMessage(
   const subject = `Message from ${name}`;
   const text = `${body}\n\n—\n${name}\n${from}`;
 
-  const key = process.env.RESEND_API_KEY;
-  if (!key) {
+  if (!isEmailConfigured()) {
     return { ok: false, unsent: true, to: support.email, subject, body: text };
   }
 
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        // Sending as the shopper would be forged mail that never arrives;
-        // replying to them is the part that matters, and that is honest.
-        from: process.env.CONTACT_FROM ?? "onboarding@resend.dev",
-        to: [support.email],
-        reply_to: from,
-        subject,
-        text,
-      }),
-    });
+  const { shopName } = await getEmailTemplates();
 
-    if (!response.ok) {
-      return { ok: false, unsent: true, to: support.email, subject, body: text };
-    }
-  } catch {
+  const result = await sendEmail({
+    to: support.email,
+    subject,
+    text,
+    // Sending as the shopper would be forged mail that never arrives; replying
+    // to them is the part that matters, and that is honest.
+    replyTo: from,
+    fromName: shopName,
+  });
+
+  if (!result.ok) {
     return { ok: false, unsent: true, to: support.email, subject, body: text };
   }
 

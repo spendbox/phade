@@ -70,9 +70,6 @@ export function CollectionRail({
                 <span className="block truncate text-lg font-semibold tracking-tight text-white">
                   {category.name}
                 </span>
-                <span className="mt-0.5 block text-[11px] font-medium uppercase tracking-[0.16em] text-white/70">
-                  {category.count} piece{category.count === 1 ? "" : "s"}
-                </span>
               </span>
 
               <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/90 text-noir transition group-hover:bg-white">
