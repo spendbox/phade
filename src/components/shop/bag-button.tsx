@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
 
 import { useShop } from "@/components/shop/shop-provider";
@@ -18,12 +19,19 @@ import { formatNairaShort } from "@/lib/format";
  * fixed at the bottom and one of its four items is the bag, so a button that
  * covered it would hide the thing it duplicates. On a wider screen there is no
  * tab bar, and it drops to the corner.
+ *
+ * It has nothing to offer at the checkout, where the bag is already the page
+ * and the only button that matters is the one that pays — so there it is a
+ * shortcut back to what you are looking at, sitting on top of the form.
  */
 export function BagButton() {
   const { count, subtotalKobo, openBag, bagOpen, viewing, ready } = useShop();
+  const pathname = usePathname();
 
-  // Nothing to show, or something already showing it: stay out of the way.
+  // Nothing to show, somewhere already showing it, or a page that is itself
+  // the bag: stay out of the way.
   if (!ready || count === 0 || bagOpen || viewing) return null;
+  if (pathname === "/checkout") return null;
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 flex justify-end px-4 pb-3 lg:bottom-0 lg:px-6 lg:pb-6">

@@ -56,21 +56,42 @@ export default async function OrderPage({
   }
 
   const paid = order.status !== "pending" && order.status !== "cancelled";
+
+  // An order nobody can pay for online — a coupon that covered the whole bag,
+  // or a shop with no payment provider connected — never leaves `pending`, so
+  // "paid" would leave those shoppers carrying a bag they had already ordered.
+  // There is nothing for them to go back and retry, which is the only reason
+  // the bag is held onto in the first place.
+  const nothingToCollect = order.total_kobo <= 0 || !isPaystackConfigured();
+  const settled = paid || nothingToCollect;
+
+  // What actually happened, in the shopper's terms. "We haven't seen the
+  // payment land yet" is only true when there was a payment to wait for — a
+  // coupon that covered the bag, or a shop taking payment some other way, are
+  // finished orders and reading them as stuck is its own small panic.
+  const note = paid
+    ? `We've got your payment and we're getting it ready. A confirmation is on its way to ${order.customer?.email ?? "your email"}.`
+    : order.total_kobo <= 0
+      ? "Your coupon covered the whole order, so there was nothing left to pay. We're getting it ready now."
+      : !isPaystackConfigured()
+        ? "We've got your order and we're getting it ready. We'll be in touch about payment."
+        : "We haven't seen the payment land yet. If you've just paid, it usually appears within a minute — refresh this page. Nothing is charged twice.";
+
   const items = order.items ?? [];
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-      {paid && <ClearBag />}
+      {settled && <ClearBag />}
 
       <div className="rounded-3xl bg-canvas-deep/60 p-6 text-center sm:p-10">
         <span
           className={
-            paid
+            settled
               ? "mx-auto flex size-14 items-center justify-center rounded-full bg-good text-white"
               : "mx-auto flex size-14 items-center justify-center rounded-full bg-warning text-white"
           }
         >
-          {paid ? (
+          {settled ? (
             <Check className="size-7" aria-hidden />
           ) : (
             <Clock className="size-7" aria-hidden />
@@ -78,13 +99,11 @@ export default async function OrderPage({
         </span>
 
         <h1 className="mt-5 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          {paid ? "Thank you — that's ordered" : "Order received"}
+          {settled ? "Thank you — that's ordered" : "Order received"}
         </h1>
 
         <p className="mx-auto mt-2 max-w-md text-pretty text-sm text-ink-secondary">
-          {paid
-            ? `We've got your payment and we're getting it ready. A confirmation is on its way to ${order.customer?.email ?? "your email"}.`
-            : "We haven't seen the payment land yet. If you've just paid, it usually appears within a minute — refresh this page. Nothing is charged twice."}
+          {note}
         </p>
 
         <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-canvas px-4 py-2 text-[13px] text-ink-secondary">
